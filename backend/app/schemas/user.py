@@ -1,11 +1,40 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+import re
 
-#ตรวจจาก Frontend   
+#register จาก front
 class UserCreate(BaseModel):
     email: EmailStr
     username: str
     password: str
     full_name: str | None = None
+
+    #Validate Domain
+    @field_validator("email")
+    @classmethod 
+    def validate_ku_email(cls, email: EmailStr):
+        if not str(email).lower().endswith("@ku.th"):
+            raise ValueError("Email Must Be Use only @ku.th")
+        return email
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, password: str):
+        if len(password) < 8:
+            raise ValueError("Password must be longer or equal 8 characters")
+        
+        if not re.search(r"[A-Z]", password):
+            raise ValueError("Password must be have least 1 upper letter")
+
+        if not re.search(r"[a-z]", password):
+            raise ValueError("Password must be have least 1 lower letter")
+        
+        if not re.search(r"\d", password):
+            raise ValueError("Password must contain at least one number")
+
+        if not re.search(r"[^A-Za-z0-9]", password):
+            raise ValueError("Password must contain at least one special character")
+
+        return password
 
 #ส่งกลับ Backend
 class UserResponse(BaseModel):
@@ -17,3 +46,18 @@ class UserResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_ku_email(cls, email: EmailStr) -> EmailStr:
+        if not str(email).lower().endswith("@ku.th"):
+            raise ValueError("Email must be use @ku.th domain")
+        return email
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str

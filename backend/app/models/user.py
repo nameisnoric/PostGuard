@@ -11,43 +11,43 @@ class User(Base):
     __tablename__ = "users"
 #PK 
     id: Mapped[int] = mapped_column(
-        primary_key=True,
-        index=True
+        primary_key = True,
+        index = True
     )
 
     email: Mapped[str] = mapped_column(
         String(255),
-        unique=True,
-        index=True,
-        nullable=False
+        unique = True,
+        index = True,
+        nullable = False
     )
 
     username: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
-        index=True,
-        nullable=False
+        unique = True,
+        index = True,
+        nullable = False
     )
 
     password_hash: Mapped[str] = mapped_column(
         String(255),
-        nullable=False
+        nullable = False
     )
 
     full_name: Mapped[str | None] = mapped_column(
         String(150),
-        nullable=True
+        nullable = True
     )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        nullable=False
+        default = datetime.utcnow,
+        nullable = False
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False
+        default = datetime.utcnow,
+        onupdate = datetime.utcnow,
+        nullable = False
     )
