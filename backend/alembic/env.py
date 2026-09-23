@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from app.database.database import Base
 from app.models.user import User
+from app.models.password_reset import PasswordResetOTP
 
 from logging.config import fileConfig
 
