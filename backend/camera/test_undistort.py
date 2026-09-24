@@ -82,6 +82,15 @@ undistorted = cv.undistort(
     new_camera_matrix
 )
 
+output_image = os.path.join(
+    base_dir,
+    "undistorted_test.png"
+)
+
+cv.imwrite(output_image, undistorted)
+
+print("Saved:", output_image)
+
 # =========================
 # 5. Display
 # =========================
