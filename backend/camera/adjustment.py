@@ -1,5 +1,5 @@
 import cv2
-import apriltag
+from pupil_apriltags import Detector
 import numpy as np
 
 TAG_ID = 0
