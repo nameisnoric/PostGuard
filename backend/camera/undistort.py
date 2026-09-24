@@ -22,14 +22,17 @@ dist_coeff = np.array(
     dtype=np.float64
 )
 
+image_width = calibration["image_width"]
+image_height = calibration["image_height"]
+
 print("Camera Matrix: \n", camera_matrix)
-print("Distortion_coefficients: ", dist_coeff)
+print("Distortion_coefficients: \n", dist_coeff)
 
 cap = cv.VideoCapture(0)
 
 # ใช้ resolution เดียวกับตอน Calibration
-cap.set(cv.CAP_PROP_FRAME_WIDTH, 1024)
-cap.set(cv.CAP_PROP_FRAME_HEIGHT, 576)
+cap.set(cv.CAP_PROP_FRAME_WIDTH, image_width)
+cap.set(cv.CAP_PROP_FRAME_HEIGHT, image_height)
 
 new_camera_matrix, roi = cv.getOptimalNewCameraMatrix(
     camera_matrix,
@@ -44,6 +47,7 @@ while True:
     ret, frame = cap.read()
 
     if not ret:
+        print("Cannot read frame")
         break
 
     # Undistort frame
