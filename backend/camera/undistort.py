@@ -36,10 +36,10 @@ cap.set(cv.CAP_PROP_FRAME_HEIGHT, image_height)
 
 new_camera_matrix, roi = cv.getOptimalNewCameraMatrix(
     camera_matrix,
-    dist_coeffs,
-    (1024, 576),
+    dist_coeff,
+    (image_width, image_height),
     1,
-    (1024, 576)
+    (image_width, image_height)
 )
 
 while True:
@@ -54,7 +54,7 @@ while True:
     undistorted = cv.undistort(
         frame,
         camera_matrix,
-        dist_coeffs,
+        dist_coeff,
         None,
         new_camera_matrix
     )
