@@ -120,3 +120,24 @@ class ResetPasswordRequest(BaseModel):
             raise ValueError("Password must contain at least one special character")
         
         return password
+
+class RegistrationOTPRequest(UserCreate):
+    pass
+class RegistrationOTPVerify(BaseModel):
+    email : str
+    otp : str
+
+    @field_validator("email")
+    @classmethod
+    def validate_ku_email(cls, email: EmailStr) -> EmailStr:
+        if not str(email).lower().endswith("@ku.th"):
+            raise ValueError("Email must be use @ku.th domain")
+        return email
+
+    @field_validator("otp")
+    @classmethod  
+    def validate_otp(cls, otp: str) -> str:
+        if not otp.isdigit() or len(otp) != 6:
+            raise ValueError("OTP must be exactly 6 digits")
+        return otp
+    

@@ -33,3 +33,25 @@ def send_password_reset_otp(
             """
     }
     return resend.Emails.send(params)
+
+def send_registration_otp(
+    email: str,
+    otp: str
+):
+    params: resend.Email.SendParams = {
+        "from": "PostGuard <onboarding@resend.dev>",
+        "to": ["witsanu.e@ku.th"],
+        "subject": "PostGuard Email Verification Code",
+        "html": f"""
+            <h2>Welcome to PostGuard</h2>
+
+            <p>Your email verification code is:</p>
+
+            <h1>{otp}</h1>
+
+            <p>This code will expire in 5 minutes.</p>
+
+        """
+    }
+
+    return resend.Emails.send(params)

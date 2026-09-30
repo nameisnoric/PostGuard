@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.database import Base
@@ -33,10 +33,12 @@ class AlertEvent(Base):
     )
 
     started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False
     )
 
     ended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True
     )
 

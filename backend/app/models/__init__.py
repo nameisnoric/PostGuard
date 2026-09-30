@@ -5,3 +5,4 @@ from app.models.personal_baseline import PersonalBaseline
 from app.models.session import PostureSession
 from app.models.alert_event import AlertEvent
 from app.models.session_summary import SessionSummary
+from app.models.register_otp import RegistrationOTP
