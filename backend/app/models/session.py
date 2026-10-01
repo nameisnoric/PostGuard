@@ -45,6 +45,11 @@ class PostureSession(Base):
         DateTime(timezone=True),
         nullable=True
     )
+    
+    paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
 
     status: Mapped[str] = mapped_column(
         String(20),
@@ -66,3 +71,4 @@ class PostureSession(Base):
         nullable=False,
         default=0
     )
+
