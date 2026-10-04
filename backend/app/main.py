@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.database.database import engine
-from app.routers import auth, health, cameras, personal_baselines, sessions, alert_events
+from app.routers import auth, health, cameras, personal_baselines, sessions, alert_events, session_summaries
 
 app = FastAPI()
 
@@ -12,6 +12,7 @@ app.include_router(cameras.router)
 app.include_router(personal_baselines.router)
 app.include_router(sessions.router)
 app.include_router(alert_events.router)
+app.include_router(session_summaries.router)
 
 @app.get("/")
 def root():

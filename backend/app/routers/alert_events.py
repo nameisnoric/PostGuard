@@ -26,6 +26,7 @@ def create_alert_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 1. ตรวจสอบว่า Session มีอยู่และเป็นของ User คนนี้
     session_statement = select(PostureSession).where(
         PostureSession.session_id == session_id,
         PostureSession.user_id == current_user.id
@@ -39,31 +40,48 @@ def create_alert_event(
             detail="Session not found"
         )
 
+    # 2. สร้าง Alert ได้เฉพาะตอน Session กำลัง RUNNING
     if posture_session.status != "RUNNING":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Alerts can only be created during a running session"
         )
 
+    # 3. หา Alert ชนิดเดียวกันที่ยัง Active
     active_alert_statement = select(AlertEvent).where(
         AlertEvent.session_id == session_id,
-        AlertEvent.event_type == request.event_type,
+        AlertEvent.event_type == request.event_type.value,
         AlertEvent.ended_at.is_(None)
     )
 
     active_alert = db.scalar(active_alert_statement)
 
+    now = datetime.now(timezone.utc)
+
+    # 4. ถ้ามี Active Alert ชนิดเดียวกันอยู่แล้ว
     if active_alert is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An active alert of this type already exists"
+
+        # 4.1 Risk Level เหมือนเดิม → ไม่สร้างซ้ำ
+        if active_alert.risk_level == request.risk_level.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An active alert with the same type and risk level already exists"
+            )
+
+        # 4.2 Risk Level เปลี่ยน → ปิด Alert เก่า
+        duration_seconds = int(
+            (now - active_alert.started_at).total_seconds()
         )
 
+        active_alert.ended_at = now
+        active_alert.duration = duration_seconds
+
+    # 5. สร้าง Alert ใหม่
     alert_event = AlertEvent(
         session_id=session_id,
-        event_type=request.event_type,
-        risk_level=request.risk_level,
-        started_at=datetime.now(timezone.utc),
+        event_type=request.event_type.value,
+        risk_level=request.risk_level.value,
+        started_at=now,
         duration=0
     )
 
