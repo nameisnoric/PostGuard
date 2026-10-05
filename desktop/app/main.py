@@ -2,7 +2,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from ui.login_window import LoginWindow
+from app.ui.login_window import LoginWindow
 
 def main() -> None:
     app = QApplication(sys.argv)
