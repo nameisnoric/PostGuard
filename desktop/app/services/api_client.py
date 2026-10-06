@@ -88,3 +88,16 @@ class APIClient:
                 "otp": otp
             }
         )
+        
+    @staticmethod
+    def get_cameras():
+        return APIClient.get(
+            "/cameras"
+        )
+
+
+    @staticmethod
+    def get_camera(camera_id: int):
+        return APIClient.get(
+            f"/cameras/{camera_id}"
+        )
