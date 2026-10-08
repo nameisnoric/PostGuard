@@ -1,4 +1,3 @@
-
 import cv2, math, statistics
 
 from PySide6.QtCore import (
@@ -23,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
+from app.services.api_client import APIClient
 
 
 class BaselinePage(QWidget):
@@ -51,6 +51,7 @@ class BaselinePage(QWidget):
         #ความนิ่งของผู้ใช้
         self.stability_threshold = 2.0
 
+        self.saved_baseline_id = None   
         # -------------------------
         # Camera Timer
         # -------------------------
@@ -224,7 +225,13 @@ class BaselinePage(QWidget):
         self.calibrate_button = QPushButton(
             "Start Calibration"
         )
-
+        
+        self.save_button = QPushButton(
+            "Save Personal Baseline"
+        )
+        #Save ไม่ได้จนกว่า calibrate จะเสร็จ
+        self.save_button.setEnabled(False)
+        
         # ยังไม่เปิดจนกว่าจะทำ Calibration Logic
         self.calibrate_button.setEnabled(False)
         
@@ -234,6 +241,10 @@ class BaselinePage(QWidget):
 
         button_layout.addWidget(
             self.calibrate_button
+        )
+        
+        button_layout.addWidget(
+            self.save_button
         )
 
         # -------------------------
@@ -275,6 +286,10 @@ class BaselinePage(QWidget):
         
         self.calibrate_button.clicked.connect(
             self.start_calibration
+        )
+        
+        self.save_button.clicked.connect(
+            self.save_baseline
         )
 
     # =========================================================
@@ -450,6 +465,9 @@ class BaselinePage(QWidget):
         self.calibration_samples = []
 
         self.baseline_result = None
+        
+        self.saved_baseline_id = None
+        self.save_button.setEnabled(False)
 
         self.calibrate_button.setEnabled(False)
 
@@ -556,7 +574,7 @@ class BaselinePage(QWidget):
         }   
 
         self.is_calibrating = False
-
+        self.save_button.setEnabled(True)
         self.calibrate_button.setEnabled(True)
         self.calibrate_button.setText(
             "Recalibrate"
@@ -584,6 +602,166 @@ class BaselinePage(QWidget):
             "PERSONAL BASELINE:",
             self.baseline_result
         )
+    
+    # =========================================================
+    # Save Personal Baseline
+    # =========================================================
+
+    def save_baseline(self) -> None:
+
+        # -------------------------
+        # Validate Calibration
+        # -------------------------
+
+        if self.baseline_result is None:
+
+            QMessageBox.warning(
+                self,
+                "Save Baseline",
+                "Please complete calibration first."
+            )
+
+            return
+
+        if self.selected_camera is None:
+
+            QMessageBox.warning(
+                self,
+                "Save Baseline",
+                "No camera selected."
+            )
+
+            return
+
+        # ป้องกันการบันทึกซ้ำ
+        if self.saved_baseline_id is not None:
+            return
+
+        camera_id = self.selected_camera.get(
+            "camera_id"
+        )
+
+        if (
+            not isinstance(camera_id, int)
+            or camera_id <= 0
+        ):
+
+            QMessageBox.warning(
+                self,
+                "Save Baseline",
+                "Invalid Camera ID."
+            )
+
+            return
+
+        # -------------------------
+        # Prepare Measurements
+        # -------------------------
+
+        measurements = {
+            "shoulder_angle": (
+                self.baseline_result["shoulder_tilt"]
+            ),
+            "lateral_tilt_baseline": (
+                self.baseline_result["neck_lateral_tilt"]
+            )
+        }
+
+        # -------------------------
+        # Send to Backend
+        # -------------------------
+
+        self.save_button.setEnabled(False)
+
+        self.status_label.setText(
+            "Status: Saving baseline..."
+        )
+
+        try:
+
+            response = APIClient.create_personal_baseline(
+                camera_id=camera_id,
+                measurements=measurements
+            )
+
+            # -------------------------
+            # Check API Response
+            # -------------------------
+
+            if response.status_code != 201:
+
+                try:
+                    detail = response.json().get(
+                        "detail",
+                        response.text
+                    )
+                except ValueError:
+                    detail = response.text
+
+                raise RuntimeError(
+                    f"HTTP {response.status_code}: {detail}"
+                )
+
+            saved_data = response.json()
+
+            baseline_id = saved_data.get(
+                "baseline_id"
+            )
+
+            if baseline_id is None:
+                raise RuntimeError(
+                    "Server did not return a Baseline ID."
+                )
+
+            # -------------------------
+            # Save Successful
+            # -------------------------
+
+            self.saved_baseline_id = baseline_id
+
+            self.status_label.setText(
+                "Status: Baseline saved successfully"
+            )
+
+            print(
+                "SAVED PERSONAL BASELINE:",
+                saved_data
+            )
+
+            QMessageBox.information(
+                self,
+                "Baseline Saved",
+                (
+                    "Personal Baseline saved successfully!\n\n"
+                    f"Baseline ID: {baseline_id}\n"
+                    f"Camera ID: {camera_id}\n\n"
+                    f"Shoulder Tilt: "
+                    f"{self.baseline_result['shoulder_tilt']:+.2f}°\n"
+                    f"Neck Lateral Tilt: "
+                    f"{self.baseline_result['neck_lateral_tilt']:+.2f}°"
+                )
+            )
+
+        except Exception as error:
+
+            self.status_label.setText(
+                "Status: Failed to save baseline"
+            )
+
+            QMessageBox.warning(
+                self,
+                "Save Baseline Error",
+                str(error)
+            )
+
+        finally:
+
+            # ถ้าบันทึกไม่สำเร็จ ให้ลองใหม่ได้
+            # ถ้าสำเร็จแล้ว ป้องกันการบันทึกซ้ำ
+            self.save_button.setEnabled(
+                self.baseline_result is not None
+                and self.saved_baseline_id is None
+            )
 
     # =========================================================
     # Update Frame
