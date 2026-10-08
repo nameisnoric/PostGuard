@@ -41,6 +41,7 @@ class CameraPreviewPage(QWidget):
 
         self.capture = None
         self.selected_camera = None
+        self.last_pose_points = None
 
         # -------------------------
         # Detection State
@@ -51,6 +52,14 @@ class CameraPreviewPage(QWidget):
 
         self.detection_status_label = QLabel(
             "Pose: Waiting | Face: Waiting"
+        )
+        
+        self.shoulder_tilt_label = QLabel(
+            "Shoulder Tilt: --"
+        )
+        
+        self.neck_tilt_label = QLabel(
+            "Neck Lateral Tilt: --"
         )
 
         # -------------------------
@@ -165,6 +174,14 @@ class CameraPreviewPage(QWidget):
         )
 
         layout.addWidget(
+            self.shoulder_tilt_label
+        )
+        
+        layout.addWidget(
+            self.neck_tilt_label
+        )
+        
+        layout.addWidget(
             self.preview_label,
             1
         )
@@ -188,7 +205,7 @@ class CameraPreviewPage(QWidget):
     # =========================================================
     # Start Preview
     # =========================================================
-
+    
     def start_preview(
         self,
         camera: dict
@@ -344,10 +361,38 @@ class CameraPreviewPage(QWidget):
                 result = self.detector.process_frame(
                     frame
                 )
+                
+                shoulder_tilt = result["shoulder_tilt"]
+
+                if shoulder_tilt is not None:   
+                    self.shoulder_tilt_label.setText(
+                        f"Shoulder Tilt: {shoulder_tilt:+.2f}°"
+                    )
+                else:
+                    self.shoulder_tilt_label.setText(
+                        "Shoulder Tilt: --"
+                    )
+
+                neck_result = result["neck_lateral_tilt"]
+
+                if neck_result is not None:
+
+                    neck_angle = neck_result["neck_tilt"]
+
+                    self.neck_tilt_label.setText(
+                    f"Neck Lateral Tilt: {neck_angle:+.2f}°"
+                    )
+    
+                else:
+                    self.neck_tilt_label.setText(
+                    "Neck Lateral Tilt: --"
+                )
 
                 pose_detected = (
                     result["pose_points"] is not None
                 )
+                
+                self.last_pose_points = result["pose_points"]
 
                 face_detected = (
                     result["face_detected"]
@@ -382,6 +427,15 @@ class CameraPreviewPage(QWidget):
 
                 return
 
+        # -------------------------
+        # Draw Pose Landmarks
+        # -------------------------
+
+        self.draw_pose_landmarks(
+        frame,
+        self.last_pose_points
+        )
+        
         # -------------------------
         # Convert BGR to RGB
         # -------------------------
@@ -481,9 +535,15 @@ class CameraPreviewPage(QWidget):
 
         self.frame_count = 0
 
+        self.last_pose_points = None
+        
         self.detection_status_label.setText(
             "Pose: Waiting | Face: Waiting"
         )
+        
+        self.shoulder_tilt_label.setText(
+            "Shoulder Tilt: --"
+        )  
 
         # -------------------------
         # Disable Continue
@@ -524,3 +584,64 @@ class CameraPreviewPage(QWidget):
         self.continue_requested.emit(
             camera
         )
+    
+    
+    # =========================================================
+    # Draw Pose Landmarks
+    # =========================================================
+
+    def draw_pose_landmarks(self, frame, points) -> None:
+
+        if not points:
+            return
+
+        # เส้นเชื่อมจุดสำคัญ
+        connections = [
+            ("left_ear", "right_ear"),
+            ("left_shoulder", "right_shoulder")
+        ]
+
+        # วาดเส้นเชื่อม
+        for start_name, end_name in connections:
+
+            start = points.get(start_name)
+            end = points.get(end_name)
+
+            if start is None or end is None:
+                continue
+
+            start_xy = (
+                int(start["x"]),
+                int(start["y"])
+            )
+
+            end_xy = (
+                int(end["x"]),
+                int(end["y"])
+            )
+
+            cv2.line(
+                frame,
+                start_xy,
+                end_xy,
+                (0, 255, 0),
+                2
+            )
+
+        # วาดจุด Landmark
+        for name, point in points.items():
+
+            if point is None:
+                continue
+
+            x = int(point["x"])
+            y = int(point["y"])
+
+            cv2.circle(
+                frame,
+                (x, y),
+                5,
+                (0, 0, 255),
+                -1
+            )
+

@@ -12,6 +12,10 @@ if str(BACKEND_DIR) not in sys.path:
 # ใช้ Detection 
 from camera_card.mediapipe_detection.pose.pose_detector import PoseDetector
 from camera_card.mediapipe_detection.face.face_detector import FaceDetector
+from camera_card.mediapipe_detection.posture.posture_features import (
+    calculate_shoulder_tilt,
+    calculate_neck_lateral_tilt
+)
 
 class DetectionService:
 
@@ -41,15 +45,44 @@ class DetectionService:
         pose_points = self.pose_detector.detect(frame)
         face_result = self.face_detector.detect(frame)
 
+        # -------------------------
+        # shoulder Tilt
+        # -------------------------
+        
+        shoulder_tilt = None
+
+        if pose_points is not None:
+            shoulder_tilt = calculate_shoulder_tilt(
+                pose_points.get("left_shoulder"),
+                pose_points.get("right_shoulder")
+            )
+
         face_detected = bool(
             face_result is not None
             and face_result.face_landmarks
         )
+           
+        # -------------------------
+        # Neck Lateral Tilt
+        # -------------------------
+
+        neck_lateral_tilt = None
+
+        if pose_points is not None:
+            neck_lateral_tilt = calculate_neck_lateral_tilt(
+                pose_points.get("left_ear"),
+                pose_points.get("right_ear"),
+                pose_points.get("left_shoulder"),
+                pose_points.get("right_shoulder")
+            )
+
 
         return {
             "pose_points": pose_points,
             "face_detected": face_detected,
             "face_result": face_result,
+            "shoulder_tilt": shoulder_tilt,
+            "neck_lateral_tilt": neck_lateral_tilt
         }
 
     def close(self):
