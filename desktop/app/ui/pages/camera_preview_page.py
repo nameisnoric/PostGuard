@@ -1,3 +1,4 @@
+
 import cv2
 
 from PySide6.QtCore import (
@@ -20,13 +21,15 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 
+from app.services.detection_service import DetectionService
+
 
 class CameraPreviewPage(QWidget):
 
-    # ส่ง signal กลับไป Camera Setup
+    # ส่ง Signal กลับไป Camera Setup
     back_requested = Signal()
 
-    # เตรียมไว้สำหรับไป Personal Baseline
+    # ส่งข้อมูลกล้องไป Personal Baseline
     continue_requested = Signal(dict)
 
     def __init__(self):
@@ -38,6 +41,17 @@ class CameraPreviewPage(QWidget):
 
         self.capture = None
         self.selected_camera = None
+
+        # -------------------------
+        # Detection State
+        # -------------------------
+
+        self.detector = None
+        self.frame_count = 0
+
+        self.detection_status_label = QLabel(
+            "Pose: Waiting | Face: Waiting"
+        )
 
         # -------------------------
         # Timer
@@ -147,6 +161,10 @@ class CameraPreviewPage(QWidget):
         )
 
         layout.addWidget(
+            self.detection_status_label
+        )
+
+        layout.addWidget(
             self.preview_label,
             1
         )
@@ -176,7 +194,7 @@ class CameraPreviewPage(QWidget):
         camera: dict
     ) -> None:
 
-        # ปิดกล้องเก่าก่อน
+        # ปิดกล้องและ Detector เดิมก่อน
         self.stop_preview()
 
         self.selected_camera = camera
@@ -206,21 +224,28 @@ class CameraPreviewPage(QWidget):
         )
 
         # -------------------------
+        # Validate Camera
+        # -------------------------
+
+        if device_index is None:
+            QMessageBox.warning(
+                self,
+                "PostGuard",
+                "No camera device index was provided."
+            )
+            return
+
+        # -------------------------
         # Open Camera
         # -------------------------
 
         self.capture = cv2.VideoCapture(
-            device_index
+            int(device_index)
         )
 
         if not self.capture.isOpened():
 
-            self.capture.release()
-            self.capture = None
-
-            self.continue_button.setEnabled(
-                False
-            )
+            self.stop_preview()
 
             QMessageBox.critical(
                 self,
@@ -231,6 +256,31 @@ class CameraPreviewPage(QWidget):
             return
 
         # -------------------------
+        # Initialize Detection
+        # -------------------------
+
+        try:
+            self.detector = DetectionService()
+
+        except Exception as error:
+
+            self.stop_preview()
+
+            QMessageBox.critical(
+                self,
+                "Detection Error",
+                str(error)
+            )
+
+            return
+
+        self.frame_count = 0
+
+        self.detection_status_label.setText(
+            "Pose: Waiting | Face: Waiting"
+        )
+
+        # -------------------------
         # Start Timer
         # -------------------------
 
@@ -238,6 +288,10 @@ class CameraPreviewPage(QWidget):
 
         self.continue_button.setEnabled(
             True
+        )
+
+        print(
+            "CAMERA AND DETECTION STARTED"
         )
 
     # =========================================================
@@ -255,20 +309,83 @@ class CameraPreviewPage(QWidget):
         success, frame = self.capture.read()
 
         if not success or frame is None:
-            print("CAMERA ERROR: Cannot read frame")
+
+            print(
+                "CAMERA ERROR: Cannot read frame"
+            )
+
+            self.stop_preview()
+
+            QMessageBox.warning(
+                self,
+                "Camera Error",
+                "Unable to read a frame from the camera."
+            )
+
             return
 
-        print(
-            "FRAME:",
-            frame.shape,
-            "MEAN:",
-            frame.mean(),
-            "MAX:",
-            frame.max()
-        )
+        # -------------------------
+        # Count Frames
+        # -------------------------
 
-        # OpenCV ใช้ BGR
-        # Qt ใช้ RGB
+        self.frame_count += 1
+
+        # -------------------------
+        # Detection Every 5 Frames
+        # -------------------------
+
+        if (
+            self.detector is not None
+            and self.frame_count % 5 == 0
+        ):
+
+            try:
+
+                result = self.detector.process_frame(
+                    frame
+                )
+
+                pose_detected = (
+                    result["pose_points"] is not None
+                )
+
+                face_detected = (
+                    result["face_detected"]
+                )
+
+                pose_status = (
+                    "Detected"
+                    if pose_detected
+                    else "Not Found"
+                )
+
+                face_status = (
+                    "Detected"
+                    if face_detected
+                    else "Not Found"
+                )
+
+                self.detection_status_label.setText(
+                    f"Pose: {pose_status} | "
+                    f"Face: {face_status}"
+                )
+
+            except Exception as error:
+
+                self.stop_preview()
+
+                QMessageBox.warning(
+                    self,
+                    "Detection Error",
+                    str(error)
+                )
+
+                return
+
+        # -------------------------
+        # Convert BGR to RGB
+        # -------------------------
+
         frame_rgb = cv2.cvtColor(
             frame,
             cv2.COLOR_BGR2RGB
@@ -282,6 +399,10 @@ class CameraPreviewPage(QWidget):
             channels * width
         )
 
+        # -------------------------
+        # Convert to Qt Image
+        # -------------------------
+
         image = QImage(
             frame_rgb.data,
             width,
@@ -294,7 +415,10 @@ class CameraPreviewPage(QWidget):
             image
         )
 
-        # ปรับขนาดให้พอดีกับพื้นที่
+        # -------------------------
+        # Resize Preview
+        # -------------------------
+
         pixmap = pixmap.scaled(
             self.preview_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -311,8 +435,28 @@ class CameraPreviewPage(QWidget):
 
     def stop_preview(self) -> None:
 
+        # -------------------------
+        # Stop Timer
+        # -------------------------
+
         if self.timer.isActive():
             self.timer.stop()
+
+        # -------------------------
+        # Close Detection
+        # -------------------------
+
+        if self.detector is not None:
+
+            try:
+                self.detector.close()
+
+            finally:
+                self.detector = None
+
+        # -------------------------
+        # Release Camera
+        # -------------------------
 
         if self.capture is not None:
 
@@ -321,11 +465,29 @@ class CameraPreviewPage(QWidget):
 
             self.capture = None
 
+        # -------------------------
+        # Reset Preview
+        # -------------------------
+
         self.preview_label.clear()
 
         self.preview_label.setText(
             "Camera preview will appear here."
         )
+
+        # -------------------------
+        # Reset Detection Status
+        # -------------------------
+
+        self.frame_count = 0
+
+        self.detection_status_label.setText(
+            "Pose: Waiting | Face: Waiting"
+        )
+
+        # -------------------------
+        # Disable Continue
+        # -------------------------
 
         self.continue_button.setEnabled(
             False
@@ -354,10 +516,11 @@ class CameraPreviewPage(QWidget):
         if self.selected_camera is None:
             return
 
-        # ปิดกล้องก่อนส่งต่อ
-        # เพื่อไม่ให้ Baseline เปิดกล้องไม่ได้
+        camera = self.selected_camera
+
+        # ปิดกล้องก่อนส่งต่อไป Baseline
         self.stop_preview()
 
         self.continue_requested.emit(
-            self.selected_camera
+            camera
         )
