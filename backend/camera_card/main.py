@@ -20,6 +20,8 @@ from camera_setup.camera_roll import (
     estimate_scene_tilt
 )
 
+from mediapipe_dection.pose_detector import PoseDetector
+
 STABLE_FRAMES = 15   # ต้องผ่านต่อเนื่องกี่ frame ถึงนับว่านิ่ง
 
 WHITE = (255, 255, 255)
@@ -85,6 +87,12 @@ def main():
     tilt_history = deque(maxlen=15)    # เก็บค่าเอียงของเส้นในห้องหลาย frame
     scene_roll = None                  # ค่ากลางที่วัดได้จากห้อง (None = วัดไม่ได้)
 
+    # =========================
+    # Pose Detector 
+    # =========================
+    pose_detector = PoseDetector(
+        model_path="models/pose_landmarker_lite.task"
+    )
     # =========================
     # Main Loop
     # =========================
@@ -257,6 +265,7 @@ def main():
                         cv2.imshow("PostGuard - Warped Card",
                                    perspective["image"])
 
+            
             # ---------- Debug Information ----------
             put(display, f"Contours: {debug['contours']}", (20, 405), WHITE)
 
@@ -325,8 +334,38 @@ def main():
         # ==========================================================
         elif system_state == SystemState.PERSONAL_BASELINE:
 
-            put(display, "Personal Baseline", (20, 40), YELLOW)
-            put(display, "Sit upright and look forward", (20, 75), WHITE)
+            put(display, 
+                "Personal Baseline", 
+                (20, 40), 
+                YELLOW)
+            put(display, 
+                "Sit upright and look forward", 
+                (20, 75), 
+                WHITE)
+            #=========================================================
+            #Mediapipe Pose Detection
+            #=========================================================
+            pose_landmarks = pose_detector.detect(frame)
+
+            if pose_landmarks is None:
+
+                put(
+                    display,
+                    "Pose: NOT FOUND",
+                    (20, 110),
+                    RED
+                )
+
+            else:
+
+                put(
+                    display,
+                    "Pose: OK",
+                    (20, 110),
+                    GREEN
+                )
+
+                print(pose_landmarks)
 
         # ==========================================================
         # แสดงผล + ปุ่มกด
@@ -364,6 +403,7 @@ def main():
                 system_state = SystemState.CAMERA_SETUP
                 print("Current State:", system_state)
 
+    pose_detector.close()
     cap.release()
     cv2.destroyAllWindows()
 
