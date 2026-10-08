@@ -1,5 +1,16 @@
 
-from PySide6.QtCore import Signal
+import cv2, math, statistics
+
+from PySide6.QtCore import (
+    Qt,
+    QTimer,
+    Signal
+)
+
+from PySide6.QtGui import (
+    QImage,
+    QPixmap
+)
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -11,6 +22,8 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 
+from app.services.detection_service import DetectionService
+
 
 class BaselinePage(QWidget):
 
@@ -20,7 +33,34 @@ class BaselinePage(QWidget):
     def __init__(self):
         super().__init__()
 
+        # -------------------------
+        # Variables
+        # -------------------------
+
         self.selected_camera = None
+        self.capture = None
+        self.detector = None
+        self.frame_count = 0
+        
+        #Calibrate State
+        
+        self.is_calibrating = False
+        self.calibration_samples = []
+        self.baseline_result = None
+        self.required_samples = 30
+        #ความนิ่งของผู้ใช้
+        self.stability_threshold = 2.0
+
+        # -------------------------
+        # Camera Timer
+        # -------------------------
+
+        self.timer = QTimer(self)
+        self.timer.setInterval(30)
+
+        self.timer.timeout.connect(
+            self.update_frame
+        )
 
         # -------------------------
         # Main Layout
@@ -60,7 +100,7 @@ class BaselinePage(QWidget):
         self.device_label = QLabel(
             "Device: -"
         )
-        
+
         self.camera_id_label = QLabel(
             "Camera ID: -"
         )
@@ -76,13 +116,40 @@ class BaselinePage(QWidget):
         camera_layout.addWidget(
             self.device_label
         )
-        
+
         camera_layout.addWidget(
             self.camera_id_label
         )
 
         camera_layout.addWidget(
             self.resolution_label
+        )
+
+        # -------------------------
+        # Camera Preview
+        # -------------------------
+
+        self.preview_label = QLabel(
+            "Camera preview will appear here."
+        )
+
+        self.preview_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        self.preview_label.setMinimumSize(
+            640,
+            360
+        )
+
+        self.preview_label.setStyleSheet(
+            """
+            QLabel {
+                background-color: #111111;
+                border: 1px solid #444444;
+                border-radius: 8px;
+            }
+            """
         )
 
         # -------------------------
@@ -105,7 +172,23 @@ class BaselinePage(QWidget):
         )
 
         self.status_label = QLabel(
-            "Status: Waiting for detection module"
+            "Status: Waiting for camera"
+        )
+
+        # -------------------------
+        # Detection Information
+        # -------------------------
+
+        self.detection_label = QLabel(
+            "Pose: Waiting | Face: Waiting"
+        )
+
+        self.shoulder_tilt_label = QLabel(
+            "Shoulder Tilt: --"
+        )
+
+        self.neck_tilt_label = QLabel(
+            "Neck Lateral Tilt: --"
         )
 
         calibration_layout.addWidget(
@@ -114,6 +197,18 @@ class BaselinePage(QWidget):
 
         calibration_layout.addWidget(
             self.status_label
+        )
+
+        calibration_layout.addWidget(
+            self.detection_label
+        )
+
+        calibration_layout.addWidget(
+            self.shoulder_tilt_label
+        )
+
+        calibration_layout.addWidget(
+            self.neck_tilt_label
         )
 
         # -------------------------
@@ -130,9 +225,9 @@ class BaselinePage(QWidget):
             "Start Calibration"
         )
 
-        # ยังไม่เปิดจนกว่าจะเชื่อม Detection
+        # ยังไม่เปิดจนกว่าจะทำ Calibration Logic
         self.calibrate_button.setEnabled(False)
-
+        
         button_layout.addWidget(
             self.back_button
         )
@@ -158,10 +253,13 @@ class BaselinePage(QWidget):
         )
 
         layout.addWidget(
-            calibration_group
+            self.preview_label,
+            1
         )
 
-        layout.addStretch()
+        layout.addWidget(
+            calibration_group
+        )
 
         layout.addLayout(
             button_layout
@@ -174,6 +272,10 @@ class BaselinePage(QWidget):
         self.back_button.clicked.connect(
             self.handle_back
         )
+        
+        self.calibrate_button.clicked.connect(
+            self.start_calibration
+        )
 
     # =========================================================
     # Receive Camera
@@ -185,11 +287,9 @@ class BaselinePage(QWidget):
     ) -> None:
 
         self.selected_camera = camera.copy()
-        
-        camera_id = camera.get("camera_id")
 
-        self.camera_id_label.setText(
-            f"Camera ID: {camera_id}"
+        camera_id = camera.get(
+            "camera_id"
         )
 
         camera_name = camera.get(
@@ -209,6 +309,10 @@ class BaselinePage(QWidget):
             "resolution_height"
         )
 
+        self.camera_id_label.setText(
+            f"Camera ID: {camera_id}"
+        )
+
         self.camera_name_label.setText(
             f"Camera: {camera_name}"
         )
@@ -221,29 +325,574 @@ class BaselinePage(QWidget):
             f"Resolution: {width}x{height}"
         )
 
-        self.status_label.setText(
-            "Status: Ready for detection integration"
-        )
-
         print(
             "BASELINE CAMERA:",
             self.selected_camera
         )
 
+        # เปิด Webcam และ Detection
+        self.start_camera_preview()
+
     # =========================================================
-    # Back to Preview
+    # Start Camera Preview
+    # =========================================================
+
+    def start_camera_preview(self) -> None:
+
+        # ปิดทรัพยากรเดิมก่อนเปิดใหม่
+        self.stop_camera_preview()
+
+        if self.selected_camera is None:
+            return
+
+        device_index = self.selected_camera.get(
+            "device_index"
+        )
+
+        if device_index is None:
+
+            self.status_label.setText(
+                "Status: Camera not selected"
+            )
+
+            return
+
+        # -------------------------
+        # Open Webcam
+        # -------------------------
+
+        try:
+            self.capture = cv2.VideoCapture(
+                int(device_index)
+            )
+
+            if not self.capture.isOpened():
+                raise RuntimeError(
+                    "Unable to open the selected camera."
+                )
+
+        except Exception as error:
+
+            self.stop_camera_preview()
+
+            self.status_label.setText(
+                "Status: Camera unavailable"
+            )
+
+            QMessageBox.warning(
+                self,
+                "Camera Error",
+                str(error)
+            )
+
+            return
+
+        # -------------------------
+        # Initialize Detection
+        # -------------------------
+
+        try:
+            self.detector = DetectionService()
+
+        except Exception as error:
+
+            self.stop_camera_preview()
+
+            self.status_label.setText(
+                "Status: Detection unavailable"
+            )
+
+            QMessageBox.critical(
+                self,
+                "Detection Error",
+                str(error)
+            )
+
+            return
+
+        # -------------------------
+        # Start Timer
+        # -------------------------
+
+        self.frame_count = 0
+
+        self.status_label.setText(
+            "Status: Camera and detection ready"
+        )
+
+       # เปิดปุ่มเมื่อกล้องและ Detection พร้อมแล้ว  
+        self.calibrate_button.setEnabled(True)
+
+        self.calibrate_button.setText(
+            "Start Calibration"
+        )
+
+        self.timer.start()
+
+    #Start Calibration
+
+    def start_calibration(self) -> None:
+
+        if (
+            self.capture is None
+            or self.detector is None
+        ):
+            QMessageBox.warning(
+                self,
+                "Calibration",
+                "Camera or detection is not ready."
+            )
+            return
+
+        # เริ่มเก็บข้อมูลใหม่
+        self.is_calibrating = True
+
+        self.calibration_samples = []
+
+        self.baseline_result = None
+
+        self.calibrate_button.setEnabled(False)
+
+        self.status_label.setText(
+            "Status: Calibrating 0/30"
+        )
+        
+    def collect_calibration_sample(
+        self,
+        result: dict
+    ) -> None:
+
+        if not self.is_calibrating:
+            return
+
+        shoulder = result.get("shoulder_tilt")
+        neck_result = result.get("neck_lateral_tilt")
+
+        # ต้องพบ Pose และ Face
+        if (
+            result.get("pose_points") is None
+            or not result.get("face_detected")
+            or shoulder is None
+            or neck_result is None
+        ):
+            self.calibration_samples.clear()
+
+            self.status_label.setText(
+                "Status: Face and shoulders must be visible"
+            )
+            return
+
+        neck = neck_result.get("neck_tilt")
+
+        if neck is None:
+            self.calibration_samples.clear()
+            return
+
+        # ตรวจสอบว่าค่าเป็นตัวเลขที่ใช้คำนวณได้
+        if not (
+            math.isfinite(shoulder)
+            and math.isfinite(neck)
+        ):
+            self.calibration_samples.clear()
+            return
+
+        self.calibration_samples.append({
+            "shoulder_tilt": shoulder,
+            "neck_tilt": neck
+        })
+
+        count = len(self.calibration_samples)
+
+        self.status_label.setText(
+            f"Status: Calibrating {count}/{self.required_samples}"
+        )
+
+        if count < self.required_samples:
+            return
+
+        # แยกชุดข้อมูลสองประเภท
+        shoulder_values = [
+            sample["shoulder_tilt"]
+            for sample in self.calibration_samples
+        ]
+
+        neck_values = [
+            sample["neck_tilt"]
+            for sample in self.calibration_samples
+        ]
+
+        # ตรวจสอบความกระจายของข้อมูล
+        shoulder_std = statistics.pstdev(
+            shoulder_values
+        )
+
+        neck_std = statistics.pstdev(
+            neck_values
+        )
+
+        if (
+            shoulder_std > self.stability_threshold
+            or neck_std > self.stability_threshold
+        ):
+            self.calibration_samples.clear()
+
+            self.status_label.setText(
+                "Status: Movement detected. "
+                "Collecting again..."
+            )
+            return
+
+        # คำนวณค่าเฉลี่ยพื้นฐาน
+        self.baseline_result = {
+            "shoulder_tilt": statistics.mean(
+                shoulder_values
+            ),
+            "neck_lateral_tilt": statistics.mean(
+                neck_values
+            ),
+            "shoulder_std": shoulder_std,
+            "neck_std": neck_std,
+            "sample_count": count
+        }   
+
+        self.is_calibrating = False
+
+        self.calibrate_button.setEnabled(True)
+        self.calibrate_button.setText(
+            "Recalibrate"
+        )
+
+        self.status_label.setText(
+            "Status: Calibration completed"
+        )
+
+        QMessageBox.information(
+            self,
+            "Calibration Completed",
+            (
+                "Personal Baseline calculated.\n\n"
+                f"Shoulder Tilt: "
+                f"{self.baseline_result['shoulder_tilt']:+.2f}°\n"
+                f"Neck Lateral Tilt: "
+                f"{self.baseline_result['neck_lateral_tilt']:+.2f}°\n\n"
+                f"Samples: {count}\n"
+                "Not saved to database yet."
+            )   
+        )
+
+        print(
+            "PERSONAL BASELINE:",
+            self.baseline_result
+        )
+
+    # =========================================================
+    # Update Frame
+    # =========================================================
+
+    def update_frame(self) -> None:
+
+        if self.capture is None:
+            return
+
+        # -------------------------
+        # Read Webcam Frame 
+        # -------------------------
+
+        success, frame = self.capture.read()
+
+        if not success or frame is None:
+
+            self.stop_camera_preview()
+
+            self.status_label.setText(
+                "Status: Camera read failed"
+            )
+
+            QMessageBox.warning(
+                self,
+                "Camera Error",
+                "Unable to read a camera frame."
+            )
+
+            return
+
+        # -------------------------
+        # Count Frames
+        # -------------------------
+
+        self.frame_count += 1
+
+        # -------------------------
+        # Detection Every 5 Frames
+        # -------------------------
+
+        if (
+            self.detector is not None
+            and self.frame_count % 5 == 0
+        ):
+
+            try:
+                result = self.detector.process_frame(
+                    frame
+                )
+                
+                self.collect_calibration_sample(
+                    result
+                )
+
+                # -------------------------
+                # Pose / Face Status
+                # -------------------------
+
+                pose_detected = (
+                    result["pose_points"] is not None
+                )
+
+                face_detected = result[
+                    "face_detected"
+                ]
+
+                pose_text = (
+                    "Detected"
+                    if pose_detected
+                    else "Not Found"
+                )
+
+                face_text = (
+                    "Detected"
+                    if face_detected
+                    else "Not Found"
+                )
+
+                self.detection_label.setText(
+                    f"Pose: {pose_text} | "
+                    f"Face: {face_text}"
+                )
+
+                # -------------------------
+                # Shoulder Tilt
+                # -------------------------
+
+                shoulder_tilt = result[
+                    "shoulder_tilt"
+                ]
+
+                if shoulder_tilt is not None:
+
+                    self.shoulder_tilt_label.setText(
+                        f"Shoulder Tilt: "
+                        f"{shoulder_tilt:+.2f}°"
+                    )
+
+                else:
+
+                    self.shoulder_tilt_label.setText(
+                        "Shoulder Tilt: --"
+                    )
+
+                # -------------------------
+                # Neck Lateral Tilt
+                # -------------------------
+
+                neck_result = result[
+                    "neck_lateral_tilt"
+                ]
+
+                if neck_result is not None:
+
+                    neck_angle = neck_result[
+                        "neck_tilt"
+                    ]
+
+                    self.neck_tilt_label.setText(
+                        f"Neck Lateral Tilt: "
+                        f"{neck_angle:+.2f}°"
+                    )
+
+                else:
+
+                    self.neck_tilt_label.setText(
+                        "Neck Lateral Tilt: --"
+                    )
+
+            except Exception as error:
+
+                self.stop_camera_preview()
+
+                self.status_label.setText(
+                    "Status: Detection error"
+                )
+
+                QMessageBox.warning(
+                    self,
+                    "Detection Error",
+                    str(error)
+                )
+
+                return
+
+        # -------------------------
+        # Convert Frame to RGB
+        # -------------------------
+
+        frame_rgb = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2RGB
+        )
+
+        height, width, channels = (
+            frame_rgb.shape
+        )
+
+        bytes_per_line = (
+            channels * width
+        )
+
+        # -------------------------
+        # Convert to QImage
+        # -------------------------
+
+        image = QImage(
+            frame_rgb.data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888
+        ).copy()
+
+        # -------------------------
+        # Display Frame
+        # -------------------------
+
+        pixmap = QPixmap.fromImage(
+            image
+        )
+
+        pixmap = pixmap.scaled(
+            self.preview_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
+        self.preview_label.setPixmap(
+            pixmap
+        )
+
+    # =========================================================
+    # Stop Camera Preview
+    # =========================================================
+
+    def stop_camera_preview(self) -> None:
+
+        # -------------------------
+        # Stop Timer
+        # -------------------------
+
+        if self.timer.isActive():
+            self.timer.stop()
+
+        # -------------------------
+        # Close Detection
+        # -------------------------
+
+        if self.detector is not None:
+
+            try:
+                self.detector.close()
+
+            finally:
+                self.detector = None
+
+        # -------------------------
+        # Release Webcam
+        # -------------------------
+
+        if self.capture is not None:
+
+            if self.capture.isOpened():
+                self.capture.release()
+
+            self.capture = None
+
+        # -------------------------
+        # Reset Detection Values
+        # -------------------------
+
+        self.frame_count = 0
+        
+        # -------------------------
+        # Reset Calibration State
+        # -------------------------
+
+        self.is_calibrating = False
+
+        self.calibration_samples.clear()
+
+        self.baseline_result = None
+
+        self.calibrate_button.setEnabled(False)
+
+        self.calibrate_button.setText(
+            "Start Calibration"
+        )
+
+
+        self.detection_label.setText(
+            "Pose: Waiting | Face: Waiting"
+        )
+
+        self.shoulder_tilt_label.setText(
+            "Shoulder Tilt: --"
+        )
+
+        self.neck_tilt_label.setText(
+            "Neck Lateral Tilt: --"
+        )
+
+        # -------------------------
+        # Reset Preview
+        # -------------------------
+
+        self.preview_label.clear()
+
+        self.preview_label.setText(
+            "Camera preview will appear here."
+        )
+
+        print(
+            "BASELINE CAMERA STOPPED"
+        )
+
+    # =========================================================
+    # Back to Camera Preview
     # =========================================================
 
     def handle_back(self) -> None:
 
         if self.selected_camera is None:
+
             QMessageBox.warning(
                 self,
                 "PostGuard",
                 "No camera selected."
             )
+
             return
 
+        camera = self.selected_camera.copy()
+
+        self.stop_camera_preview()
+
         self.back_requested.emit(
-            self.selected_camera
+            camera
         )
+
+    # =========================================================
+    # Stop Camera When Page Is Hidden
+    # =========================================================
+
+    def hideEvent(self, event) -> None:
+
+        self.stop_camera_preview()
+
+        super().hideEvent(event)
