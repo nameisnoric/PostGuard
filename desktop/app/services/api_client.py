@@ -101,3 +101,68 @@ class APIClient:
         return APIClient.get(
             f"/cameras/{camera_id}"
         )
+        
+    
+    @staticmethod
+    def create_camera(
+        device_id: str,
+        camera_name: str,
+        resolution_width: int,
+        resolution_height: int
+    ):
+        return APIClient.post(
+            "/cameras",
+            {
+                "device_id": device_id,
+                "camera_name": camera_name,
+                "resolution_width": resolution_width,
+                "resolution_height": resolution_height,
+                "reprojection_error": None
+            }
+        )
+    
+    @staticmethod
+    def create_personal_baseline(
+        camera_id: int,
+        measurements: dict
+    ):
+        allowed_fields = {
+            "neck_flexion_baseline",
+            "shoulder_angle",
+            "lateral_tilt_baseline",
+            "shoulder_tilt_status",
+            "forward_head_baseline",
+            "neck_rotation_baseline",
+            "shoulder_level_difference_baseline",
+            "ipd_baseline",
+            "screen_distance_baseline"
+        }
+
+        unknown_fields = (
+            set(measurements) - allowed_fields
+        )
+
+        if unknown_fields:
+            raise ValueError(
+                f"Unknown baseline fields: {unknown_fields}"
+            )
+
+        if not isinstance(camera_id, int) or camera_id <= 0:
+            raise ValueError(
+                "A valid camera_id is required."
+            )
+
+        if not measurements:
+            raise ValueError(
+                "Calibration measurements are required."
+            )
+
+        data = {
+            "camera_id": camera_id,
+            **measurements
+        }
+
+        return APIClient.post(
+            "/personal-baselines",
+            data
+        )

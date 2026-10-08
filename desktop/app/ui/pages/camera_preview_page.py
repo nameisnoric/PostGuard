@@ -254,8 +254,18 @@ class CameraPreviewPage(QWidget):
 
         success, frame = self.capture.read()
 
-        if not success:
+        if not success or frame is None:
+            print("CAMERA ERROR: Cannot read frame")
             return
+
+        print(
+            "FRAME:",
+            frame.shape,
+            "MEAN:",
+            frame.mean(),
+            "MAX:",
+            frame.max()
+        )
 
         # OpenCV ใช้ BGR
         # Qt ใช้ RGB

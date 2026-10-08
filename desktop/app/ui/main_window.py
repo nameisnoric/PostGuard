@@ -13,6 +13,11 @@ from app.core.token_store import TokenStore
 from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.camera_setup_page import CameraSetupPage
 from app.ui.pages.camera_preview_page import CameraPreviewPage
+from app.ui.pages.baseline_page import BaselinePage
+from app.services.api_client import APIClient
+
+import requests
+
 
 
 class MainWindow(QMainWindow):
@@ -105,6 +110,10 @@ class MainWindow(QMainWindow):
         self.camera_preview_page = (
             CameraPreviewPage()
         )
+        
+        self.baseline_page = (
+            BaselinePage()
+        )
 
         self.history_placeholder = QLabel(
             "History Page"
@@ -120,6 +129,10 @@ class MainWindow(QMainWindow):
         
         self.pages.addWidget(
             self.camera_preview_page
+        )
+        
+        self.pages.addWidget(
+            self.baseline_page
         )
 
         self.pages.addWidget(
@@ -173,6 +186,10 @@ class MainWindow(QMainWindow):
 
         self.camera_preview_page.continue_requested.connect(
             self.handle_preview_continue
+        )
+        
+        self.baseline_page.back_requested.connect(
+            self.show_camera_preview
         )
 
 
@@ -236,17 +253,128 @@ class MainWindow(QMainWindow):
         )
 
 
+    
     def handle_preview_continue(
         self,
         camera: dict
-    ):
-        print(
-            "READY FOR PERSONAL BASELINE:",
-            camera
+    ) -> None:
+
+        try:
+            # 1. รับข้อมูลกล้องจาก OpenCV
+            device_index = camera.get("device_index")
+
+            if device_index is None:
+                raise ValueError(
+                    "Camera device index is missing."
+                )
+
+            # รหัสชั่วคราวสำหรับการพัฒนา
+            device_id = f"opencv-index:{device_index}"
+
+            # 2. ตรวจสอบกล้องที่เคยบันทึกไว้
+            response = APIClient.get_cameras()
+
+            if not response.ok:
+                raise RuntimeError(
+                    f"Cannot load cameras: HTTP "
+                    f"{response.status_code}"
+                )
+
+            saved_cameras = response.json()
+
+            if not isinstance(saved_cameras, list):
+                raise ValueError(
+                    "Invalid camera list from server."
+                )
+
+            # 3. ค้นหากล้องที่มี device_id ตรงกัน
+            registered_camera = next(
+                (
+                    item
+                    for item in saved_cameras
+                    if item.get("device_id") == device_id
+                ),
+                None
+            )
+
+            # 4. ถ้าไม่พบ ให้ลงทะเบียนกล้องใหม่
+            if registered_camera is None:
+
+                print("REGISTERING CAMERA:", device_id)
+
+                response = APIClient.create_camera(
+                    device_id=device_id,
+                    camera_name=camera.get(
+                        "camera_name",
+                        f"Camera {device_index}"
+                    ),
+                    resolution_width=camera[
+                        "resolution_width"
+                    ],
+                    resolution_height=camera[
+                        "resolution_height"
+                    ]
+                )
+
+                if not response.ok:
+                    raise RuntimeError(
+                        f"Camera registration failed: "
+                        f"HTTP {response.status_code}"
+                    )
+
+                registered_camera = response.json()
+
+                print("NEW CAMERA REGISTERED")
+
+            else:
+                print("USING EXISTING CAMERA")
+
+            # 5. รับ camera_id จาก PostgreSQL
+            camera_id = registered_camera.get(
+                "camera_id"
+            )
+
+            if not isinstance(camera_id, int):
+                raise ValueError(
+                    "Invalid camera_id from server."
+                )
+
+            # 6. รวมข้อมูลกล้องกับ camera_id
+            camera_data = camera.copy()
+
+            camera_data["camera_id"] = camera_id
+            camera_data["device_id"] = device_id
+
+            print("CAMERA ID:", camera_id)
+            print("BASELINE CAMERA:", camera_data)
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+            KeyError,
+            TypeError
+        ) as error:
+
+            QMessageBox.warning(
+                self,
+                "Camera Registration Error",
+                str(error)
+            )
+
+            # เปิด Preview อีกครั้งเพื่อให้ลองใหม่ได้
+            self.camera_preview_page.start_preview(
+                camera
+            )
+
+            return
+
+        # 7. ส่งข้อมูลกล้องให้ BaselinePage
+        self.baseline_page.set_camera(
+            camera_data
         )
 
-        QMessageBox.information(
-            self,
-            "PostGuard",
-            "Camera check completed. Personal Baseline is next."
+        # 8. เปิดหน้า Personal Baseline
+        self.pages.setCurrentWidget(
+            self.baseline_page
         )
