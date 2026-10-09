@@ -20,7 +20,7 @@ from camera_setup.camera_roll import (
     estimate_scene_tilt
 )
 
-from mediapipe_dection.pose_detector import PoseDetector
+from mediapipe_detection.pose.pose_detector import PoseDetector
 
 STABLE_FRAMES = 15   # ต้องผ่านต่อเนื่องกี่ frame ถึงนับว่านิ่ง
 
