@@ -14,11 +14,10 @@ from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.camera_setup_page import CameraSetupPage
 from app.ui.pages.camera_preview_page import CameraPreviewPage
 from app.ui.pages.baseline_page import BaselinePage
+from app.ui.pages.monitoring_page import MonitoringPage
 from app.services.api_client import APIClient
 
 import requests
-
-
 
 class MainWindow(QMainWindow):
 
@@ -114,6 +113,10 @@ class MainWindow(QMainWindow):
         self.baseline_page = (
             BaselinePage()
         )
+        
+        self.monitoring_page = (
+            MonitoringPage()
+        )
 
         self.history_placeholder = QLabel(
             "History Page"
@@ -133,6 +136,10 @@ class MainWindow(QMainWindow):
         
         self.pages.addWidget(
             self.baseline_page
+        )
+        
+        self.pages.addWidget(
+            self.monitoring_page
         )
 
         self.pages.addWidget(
@@ -191,7 +198,14 @@ class MainWindow(QMainWindow):
         self.baseline_page.back_requested.connect(
             self.show_camera_preview
         )
-
+        
+        self.baseline_page.monitoring_requested.connect(
+            self.show_monitoring_page
+        )
+        
+        self.monitoring_page.stop_requested.connect(
+            self.show_dashboard
+        )
 
         # เปิด Dashboard เป็นหน้าแรก
         self.pages.setCurrentWidget(
@@ -221,6 +235,7 @@ class MainWindow(QMainWindow):
 
     def logout(self):
         self.camera_preview_page.stop_preview()
+        self.monitoring_page.stop_monitoring()
         
         TokenStore.clear_token()
         self.hide()
@@ -252,8 +267,6 @@ class MainWindow(QMainWindow):
             self.camera_setup_page
         )
 
-
-    
     def handle_preview_continue(
         self,
         camera: dict
@@ -378,3 +391,28 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentWidget(
             self.baseline_page
         )
+
+        
+    def show_monitoring_page(
+        self,
+        camera: dict,
+        baseline_id: int
+    ) -> None:
+
+        # เปลี่ยนจากหน้า Baseline ไป Monitoring
+        self.pages.setCurrentWidget(
+            self.monitoring_page
+        )
+
+        # เปิดกล้องพร้อมข้อมูล Baseline ID
+        started = self.monitoring_page.start_monitoring(
+            camera,
+            baseline_id
+        )
+
+        # ถ้าเปิดกล้องไม่สำเร็จ
+        # ให้กลับไปเลือกกล้องใหม่
+        if not started:
+            self.pages.setCurrentWidget(
+                self.camera_setup_page
+            )

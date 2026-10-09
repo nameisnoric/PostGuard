@@ -29,6 +29,8 @@ class BaselinePage(QWidget):
 
     # ส่งข้อมูลกล้องกลับไป MainWindow
     back_requested = Signal(dict)
+    
+    monitoring_requested = Signal(dict, int)
 
     def __init__(self):
         super().__init__()
@@ -232,6 +234,10 @@ class BaselinePage(QWidget):
         #Save ไม่ได้จนกว่า calibrate จะเสร็จ
         self.save_button.setEnabled(False)
         
+        self.monitor_button = QPushButton(
+            "Start Monitoring"  
+        )
+        self.monitor_button.setEnabled(False)
         # ยังไม่เปิดจนกว่าจะทำ Calibration Logic
         self.calibrate_button.setEnabled(False)
         
@@ -245,6 +251,10 @@ class BaselinePage(QWidget):
         
         button_layout.addWidget(
             self.save_button
+        )
+        
+        button_layout.addWidget(
+            self.monitor_button
         )
 
         # -------------------------
@@ -290,6 +300,10 @@ class BaselinePage(QWidget):
         
         self.save_button.clicked.connect(
             self.save_baseline
+        )
+        
+        self.monitor_button.clicked.connect(
+            self.handle_start_monitoring
         )
 
     # =========================================================
@@ -468,6 +482,7 @@ class BaselinePage(QWidget):
         
         self.saved_baseline_id = None
         self.save_button.setEnabled(False)
+        self.monitor_button.setEnabled(False)
 
         self.calibrate_button.setEnabled(False)
 
@@ -718,6 +733,8 @@ class BaselinePage(QWidget):
             # -------------------------
 
             self.saved_baseline_id = baseline_id
+            
+            self.monitor_button.setEnabled(True)
 
             self.status_label.setText(
                 "Status: Baseline saved successfully"
@@ -1001,7 +1018,7 @@ class BaselinePage(QWidget):
         # -------------------------
         # Reset Calibration State
         # -------------------------
-
+        self.monitor_button.setEnabled(False)
         self.is_calibrating = False
 
         self.calibration_samples.clear()
@@ -1064,6 +1081,8 @@ class BaselinePage(QWidget):
         self.back_requested.emit(
             camera
         )
+        
+
 
     # =========================================================
     # Stop Camera When Page Is Hidden
@@ -1074,3 +1093,29 @@ class BaselinePage(QWidget):
         self.stop_camera_preview()
 
         super().hideEvent(event)
+         
+    def handle_start_monitoring(self) -> None:
+
+        if (
+            self.selected_camera is None
+            or self.saved_baseline_id is None
+        ):
+            QMessageBox.warning(
+                self,
+                "Monitoring",
+                "Please save your Personal Baseline first."
+            )
+            return
+
+        camera = self.selected_camera.copy()
+        baseline_id = self.saved_baseline_id
+
+        # ปิดกล้องหน้า Baseline ก่อน
+        # เพื่อไม่ให้เปิด Webcam ซ้อนกัน
+        self.stop_camera_preview()
+
+        self.monitoring_requested.emit(
+            camera,
+            baseline_id
+        )
+
