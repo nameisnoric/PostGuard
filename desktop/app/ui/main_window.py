@@ -1,3 +1,5 @@
+import requests
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -6,18 +8,19 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLabel,
     QStackedWidget,
-    QMessageBox
+    QMessageBox,
 )
 
 from app.core.token_store import TokenStore
+
 from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.camera_setup_page import CameraSetupPage
 from app.ui.pages.camera_preview_page import CameraPreviewPage
 from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
-from app.services.api_client import APIClient
+from app.ui.pages.session_summary_page import SessionSummaryPage
 
-import requests
+from app.services.api_client import APIClient
 
 class MainWindow(QMainWindow):
 
@@ -29,9 +32,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PostGuard")
         self.resize(1200, 750)
 
-        # -------------------------
-        # Central Widget
-        # -------------------------
+        # ========================================
+        # 1. Central Widget
+        # ========================================
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -40,12 +43,11 @@ class MainWindow(QMainWindow):
             central_widget
         )
 
-        # -------------------------
-        # Sidebar
-        # -------------------------
+        # ========================================
+        # 2. Sidebar
+        # ========================================
 
         sidebar = QWidget()
-
         sidebar.setFixedWidth(220)
 
         sidebar_layout = QVBoxLayout(
@@ -92,9 +94,9 @@ class MainWindow(QMainWindow):
             self.logout_button
         )
 
-        # -------------------------
-        # Pages
-        # -------------------------
+        # ========================================
+        # 3. Create Pages
+        # ========================================
 
         self.pages = QStackedWidget()
 
@@ -105,22 +107,31 @@ class MainWindow(QMainWindow):
         self.camera_setup_page = (
             CameraSetupPage()
         )
-        
+
         self.camera_preview_page = (
             CameraPreviewPage()
         )
-        
+
         self.baseline_page = (
             BaselinePage()
         )
-        
+
         self.monitoring_page = (
             MonitoringPage()
+        )
+
+        # NEW: Session Summary
+        self.session_summary_page = (
+            SessionSummaryPage()
         )
 
         self.history_placeholder = QLabel(
             "History Page"
         )
+
+        # ========================================
+        # 4. Register Pages
+        # ========================================
 
         self.pages.addWidget(
             self.dashboard_page
@@ -129,26 +140,31 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(
             self.camera_setup_page
         )
-        
+
         self.pages.addWidget(
             self.camera_preview_page
         )
-        
+
         self.pages.addWidget(
             self.baseline_page
         )
-        
+
         self.pages.addWidget(
             self.monitoring_page
+        )
+
+        # NEW: Register Session Summary
+        self.pages.addWidget(
+            self.session_summary_page
         )
 
         self.pages.addWidget(
             self.history_placeholder
         )
 
-        # -------------------------
-        # Main Layout
-        # -------------------------
+        # ========================================
+        # 5. Main Layout
+        # ========================================
 
         main_layout.addWidget(
             sidebar
@@ -158,9 +174,9 @@ class MainWindow(QMainWindow):
             self.pages
         )
 
-        # -------------------------
-        # Button Events
-        # -------------------------
+        # ========================================
+        # 6. Sidebar Events
+        # ========================================
 
         self.dashboard_button.clicked.connect(
             self.show_dashboard
@@ -177,79 +193,127 @@ class MainWindow(QMainWindow):
         self.logout_button.clicked.connect(
             self.logout
         )
-        
-        # -------------------------
-        # Camera Page Events
-        # ใส่ 3 ตัวตรงนี้
-        # -------------------------
 
+        # ========================================
+        # 7. Camera Page Events
+        # ========================================
+
+        # Camera Setup -> Camera Preview
         self.camera_setup_page.camera_selected.connect(
             self.show_camera_preview
         )
 
+        # Camera Preview -> Camera Setup
         self.camera_preview_page.back_requested.connect(
             self.show_camera_setup
         )
 
+        # Camera Preview -> Personal Baseline
         self.camera_preview_page.continue_requested.connect(
             self.handle_preview_continue
         )
-        
+
+        # Personal Baseline -> Camera Preview
         self.baseline_page.back_requested.connect(
             self.show_camera_preview
         )
-        
+
+        # ========================================
+        # 8. Monitoring Events
+        # ========================================
+
+        # Personal Baseline -> Monitoring
         self.baseline_page.monitoring_requested.connect(
             self.show_monitoring_page
         )
-        
+
+        # Monitoring -> Session Summary
         self.monitoring_page.stop_requested.connect(
+            self.show_session_summary
+        )
+
+        # Session Summary -> Dashboard
+        self.session_summary_page.back_requested.connect(
             self.show_dashboard
         )
 
-        # เปิด Dashboard เป็นหน้าแรก
+        # ========================================
+        # 9. Default Page
+        # ========================================
+
         self.pages.setCurrentWidget(
             self.dashboard_page
         )
+
+    # ============================================
+    # Dashboard
+    # ============================================
 
     def show_dashboard(self):
+
         self.camera_preview_page.stop_preview()
-        
+
         self.pages.setCurrentWidget(
             self.dashboard_page
         )
 
+    # ============================================
+    # Monitor Menu
+    # ============================================
+
     def show_monitor(self):
+
         self.camera_preview_page.stop_preview()
-        
+
         self.pages.setCurrentWidget(
             self.camera_setup_page
         )
 
+    # ============================================
+    # History
+    # ============================================
+
     def show_history(self):
+
         self.camera_preview_page.stop_preview()
-        
+
         self.pages.setCurrentWidget(
             self.history_placeholder
         )
 
+    # ============================================
+    # Logout
+    # ============================================
+
     def logout(self):
+
+        # Stop Camera Preview
         self.camera_preview_page.stop_preview()
+
+        # Stop Monitoring
         self.monitoring_page.stop_monitoring()
-        
+
+        # Clear Authentication Token
         TokenStore.clear_token()
+
         self.hide()
-        
+
         from app.ui.login_window import LoginWindow
-        
+
         self.login_window = LoginWindow()
         self.login_window.show()
+
         self.close()
-        
+
+    # ============================================
+    # Camera Preview
+    # ============================================
+
     def show_camera_preview(
         self,
         camera: dict
     ):
+
         self.camera_preview_page.start_preview(
             camera
         )
@@ -258,6 +322,9 @@ class MainWindow(QMainWindow):
             self.camera_preview_page
         )
 
+    # ============================================
+    # Camera Setup
+    # ============================================
 
     def show_camera_setup(self):
 
@@ -267,30 +334,39 @@ class MainWindow(QMainWindow):
             self.camera_setup_page
         )
 
+    # ============================================
+    # Camera Registration
+    # ============================================
+
     def handle_preview_continue(
         self,
         camera: dict
     ) -> None:
 
         try:
-            # 1. รับข้อมูลกล้องจาก OpenCV
-            device_index = camera.get("device_index")
+
+            # 1. Get Camera Device Index
+            device_index = camera.get(
+                "device_index"
+            )
 
             if device_index is None:
                 raise ValueError(
                     "Camera device index is missing."
                 )
 
-            # รหัสชั่วคราวสำหรับการพัฒนา
-            device_id = f"opencv-index:{device_index}"
+            # Temporary Device Identifier
+            device_id = (
+                f"opencv-index:{device_index}"
+            )
 
-            # 2. ตรวจสอบกล้องที่เคยบันทึกไว้
+            # 2. Load Registered Cameras
             response = APIClient.get_cameras()
 
             if not response.ok:
                 raise RuntimeError(
-                    f"Cannot load cameras: HTTP "
-                    f"{response.status_code}"
+                    f"Cannot load cameras: "
+                    f"HTTP {response.status_code}"
                 )
 
             saved_cameras = response.json()
@@ -300,7 +376,7 @@ class MainWindow(QMainWindow):
                     "Invalid camera list from server."
                 )
 
-            # 3. ค้นหากล้องที่มี device_id ตรงกัน
+            # 3. Find Existing Camera
             registered_camera = next(
                 (
                     item
@@ -310,10 +386,13 @@ class MainWindow(QMainWindow):
                 None
             )
 
-            # 4. ถ้าไม่พบ ให้ลงทะเบียนกล้องใหม่
+            # 4. Register New Camera
             if registered_camera is None:
 
-                print("REGISTERING CAMERA:", device_id)
+                print(
+                    "REGISTERING CAMERA:",
+                    device_id
+                )
 
                 response = APIClient.create_camera(
                     device_id=device_id,
@@ -340,19 +419,24 @@ class MainWindow(QMainWindow):
                 print("NEW CAMERA REGISTERED")
 
             else:
+
                 print("USING EXISTING CAMERA")
 
-            # 5. รับ camera_id จาก PostgreSQL
+            # 5. Get Camera ID from Database
             camera_id = registered_camera.get(
                 "camera_id"
             )
 
-            if not isinstance(camera_id, int):
+            if (
+                not isinstance(camera_id, int)
+                or isinstance(camera_id, bool)
+                or camera_id <= 0
+            ):
                 raise ValueError(
                     "Invalid camera_id from server."
                 )
 
-            # 6. รวมข้อมูลกล้องกับ camera_id
+            # 6. Prepare Camera Data
             camera_data = camera.copy()
 
             camera_data["camera_id"] = camera_id
@@ -375,44 +459,67 @@ class MainWindow(QMainWindow):
                 str(error)
             )
 
-            # เปิด Preview อีกครั้งเพื่อให้ลองใหม่ได้
+            # Reopen Preview for Retry
             self.camera_preview_page.start_preview(
                 camera
             )
 
             return
 
-        # 7. ส่งข้อมูลกล้องให้ BaselinePage
+        # 7. Send Camera Data to Baseline
         self.baseline_page.set_camera(
             camera_data
         )
 
-        # 8. เปิดหน้า Personal Baseline
+        # 8. Open Personal Baseline Page
         self.pages.setCurrentWidget(
             self.baseline_page
         )
 
-        
+    # ============================================
+    # Real-time Monitoring
+    # ============================================
+
     def show_monitoring_page(
         self,
         camera: dict,
         baseline_id: int
     ) -> None:
 
-        # เปลี่ยนจากหน้า Baseline ไป Monitoring
+        # Switch to Monitoring Page
         self.pages.setCurrentWidget(
             self.monitoring_page
         )
 
-        # เปิดกล้องพร้อมข้อมูล Baseline ID
+        # Start Monitoring with Camera
+        # and Saved Personal Baseline
         started = self.monitoring_page.start_monitoring(
             camera,
             baseline_id
         )
 
-        # ถ้าเปิดกล้องไม่สำเร็จ
-        # ให้กลับไปเลือกกล้องใหม่
+        # If Monitoring Cannot Start
         if not started:
+
             self.pages.setCurrentWidget(
                 self.camera_setup_page
             )
+
+    # ============================================
+    # Session Summary
+    # ============================================
+
+    def show_session_summary(
+        self,
+        summary: dict
+    ) -> None:
+
+        # Display Session Information
+        self.session_summary_page.set_summary(
+            summary
+        )
+
+        # Switch Monitoring -> Session Summary
+        self.pages.setCurrentWidget(
+            self.session_summary_page
+        )

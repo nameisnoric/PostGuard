@@ -1,4 +1,6 @@
-import cv2
+import cv2, math, statistics
+import time
+from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
@@ -13,19 +15,33 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
+from app.services.api_client import APIClient
 
 class MonitoringPage(QWidget):
 
-    stop_requested = Signal()
+    stop_requested = Signal(dict)
 
     def __init__(self):
         super().__init__()
 
         self.selected_camera = None
         self.baseline_id = None
+        self.baseline_data = None
         self.capture = None
         self.detector = None
         self.frame_count = 0
+        
+        # Session tracking
+        self.session_started_at = None
+        self.session_started_monotonic = None
+
+        self.detection_count = 0
+        self.pose_detected_count = 0
+        self.face_detected_count = 0
+
+        self.shoulder_samples = []
+        self.neck_samples = []
+
 
         self.timer = QTimer(self)
         self.timer.setInterval(30)
@@ -44,10 +60,14 @@ class MonitoringPage(QWidget):
 
         self.camera_label = QLabel("Camera: -")
         self.baseline_label = QLabel("Baseline ID: -")
+        self.baseline_shoulder_label = QLabel("Baseline Shoulder Tilt: -")
+        self.baseline_neck_label = QLabel("Baseline Neck Lateral Tilt: -")
         self.status_label = QLabel("Status: Not started")
 
         info_layout.addWidget(self.camera_label)
         info_layout.addWidget(self.baseline_label)
+        info_layout.addWidget(self.baseline_shoulder_label)
+        info_layout.addWidget(self.baseline_neck_label)
         info_layout.addWidget(self.status_label)
 
         self.preview_label = QLabel("Monitoring preview will appear here.")
@@ -71,10 +91,14 @@ class MonitoringPage(QWidget):
         )
         self.shoulder_label = QLabel("Shoulder Tilt: --")
         self.neck_label = QLabel("Neck Lateral Tilt: --")
+        self.shoulder_difference_label = QLabel("Shoulder Difference: --")
+        self.neck_difference_label = QLabel("Neck Difference: --")
 
         detection_layout.addWidget(self.detection_label)
         detection_layout.addWidget(self.shoulder_label)
         detection_layout.addWidget(self.neck_label)
+        detection_layout.addWidget(self.shoulder_difference_label)
+        detection_layout.addWidget(self.neck_difference_label)
 
         button_layout = QHBoxLayout()
 
@@ -91,6 +115,67 @@ class MonitoringPage(QWidget):
         layout.addWidget(self.preview_label, 1)
         layout.addWidget(detection_group)
         layout.addLayout(button_layout)
+
+
+    def load_personal_baseline(
+        self,
+        baseline_id: int,
+        camera_id: int
+    ) -> dict:
+
+        response = APIClient.get(
+            f"/personal-baselines/{baseline_id}"
+        )
+
+        if not response.ok:
+            raise RuntimeError(
+                f"Cannot load baseline: HTTP "
+                f"{response.status_code}"
+            )
+
+        baseline = response.json()
+
+        if not isinstance(baseline, dict):
+            raise ValueError(
+                "Invalid baseline response."
+            )
+
+        if baseline.get("baseline_id") != baseline_id:
+            raise ValueError(
+                "Baseline ID does not match."
+            )   
+
+        if baseline.get("camera_id") != camera_id:
+            raise ValueError(
+                "Baseline belongs to another camera."
+            )
+
+        shoulder = baseline.get("shoulder_angle")
+        neck = baseline.get("lateral_tilt_baseline")
+
+        for name, value in [
+            ("Shoulder", shoulder),
+            ("Neck", neck)
+        ]:
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise ValueError(
+                    f"Invalid {name} baseline value."
+                )
+
+        self.baseline_shoulder_label.setText(
+            f"Baseline Shoulder Tilt: {shoulder:+.2f}°"
+        )
+
+        self.baseline_neck_label.setText(
+            f"Baseline Neck Lateral Tilt: {neck:+.2f}°"
+        )
+
+        self.baseline_data = baseline
+        return baseline
 
     def start_monitoring(
         self,
@@ -120,7 +205,30 @@ class MonitoringPage(QWidget):
                 "A saved Baseline ID is required."
             )
             return False
+           
+        # -------------------------
+        # Load Personal Baseline
+        # -------------------------
 
+        camera_id = camera.get("camera_id")
+
+        try:
+            if not isinstance(camera_id, int) or camera_id <= 0:
+                raise ValueError("Invalid Camera ID.")
+
+            self.load_personal_baseline(
+                baseline_id=baseline_id,
+                camera_id=camera_id
+            )
+
+        except Exception as error:
+            QMessageBox.warning(
+                self,
+                "Baseline Error",
+                str(error)
+            )
+            return False
+        
         self.camera_label.setText(
             f"Camera: {camera.get('camera_name', 'Unknown Camera')}"
         )
@@ -150,6 +258,22 @@ class MonitoringPage(QWidget):
             return False
 
         self.frame_count = 0
+        
+        self.session_started_at = (
+            datetime.now().astimezone().isoformat(
+                timespec="seconds"
+            )
+        )
+
+        self.session_started_monotonic = time.monotonic()
+
+        self.detection_count = 0
+        self.pose_detected_count = 0
+        self.face_detected_count = 0
+
+        self.shoulder_samples = []
+        self.neck_samples = []
+
         self.status_label.setText("Status: Monitoring")
         self.stop_button.setEnabled(True)
 
@@ -163,6 +287,131 @@ class MonitoringPage(QWidget):
         )
 
         return True
+    
+    
+    def update_baseline_comparison(
+        self,
+        result: dict
+    ) -> None:
+
+        if self.baseline_data is None:
+            return
+
+        # -------------------------
+        # Current Detection Values
+        # -------------------------
+
+        current_shoulder = result.get(
+            "shoulder_tilt"
+        )
+
+        neck_result = result.get(
+            "neck_lateral_tilt"
+        )
+
+        current_neck = (
+            neck_result.get("neck_tilt")
+            if isinstance(neck_result, dict)
+            else None
+        )
+
+        # -------------------------
+        # Personal Baseline Values
+        # -------------------------
+
+        baseline_shoulder = self.baseline_data.get(
+            "shoulder_angle"
+        )
+
+        baseline_neck = self.baseline_data.get(
+            "lateral_tilt_baseline"
+        )
+
+        # -------------------------
+        # Shoulder Difference
+        # -------------------------
+
+        if (
+            current_shoulder is not None
+            and baseline_shoulder is not None
+            and math.isfinite(current_shoulder)
+            and math.isfinite(baseline_shoulder)
+        ):
+
+            shoulder_difference = (
+                current_shoulder - baseline_shoulder
+            )
+
+            self.shoulder_difference_label.setText(
+                f"Shoulder Difference: "
+                f"{shoulder_difference:+.2f}°"
+            )
+
+        else:
+            self.shoulder_difference_label.setText(
+                "Shoulder Difference: --"
+            )
+
+        # -------------------------
+        # Neck Difference
+        # -------------------------
+
+        if (
+            current_neck is not None
+            and baseline_neck is not None
+            and math.isfinite(current_neck)
+            and math.isfinite(baseline_neck)
+        ):
+
+            neck_difference = (
+                current_neck - baseline_neck
+            )
+
+            self.neck_difference_label.setText(
+                f"Neck Difference: "
+                f"{neck_difference:+.2f}°"
+            )
+
+        else:
+            self.neck_difference_label.setText(
+                "Neck Difference: --"
+            )
+
+
+    def record_detection_sample(self, result: dict) -> None:
+
+        # นับเฉพาะรอบที่ประมวลผล Detection สำเร็จ
+        self.detection_count += 1
+
+        if result.get("pose_points") is not None:
+            self.pose_detected_count += 1
+
+        if result.get("face_detected"):
+            self.face_detected_count += 1
+
+        shoulder = result.get("shoulder_tilt")
+
+        if (
+            isinstance(shoulder, (int, float))
+            and not isinstance(shoulder, bool)
+            and math.isfinite(shoulder)
+        ):
+            self.shoulder_samples.append(float(shoulder))
+
+        neck_result = result.get("neck_lateral_tilt")
+
+        neck = (
+            neck_result.get("neck_tilt")
+            if isinstance(neck_result, dict)
+            else None
+        )
+
+        if (
+            isinstance(neck, (int, float))
+            and not isinstance(neck, bool)
+            and math.isfinite(neck)
+        ):
+            self.neck_samples.append(float(neck))
 
     def update_frame(self) -> None:
 
@@ -189,7 +438,9 @@ class MonitoringPage(QWidget):
         ):
             try:
                 result = self.detector.process_frame(frame)
-
+                self.record_detection_sample(result)
+                self.update_baseline_comparison(result)
+                
                 pose_detected = result["pose_points"] is not None
                 face_detected = result["face_detected"]
 
@@ -287,6 +538,8 @@ class MonitoringPage(QWidget):
         )
         self.shoulder_label.setText("Shoulder Tilt: --")
         self.neck_label.setText("Neck Lateral Tilt: --")
+        self.shoulder_difference_label.setText("Shoulder Difference: --")
+        self.neck_difference_label.setText("Neck Difference: --")
 
         self.preview_label.clear()
         self.preview_label.setText(
@@ -295,11 +548,105 @@ class MonitoringPage(QWidget):
 
         self.status_label.setText("Status: Stopped")
         self.stop_button.setEnabled(False)
+        
+        # -------------------------
+        # Reset Session State
+        # -------------------------
+
+        self.session_started_at = None
+        self.session_started_monotonic = None
+               
+        # -------------------------
+        # Reset Baseline State
+        # -------------------------
+
+        self.baseline_data = None
+
+        self.baseline_shoulder_label.setText(
+            "Baseline Shoulder Tilt: --"
+        )
+
+        self.baseline_neck_label.setText(
+            "Baseline Neck Lateral Tilt: --"
+        )
+            
+        # -------------------------
+        # Reset Detection Statistics
+        # -------------------------
+
+        self.detection_count = 0    
+        self.pose_detected_count = 0
+        self.face_detected_count = 0
+
+        self.shoulder_samples.clear()
+        self.neck_samples.clear()
+    
+    def build_session_summary(self) -> dict:
+
+        if self.session_started_monotonic is None:
+            raise RuntimeError("No active monitoring session.")
+
+        duration = max(
+            0.0,
+            time.monotonic() - self.session_started_monotonic
+        )
+
+        baseline = self.baseline_data or {}
+        camera = self.selected_camera or {}
+
+        average_shoulder = (
+            statistics.mean(self.shoulder_samples)
+            if self.shoulder_samples
+            else None
+        )
+
+        average_neck = (
+            statistics.mean(self.neck_samples)
+            if self.neck_samples
+            else None
+        )
+
+        return {
+            "camera_name": camera.get(
+                "camera_name", "Unknown Camera"
+            ),
+            "camera_id": camera.get("camera_id"),
+            "baseline_id": self.baseline_id,
+            "started_at": self.session_started_at,
+            "ended_at": (
+                datetime.now().astimezone().isoformat(
+                    timespec="seconds"
+                )
+            ),
+            "duration_seconds": duration,
+            "detection_count": self.detection_count,
+            "pose_detected_count": self.pose_detected_count,
+            "face_detected_count": self.face_detected_count,
+            "average_shoulder": average_shoulder,
+            "average_neck": average_neck,
+            "baseline_shoulder": baseline.get(
+                "shoulder_angle"
+            ),
+            "baseline_neck": baseline.get(
+                "lateral_tilt_baseline"
+            )
+        }
+
 
     def handle_stop(self) -> None:
 
+        if self.session_started_monotonic is None:
+            return
+
+        # สรุปข้อมูลก่อนรีเซ็ต Monitoring
+        summary = self.build_session_summary()
+
+        # หยุด Webcam และ Detection
         self.stop_monitoring()
-        self.stop_requested.emit()
+
+        # ส่งข้อมูลไปหน้า Session Summary
+        self.stop_requested.emit(summary)
+
 
     def hideEvent(self, event) -> None:
 
