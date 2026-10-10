@@ -1,11 +1,13 @@
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QGroupBox
+    QGroupBox,
 )
+
 
 class SessionSummaryPage(QWidget):
 
@@ -16,40 +18,93 @@ class SessionSummaryPage(QWidget):
 
         layout = QVBoxLayout(self)
 
-        self.title_label = QLabel("Session Summary")
+        self.title_label = QLabel(
+            "Session Summary"
+        )
+
         self.description_label = QLabel(
             "Summary of the completed monitoring session."
         )
 
-        info_group = QGroupBox("Session Information")
+        # Session Information
+        info_group = QGroupBox(
+            "Session Information"
+        )
+
         info_layout = QVBoxLayout(info_group)
 
-        self.camera_label = QLabel("Camera: --")
-        self.baseline_label = QLabel("Baseline ID: --")
-        self.start_label = QLabel("Started: --")
-        self.end_label = QLabel("Ended: --")
-        self.duration_label = QLabel("Duration: --")
+        self.session_label = QLabel(
+            "Session ID: --"
+        )
+
+        self.database_label = QLabel(
+            "Database Status: --"
+        )
+
+        self.camera_label = QLabel(
+            "Camera: --"
+        )
+
+        self.baseline_label = QLabel(
+            "Baseline ID: --"
+        )
+
+        self.start_label = QLabel(
+            "Started: --"
+        )
+
+        self.end_label = QLabel(
+            "Ended: --"
+        )
+
+        self.duration_label = QLabel(
+            "Duration: --"
+        )
 
         for label in (
+            self.session_label,
+            self.database_label,
             self.camera_label,
             self.baseline_label,
             self.start_label,
             self.end_label,
-            self.duration_label
+            self.duration_label,
         ):
             info_layout.addWidget(label)
 
-        result_group = QGroupBox("Detection Summary")
-        result_layout = QVBoxLayout(result_group)
+        # Detection Summary
+        result_group = QGroupBox(
+            "Detection Summary"
+        )
 
-        self.count_label = QLabel("Detection Cycles: --")
-        self.pose_label = QLabel("Pose Detected: --")
-        self.face_label = QLabel("Face Detected: --")
-        self.shoulder_label = QLabel("Average Shoulder Tilt: --")
-        self.neck_label = QLabel("Average Neck Lateral Tilt: --")
+        result_layout = QVBoxLayout(
+            result_group
+        )
+
+        self.count_label = QLabel(
+            "Detection Cycles: --"
+        )
+
+        self.pose_label = QLabel(
+            "Pose Detected: --"
+        )
+
+        self.face_label = QLabel(
+            "Face Detected: --"
+        )
+
+        self.shoulder_label = QLabel(
+            "Average Shoulder Tilt: --"
+        )
+
+        self.neck_label = QLabel(
+            "Average Neck Lateral Tilt: --"
+        )
+
         self.baseline_shoulder_label = QLabel(
             "Baseline Shoulder Tilt: --"
         )
+
         self.baseline_neck_label = QLabel(
             "Baseline Neck Lateral Tilt: --"
         )
@@ -61,16 +116,26 @@ class SessionSummaryPage(QWidget):
             self.shoulder_label,
             self.neck_label,
             self.baseline_shoulder_label,
-            self.baseline_neck_label
+            self.baseline_neck_label,
         ):
             result_layout.addWidget(label)
 
         self.note_label = QLabel(
-            "Risk assessment: Not available yet.\n"
-            "This summary is not saved to the database."
+            "Database: Session lifecycle saved "
+            "(RUNNING → COMPLETED).\n"
+            "Local detection averages are displayed "
+            "only; they are NOT stored in the "
+            "Session Summary database table.\n"
+            "Risk assessment and blink rate "
+            "are not enabled yet."
         )
 
-        self.back_button = QPushButton("Back to Dashboard")
+        self.note_label.setWordWrap(True)
+
+        self.back_button = QPushButton(
+            "Back to Dashboard"
+        )
+
         self.back_button.clicked.connect(
             lambda: self.back_requested.emit()
         )
@@ -85,63 +150,89 @@ class SessionSummaryPage(QWidget):
 
     @staticmethod
     def format_angle(value):
+
         if value is None:
             return "--"
+
         return f"{value:+.2f}°"
 
     def set_summary(self, summary: dict) -> None:
 
+        self.session_label.setText(
+            f"Session ID: {summary.get('session_id', '--')}"
+        )
+
+        self.database_label.setText(
+            "Database Status: "
+            + str(summary.get("database_status", "--"))
+        )
+
         self.camera_label.setText(
-            f"Camera: {summary['camera_name']}"
+            f"Camera: {summary.get('camera_name', '--')}"
         )
 
         self.baseline_label.setText(
-            f"Baseline ID: {summary['baseline_id']}"
+            f"Baseline ID: {summary.get('baseline_id', '--')}"
         )
 
         self.start_label.setText(
-            f"Started: {summary['started_at']}"
+            f"Started: {summary.get('started_at', '--')}"
         )
 
         self.end_label.setText(
-            f"Ended: {summary['ended_at']}"
+            f"Ended: {summary.get('ended_at', '--')}"
         )
 
-        seconds = summary["duration_seconds"]
-        minutes, remaining = divmod(int(seconds), 60)
+        seconds = summary.get("duration_seconds") or 0
+
+        minutes, remaining = divmod(
+            int(seconds),
+            60,
+        )
 
         self.duration_label.setText(
             f"Duration: {minutes:02d}:{remaining:02d}"
         )
 
         self.count_label.setText(
-            f"Detection Cycles: {summary['detection_count']}"
+            "Detection Cycles: "
+            + str(summary.get("detection_count", 0))
         )
 
         self.pose_label.setText(
-            f"Pose Detected: {summary['pose_detected_count']}"
+            "Pose Detected: "
+            + str(summary.get("pose_detected_count", 0))
         )
 
         self.face_label.setText(
-            f"Face Detected: {summary['face_detected_count']}"
+            "Face Detected: "
+            + str(summary.get("face_detected_count", 0))
         )
 
         self.shoulder_label.setText(
             "Average Shoulder Tilt: "
-            + self.format_angle(summary["average_shoulder"])
+            + self.format_angle(
+                summary.get("average_shoulder")
+            )
         )
 
         self.neck_label.setText(
             "Average Neck Lateral Tilt: "
-            + self.format_angle(summary["average_neck"])
+            + self.format_angle(
+                summary.get("average_neck")
+            )
         )
 
         self.baseline_shoulder_label.setText(
             "Baseline Shoulder Tilt: "
-            + self.format_angle(summary["baseline_shoulder"])
+            + self.format_angle(
+                summary.get("baseline_shoulder")
+            )
         )
 
         self.baseline_neck_label.setText(
             "Baseline Neck Lateral Tilt: "
-            + self.format_angle(summary["baseline_neck"])
+            + self.format_angle(
+                summary.get("baseline_neck")
+            )
         )
