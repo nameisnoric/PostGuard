@@ -19,6 +19,7 @@ from app.ui.pages.camera_preview_page import CameraPreviewPage
 from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
+from app.ui.pages.history_page import HistoryPage
 
 from app.services.api_client import APIClient
 
@@ -125,8 +126,8 @@ class MainWindow(QMainWindow):
             SessionSummaryPage()
         )
 
-        self.history_placeholder = QLabel(
-            "History Page"
+        self.history_page = (
+            HistoryPage()
         )
 
         # ========================================
@@ -159,7 +160,7 @@ class MainWindow(QMainWindow):
         )
 
         self.pages.addWidget(
-            self.history_placeholder
+            self.history_page
         )
 
         # ========================================
@@ -275,11 +276,16 @@ class MainWindow(QMainWindow):
 
     def show_history(self):
 
+        # Stop camera preview before switching pages
         self.camera_preview_page.stop_preview()
 
+        # Display History page
         self.pages.setCurrentWidget(
-            self.history_placeholder
+            self.history_page
         )
+
+        # Load saved sessions from PostgreSQL
+        self.history_page.load_sessions()
 
     # ============================================
     # Logout
