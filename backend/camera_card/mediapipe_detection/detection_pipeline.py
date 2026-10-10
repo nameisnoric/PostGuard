@@ -7,11 +7,21 @@ from pathlib import Path
 # Detector
 # ==========================================================
 
-from .pose.pose_detector import PoseDetector
-from .face.face_detector import FaceDetector
+from .pose.pose_detector import (
+    PoseDetector,
+)
 
-from .face.face_points import extract_face_points
-from .face.face_orientation import extract_face_orientation
+from .face.face_detector import (
+    FaceDetector,
+)
+
+from .face.face_points import (
+    extract_face_points,
+)
+
+from .face.face_orientation import (
+    extract_face_orientation,
+)
 
 
 # ==========================================================
@@ -28,11 +38,11 @@ from .pose.pose_validator import (
 
 
 # ==========================================================
-# Face Feature Validator
+# Face Validator
 # ==========================================================
 
 from .face.face_feature_validator import (
-    validate_face_feature
+    validate_face_feature,
 )
 
 
@@ -48,11 +58,15 @@ from .posture.posture_features import (
 )
 
 from .posture.relative_distance import (
-    calculate_eye_distance
+    calculate_eye_distance,
 )
 
 from .posture.torso_orientation import (
-    calculate_torso_orientation
+    calculate_torso_orientation,
+)
+
+from .posture.context_filter import (
+    PostureContextFilter,
 )
 
 
@@ -61,11 +75,40 @@ from .posture.torso_orientation import (
 # ==========================================================
 
 from .eye.eye_measurement import (
-    calculate_eye_openness
+    calculate_eye_openness,
 )
 
 from .eye.eye_state import (
-    EyeStateDetector
+    EyeStateDetector,
+)
+
+from .eye.blink_detector import (
+    BlinkDetector,
+)
+
+from .eye.eye_closure import (
+    EyeClosureDetector,
+)
+
+
+# ==========================================================
+# Feature Status
+# ==========================================================
+
+STATUS_VALIDATED = (
+    "validated_prototype"
+)
+
+STATUS_CANDIDATE = (
+    "candidate_prototype"
+)
+
+STATUS_EXPERIMENTAL = (
+    "experimental"
+)
+
+STATUS_DIAGNOSTIC = (
+    "diagnostic"
 )
 
 
@@ -73,67 +116,73 @@ from .eye.eye_state import (
 # Numeric Helper
 # ==========================================================
 
-def _is_finite_number(value):
-    """
-    ตรวจว่าเป็นตัวเลขปกติที่ใช้งานได้หรือไม่
-
-    ป้องกัน:
-    - None
-    - NaN
-    - Infinity
-    - String ที่แปลงไม่ได้
-    """
-
+def _is_finite_number(
+    value
+):
     if value is None:
         return False
 
     try:
-        return math.isfinite(float(value))
+        return math.isfinite(
+            float(
+                value
+            )
+        )
 
-    except (TypeError, ValueError):
+    except (
+        TypeError,
+        ValueError,
+    ):
         return False
 
 
 # ==========================================================
-# Feature Result Helper
+# Invalid Feature
 # ==========================================================
 
 def _invalid_feature(
     reason,
-    status="validated",
+    status=STATUS_CANDIDATE,
     unit=None,
     details=None,
 ):
-    """
-    Output มาตรฐานเมื่อ Feature ใช้งานไม่ได้
-    """
-
     result = {
         "valid": False,
+
         "value": None,
+
         "unit": unit,
-        "reason": reason,
-        "status": status,
+
+        "reason": (
+            reason
+        ),
+
+        "status": (
+            status
+        ),
     }
 
     if details is not None:
-        result["details"] = details
+        result[
+            "details"
+        ] = details
 
     return result
 
 
+# ==========================================================
+# Valid Feature
+# ==========================================================
+
 def _valid_feature(
     value,
     unit=None,
-    status="validated",
+    status=STATUS_CANDIDATE,
     extra=None,
 ):
-    """
-    Output มาตรฐานเมื่อ Feature ใช้งานได้
-    """
-
-    if not _is_finite_number(value):
-
+    if not _is_finite_number(
+        value
+    ):
         return _invalid_feature(
             reason="INVALID_RESULT",
             status=status,
@@ -142,14 +191,24 @@ def _valid_feature(
 
     result = {
         "valid": True,
-        "value": float(value),
+
+        "value": float(
+            value
+        ),
+
         "unit": unit,
+
         "reason": "OK",
-        "status": status,
+
+        "status": (
+            status
+        ),
     }
 
     if extra is not None:
-        result["extra"] = extra
+        result[
+            "extra"
+        ] = extra
 
     return result
 
@@ -162,38 +221,43 @@ class DetectionPipeline:
     """
     PostGuard Detection Pipeline
 
+    Input:
+        OpenCV BGR Frame แบบ UNMIRRORED
 
-    Frame Rule
-    ----------
+    Pipeline ทำ:
+        - Pose Detection
+        - Face Detection
 
-    Input ของ Pipeline ต้องเป็น:
+        - Context Filter
 
-        UNMIRRORED FRAME
+        - Shoulder Tilt
+        - Shoulder Elevation
 
-    ถ้ามี Camera Roll Correction:
+        - Neck Lateral Tilt
+        - Neck Flexion
 
-        Raw Frame
-            ↓
-        Roll Correction
-            ↓
-        DetectionPipeline
+        - Head Yaw
+        - Head Roll
 
+        - Forward Head Experimental
 
-    การ Mirror ต้องเกิดเฉพาะตอน Display:
+        - Torso Orientation
 
-        Detection Frame
-            ↓
-        cv2.flip()
-            ↓
-        Display
+        - Relative Eye Distance
 
+        - Eye Openness
+        - Eye State
+        - Blink
+        - Long Eye Closure
 
-    Pipeline นี้ไม่ทำ:
-    - Personal Baseline
-    - Relative Neck Rotation จาก Baseline
-    - RULA
-    - Risk
-    - Alert
+    Pipeline ไม่ทำ:
+        - Personal Baseline Comparison
+        - Final Relative Neck Rotation
+        - Risk Assessment
+        - RULA
+        - Sustained Risk
+        - Alert
+        - Session Summary
     """
 
     # ======================================================
@@ -205,13 +269,7 @@ class DetectionPipeline:
         pose_model_path=None,
         face_model_path=None,
     ):
-
         # --------------------------------------------------
-        # Camera Card Root
-        #
-        # detection_pipeline.py
-        # อยู่:
-        #
         # camera_card/
         #   mediapipe_detection/
         #       detection_pipeline.py
@@ -220,9 +278,13 @@ class DetectionPipeline:
         # --------------------------------------------------
 
         camera_card_dir = (
-            Path(__file__)
+            Path(
+                __file__
+            )
             .resolve()
-            .parents[1]
+            .parents[
+                1
+            ]
         )
 
         model_dir = (
@@ -231,115 +293,160 @@ class DetectionPipeline:
             "models"
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # Pose Model
-        # --------------------------------------------------
+        # ==================================================
 
         if pose_model_path is None:
-
             pose_model_path = (
                 model_dir
                 /
                 "pose_landmarker_lite.task"
             )
 
-        # --------------------------------------------------
+        # ==================================================
         # Face Model
-        # --------------------------------------------------
+        # ==================================================
 
         if face_model_path is None:
-
             face_model_path = (
                 model_dir
                 /
                 "face_landmarker.task"
             )
 
-        # --------------------------------------------------
-        # Verify Models
-        # --------------------------------------------------
+        # ==================================================
+        # Verify Files
+        # ==================================================
 
         if not Path(
             pose_model_path
         ).exists():
-
             raise FileNotFoundError(
-                f"Pose model not found: "
+                "Pose model not found: "
                 f"{pose_model_path}"
             )
 
         if not Path(
             face_model_path
         ).exists():
-
             raise FileNotFoundError(
-                f"Face model not found: "
+                "Face model not found: "
                 f"{face_model_path}"
             )
 
-        # --------------------------------------------------
+        # ==================================================
         # Pose Detector
-        # --------------------------------------------------
+        # ==================================================
 
-        self.pose_detector = PoseDetector(
-            model_path=str(
-                pose_model_path
+        self.pose_detector = (
+            PoseDetector(
+                model_path=str(
+                    pose_model_path
+                )
             )
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # Face Detector
-        # --------------------------------------------------
+        # ==================================================
 
         try:
-
-            self.face_detector = FaceDetector(
-                model_path=str(
-                    face_model_path
+            self.face_detector = (
+                FaceDetector(
+                    model_path=str(
+                        face_model_path
+                    )
                 )
             )
 
         except Exception:
-
             self.pose_detector.close()
-
             raise
 
-        # --------------------------------------------------
-        # Eye State Detector
-        # --------------------------------------------------
+        # ==================================================
+        # Eye Runtime
+        # ==================================================
 
         self.eye_state_detector = (
             EyeStateDetector()
         )
 
+        self.blink_detector = (
+            BlinkDetector()
+        )
+
+        self.eye_closure_detector = (
+            EyeClosureDetector()
+        )
+
+        # ==================================================
+        # Posture Context Filter
+        #
+        # ต้องเป็น Instance เดียว
+        # และอยู่ข้ามหลาย Frame
+        # ==================================================
+
+        self.context_filter = (
+            PostureContextFilter()
+        )
 
     # ======================================================
-    # Eye Calibration
+    # Start Eye Calibration
     # ======================================================
 
     def start_eye_calibration(
         self,
         timestamp=None,
     ):
-        """
-        เริ่ม Open-eye Calibration
-        """
+        self.blink_detector.reset()
+
+        self.eye_closure_detector.reset()
 
         self.eye_state_detector.start_calibration(
             timestamp=timestamp
         )
 
+    # ======================================================
+    # Reset Eye
+    # ======================================================
 
     def reset_eye_calibration(
         self
     ):
-        """
-        Reset Eye Calibration
-        """
-
         self.eye_state_detector.reset()
 
+        self.blink_detector.reset()
+
+        self.eye_closure_detector.reset()
+
+    # ======================================================
+    # Reset Context
+    # ======================================================
+
+    def reset_context(
+        self
+    ):
+        """
+        เรียกเมื่อ:
+
+        - เริ่ม Session ใหม่
+        - เปลี่ยนกล้อง
+        - กล้อง reconnect
+        """
+
+        self.context_filter.reset()
+
+    # ======================================================
+    # Reset Runtime
+    # ======================================================
+
+    def reset_runtime(
+        self
+    ):
+        self.reset_eye_calibration()
+
+        self.reset_context()
 
     # ======================================================
     # Process Frame
@@ -353,28 +460,18 @@ class DetectionPipeline:
         """
         ประมวลผล Frame หนึ่งภาพ
 
-        Parameters
-        ----------
-        frame:
-            OpenCV BGR Frame
-            ต้องเป็น Unmirrored
+        IMPORTANT:
 
-        timestamp:
-            monotonic timestamp
-            ใช้กับ temporal detection
+        frame ต้องเป็น UNMIRRORED
 
-        Returns
-        -------
-        dict
-            Detection Result
+        Mirror เฉพาะตอน Display
         """
 
-        # --------------------------------------------------
+        # ==================================================
         # Validate Frame
-        # --------------------------------------------------
+        # ==================================================
 
         if frame is None:
-
             raise ValueError(
                 "Detection frame is None"
             )
@@ -383,23 +480,21 @@ class DetectionPipeline:
             frame,
             "size"
         ):
-
             raise ValueError(
-                "Detection frame must be a numpy image"
+                "Detection frame must be "
+                "a numpy image"
             )
 
         if frame.size == 0:
-
             raise ValueError(
                 "Detection frame is empty"
             )
 
-        # --------------------------------------------------
+        # ==================================================
         # Timestamp
-        # --------------------------------------------------
+        # ==================================================
 
         if timestamp is None:
-
             timestamp = (
                 time.perf_counter()
             )
@@ -409,9 +504,10 @@ class DetectionPipeline:
         )
 
         frame_height, frame_width = (
-            frame.shape[:2]
+            frame.shape[
+                :2
+            ]
         )
-
 
         # ==================================================
         # POSE DETECTION
@@ -424,9 +520,38 @@ class DetectionPipeline:
         )
 
         pose_detected = (
-            pose_points is not None
+            pose_points
+            is not None
         )
 
+        # ==================================================
+        # CONTEXT FILTER
+        #
+        # IMPORTANT:
+        #
+        # Context ไม่หยุด Feature Calculation
+        #
+        # มันเพียงบอก Session/Risk Layer ว่า
+        # Frame นี้ควรถูกใช้เพิ่ม Risk Timer หรือไม่
+        # ==================================================
+
+        context = (
+            self.context_filter.update(
+                points=pose_points,
+
+                frame_width=(
+                    frame_width
+                ),
+
+                frame_height=(
+                    frame_height
+                ),
+
+                timestamp=(
+                    timestamp
+                ),
+            )
+        )
 
         # ==================================================
         # FACE DETECTION
@@ -444,7 +569,10 @@ class DetectionPipeline:
                 "face_landmarks",
                 None,
             )
-            if face_result is not None
+
+            if face_result
+            is not None
+
             else None
         )
 
@@ -453,7 +581,6 @@ class DetectionPipeline:
         )
 
         if face_detected:
-
             face_points = (
                 extract_face_points(
                     face_result,
@@ -463,12 +590,12 @@ class DetectionPipeline:
             )
 
         else:
-
             face_points = None
-
 
         # ==================================================
         # SHOULDER TILT
+        #
+        # Validated Prototype
         # ==================================================
 
         shoulder_validation = (
@@ -480,10 +607,8 @@ class DetectionPipeline:
         if shoulder_validation[
             "valid"
         ]:
-
             shoulder_value = (
                 calculate_shoulder_tilt(
-
                     pose_points[
                         "left_shoulder"
                     ],
@@ -497,27 +622,42 @@ class DetectionPipeline:
             shoulder_tilt = (
                 _valid_feature(
                     shoulder_value,
+
                     unit="deg",
-                    status="validated",
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
                 )
             )
 
         else:
-
             shoulder_tilt = (
                 _invalid_feature(
-                    reason=shoulder_validation[
-                        "reason"
-                    ],
-                    status="validated",
+                    reason=(
+                        shoulder_validation[
+                            "reason"
+                        ]
+                    ),
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
+
                     unit="deg",
-                    details=shoulder_validation,
+
+                    details=(
+                        shoulder_validation
+                    ),
                 )
             )
 
-
         # ==================================================
-        # SHOULDER ELEVATION
+        # SHOULDER ELEVATION V2
+        #
+        # Candidate Prototype
+        #
+        # ต้องผ่าน Cross-talk Test ใหม่ก่อน Lock
         # ==================================================
 
         elevation_validation = (
@@ -529,13 +669,11 @@ class DetectionPipeline:
         if elevation_validation[
             "valid"
         ]:
-
             elevation_result = (
                 calculate_shoulder_elevation(
-
-                    pose_points[
+                    pose_points.get(
                         "nose"
-                    ],
+                    ),
 
                     pose_points[
                         "left_shoulder"
@@ -547,35 +685,28 @@ class DetectionPipeline:
                 )
             )
 
-            # ----------------------------------------------
-            # IMPORTANT
-            #
-            # posture_features.py คืน:
-            #
-            # {
-            #     "left": ...,
-            #     "right": ...
-            # }
-            #
-            # ไม่ใช่:
-            #
-            # left_elevation
-            # right_elevation
-            # ----------------------------------------------
-
             if elevation_result is None:
-
                 shoulder_elevation = {
                     "valid": False,
+
                     "left": None,
+
                     "right": None,
-                    "unit": "ratio",
-                    "reason": "INVALID_RESULT",
-                    "status": "validated",
+
+                    "unit": (
+                        "ratio"
+                    ),
+
+                    "reason": (
+                        "INVALID_RESULT"
+                    ),
+
+                    "status": (
+                        STATUS_CANDIDATE
+                    ),
                 }
 
             else:
-
                 left_value = (
                     elevation_result.get(
                         "left"
@@ -599,7 +730,6 @@ class DetectionPipeline:
                 )
 
                 if values_valid:
-
                     shoulder_elevation = {
                         "valid": True,
 
@@ -611,29 +741,57 @@ class DetectionPipeline:
                             right_value
                         ),
 
-                        "unit": "ratio",
+                        "unit": (
+                            "ratio"
+                        ),
+
                         "reason": "OK",
-                        "status": "validated",
+
+                        "status": (
+                            STATUS_CANDIDATE
+                        ),
+
+                        "extra": {
+                            "shoulder_width": (
+                                elevation_result.get(
+                                    "shoulder_width"
+                                )
+                            ),
+                        },
                     }
 
                 else:
-
                     shoulder_elevation = {
                         "valid": False,
+
                         "left": None,
+
                         "right": None,
-                        "unit": "ratio",
-                        "reason": "INVALID_RESULT",
-                        "status": "validated",
+
+                        "unit": (
+                            "ratio"
+                        ),
+
+                        "reason": (
+                            "INVALID_RESULT"
+                        ),
+
+                        "status": (
+                            STATUS_CANDIDATE
+                        ),
                     }
 
         else:
-
             shoulder_elevation = {
                 "valid": False,
+
                 "left": None,
+
                 "right": None,
-                "unit": "ratio",
+
+                "unit": (
+                    "ratio"
+                ),
 
                 "reason": (
                     elevation_validation[
@@ -641,16 +799,19 @@ class DetectionPipeline:
                     ]
                 ),
 
-                "status": "validated",
+                "status": (
+                    STATUS_CANDIDATE
+                ),
 
                 "details": (
                     elevation_validation
                 ),
             }
 
-
         # ==================================================
         # NECK LATERAL TILT
+        #
+        # Validated Prototype
         # ==================================================
 
         neck_validation = (
@@ -662,10 +823,8 @@ class DetectionPipeline:
         if neck_validation[
             "valid"
         ]:
-
             neck_result = (
                 calculate_neck_lateral_tilt(
-
                     pose_points[
                         "left_ear"
                     ],
@@ -685,26 +844,32 @@ class DetectionPipeline:
             )
 
             if neck_result is None:
-
                 neck_lateral_tilt = (
                     _invalid_feature(
-                        reason="INVALID_RESULT",
-                        status="validated",
+                        reason=(
+                            "INVALID_RESULT"
+                        ),
+
+                        status=(
+                            STATUS_VALIDATED
+                        ),
+
                         unit="deg",
                     )
                 )
 
             else:
-
                 neck_lateral_tilt = (
                     _valid_feature(
-
                         neck_result.get(
                             "neck_tilt"
                         ),
 
                         unit="deg",
-                        status="validated",
+
+                        status=(
+                            STATUS_VALIDATED
+                        ),
 
                         extra={
                             "ear_angle": (
@@ -718,29 +883,37 @@ class DetectionPipeline:
                                     "shoulder_angle"
                                 )
                             ),
-                        }
+                        },
                     )
                 )
 
         else:
-
             neck_lateral_tilt = (
                 _invalid_feature(
-                    reason=neck_validation[
-                        "reason"
-                    ],
-                    status="validated",
+                    reason=(
+                        neck_validation[
+                            "reason"
+                        ]
+                    ),
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
+
                     unit="deg",
-                    details=neck_validation,
+
+                    details=(
+                        neck_validation
+                    ),
                 )
             )
-
 
         # ==================================================
         # FORWARD HEAD
         #
-        # ยัง Candidate จนกว่า Final Validation
-        # จะถูก LOCK อย่างเป็นทางการ
+        # Experimental
+        #
+        # ยังไม่ใช้ Risk / Alert
         # ==================================================
 
         forward_validation = (
@@ -752,10 +925,8 @@ class DetectionPipeline:
         if forward_validation[
             "valid"
         ]:
-
             forward_result = (
                 calculate_forward_head(
-
                     pose_points[
                         "nose"
                     ],
@@ -771,26 +942,32 @@ class DetectionPipeline:
             )
 
             if forward_result is None:
-
                 forward_head = (
                     _invalid_feature(
-                        reason="INVALID_RESULT",
-                        status="candidate",
+                        reason=(
+                            "INVALID_RESULT"
+                        ),
+
+                        status=(
+                            STATUS_EXPERIMENTAL
+                        ),
+
                         unit="ratio",
                     )
                 )
 
             else:
-
                 forward_head = (
                     _valid_feature(
-
                         forward_result.get(
                             "forward_head"
                         ),
 
                         unit="ratio",
-                        status="candidate",
+
+                        status=(
+                            STATUS_EXPERIMENTAL
+                        ),
 
                         extra={
                             "nose_z": (
@@ -810,28 +987,40 @@ class DetectionPipeline:
                                     "shoulder_width"
                                 )
                             ),
-                        }
+                        },
                     )
                 )
 
         else:
-
             forward_head = (
                 _invalid_feature(
-                    reason=forward_validation[
-                        "reason"
-                    ],
-                    status="candidate",
+                    reason=(
+                        forward_validation[
+                            "reason"
+                        ]
+                    ),
+
+                    status=(
+                        STATUS_EXPERIMENTAL
+                    ),
+
                     unit="ratio",
-                    details=forward_validation,
+
+                    details=(
+                        forward_validation
+                    ),
                 )
             )
-
 
         # ==================================================
         # TORSO ORIENTATION
         #
         # Experimental
+        #
+        # ใช้ Shoulder World X/Z
+        # ไม่ใช้ Hip/Waist
+        #
+        # ต้องผ่าน Torso Cross-talk Test
         # ==================================================
 
         torso_validation = (
@@ -843,7 +1032,6 @@ class DetectionPipeline:
         if torso_validation[
             "valid"
         ]:
-
             torso_result = (
                 calculate_torso_orientation(
                     pose_points
@@ -851,31 +1039,43 @@ class DetectionPipeline:
             )
 
             if torso_result is None:
-
                 torso_orientation = (
                     _invalid_feature(
-                        reason="INVALID_RESULT",
-                        status="experimental",
+                        reason=(
+                            "INVALID_RESULT"
+                        ),
+
+                        status=(
+                            STATUS_EXPERIMENTAL
+                        ),
+
                         unit="deg",
                     )
                 )
 
             else:
-
                 torso_orientation = (
                     _valid_feature(
-
                         torso_result.get(
                             "angle"
                         ),
 
                         unit="deg",
-                        status="experimental",
+
+                        status=(
+                            STATUS_EXPERIMENTAL
+                        ),
 
                         extra={
                             "world_dx": (
                                 torso_result.get(
                                     "world_dx"
+                                )
+                            ),
+
+                            "world_dy": (
+                                torso_result.get(
+                                    "world_dy"
                                 )
                             ),
 
@@ -890,23 +1090,42 @@ class DetectionPipeline:
                                     "width_3d"
                                 )
                             ),
-                        }
+
+                            "width_xz": (
+                                torso_result.get(
+                                    "width_xz"
+                                )
+                            ),
+
+                            "depth_ratio": (
+                                torso_result.get(
+                                    "depth_ratio"
+                                )
+                            ),
+                        },
                     )
                 )
 
         else:
-
             torso_orientation = (
                 _invalid_feature(
-                    reason=torso_validation[
-                        "reason"
-                    ],
-                    status="experimental",
+                    reason=(
+                        torso_validation[
+                            "reason"
+                        ]
+                    ),
+
+                    status=(
+                        STATUS_EXPERIMENTAL
+                    ),
+
                     unit="deg",
-                    details=torso_validation,
+
+                    details=(
+                        torso_validation
+                    ),
                 )
             )
-
 
         # ==================================================
         # FACE ORIENTATION
@@ -914,7 +1133,6 @@ class DetectionPipeline:
 
         orientation_validation = (
             validate_face_feature(
-
                 face_points,
 
                 required_points=(
@@ -938,53 +1156,71 @@ class DetectionPipeline:
         if orientation_validation[
             "valid"
         ]:
-
             orientation = (
                 extract_face_orientation(
                     face_result
                 )
             )
 
-
         # ==================================================
-        # NECK FLEXION / HEAD YAW / HEAD ROLL
+        # NECK FLEXION
+        # HEAD YAW
+        # HEAD ROLL
         # ==================================================
 
         if orientation is not None:
 
+            # ----------------------------------------------
+            # Neck Flexion
+            # ----------------------------------------------
+
             neck_flexion = (
                 _valid_feature(
-
                     orientation.get(
                         "pitch"
                     ),
 
                     unit="deg",
-                    status="validated",
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
                 )
             )
 
+            # ----------------------------------------------
+            # Head Yaw
+            #
+            # ยังไม่ใช่ Final Neck Rotation
+            # ----------------------------------------------
+
             head_yaw = (
                 _valid_feature(
-
                     orientation.get(
                         "yaw"
                     ),
 
                     unit="deg",
+
                     status="candidate",
                 )
             )
 
+            # ----------------------------------------------
+            # Head Roll
+            # ----------------------------------------------
+
             head_roll = (
                 _valid_feature(
-
                     orientation.get(
                         "roll"
                     ),
 
                     unit="deg",
-                    status="diagnostic",
+
+                    status=(
+                        STATUS_DIAGNOSTIC
+                    ),
                 )
             )
 
@@ -993,7 +1229,6 @@ class DetectionPipeline:
             if not orientation_validation[
                 "valid"
             ]:
-
                 orientation_reason = (
                     orientation_validation[
                         "reason"
@@ -1001,52 +1236,79 @@ class DetectionPipeline:
                 )
 
             else:
-
                 orientation_reason = (
                     "ORIENTATION_NOT_AVAILABLE"
                 )
 
             neck_flexion = (
                 _invalid_feature(
-                    reason=orientation_reason,
-                    status="validated",
+                    reason=(
+                        orientation_reason
+                    ),
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
+
                     unit="deg",
-                    details=orientation_validation,
+
+                    details=(
+                        orientation_validation
+                    ),
                 )
             )
 
             head_yaw = (
                 _invalid_feature(
-                    reason=orientation_reason,
+                    reason=(
+                        orientation_reason
+                    ),
+
                     status="candidate",
+
                     unit="deg",
-                    details=orientation_validation,
+
+                    details=(
+                        orientation_validation
+                    ),
                 )
             )
 
             head_roll = (
                 _invalid_feature(
-                    reason=orientation_reason,
-                    status="diagnostic",
+                    reason=(
+                        orientation_reason
+                    ),
+
+                    status=(
+                        STATUS_DIAGNOSTIC
+                    ),
+
                     unit="deg",
-                    details=orientation_validation,
+
+                    details=(
+                        orientation_validation
+                    ),
                 )
             )
 
-
         # ==================================================
-        # RELATIVE DISTANCE
-        # Inter-Eye Distance / IPD Proxy
+        # RELATIVE EYE DISTANCE
+        #
+        # Validated Prototype
+        #
+        # Pixel relative proxy
+        # ไม่ใช่ Physical IPD
         # ==================================================
 
         distance_validation = (
             validate_face_feature(
-
                 face_points,
 
                 required_points=(
                     "left_eye_outer",
                     "left_eye_inner",
+
                     "right_eye_outer",
                     "right_eye_inner",
                 ),
@@ -1056,7 +1318,6 @@ class DetectionPipeline:
         if distance_validation[
             "valid"
         ]:
-
             distance_result = (
                 calculate_eye_distance(
                     face_points
@@ -1064,50 +1325,62 @@ class DetectionPipeline:
             )
 
             if distance_result is None:
-
                 eye_distance = (
                     _invalid_feature(
-                        reason="INVALID_RESULT",
-                        status="validated",
+                        reason=(
+                            "INVALID_RESULT"
+                        ),
+
+                        status=(
+                            STATUS_VALIDATED
+                        ),
+
                         unit="px",
                     )
                 )
 
             else:
-
                 eye_distance = (
                     _valid_feature(
-
                         distance_result.get(
                             "eye_distance_px"
                         ),
 
                         unit="px",
-                        status="validated",
+
+                        status=(
+                            STATUS_VALIDATED
+                        ),
                     )
                 )
 
         else:
-
             eye_distance = (
                 _invalid_feature(
-                    reason=distance_validation[
-                        "reason"
-                    ],
-                    status="validated",
+                    reason=(
+                        distance_validation[
+                            "reason"
+                        ]
+                    ),
+
+                    status=(
+                        STATUS_VALIDATED
+                    ),
+
                     unit="px",
-                    details=distance_validation,
+
+                    details=(
+                        distance_validation
+                    ),
                 )
             )
 
-
         # ==================================================
-        # EYE OPENNESS VALIDATION
+        # EYE VALIDATION
         # ==================================================
 
         eye_validation = (
             validate_face_feature(
-
                 face_points,
 
                 required_points=(
@@ -1124,42 +1397,100 @@ class DetectionPipeline:
             )
         )
 
+        # ==================================================
+        # EYE MEASUREMENT
+        # ==================================================
+
         eye_measurement = None
 
         if eye_validation[
             "valid"
         ]:
-
             eye_measurement = (
                 calculate_eye_openness(
                     face_points
                 )
             )
 
-
         # ==================================================
         # EYE STATE
+        #
+        # OPEN / CLOSED / UNKNOWN
         # ==================================================
 
         eye_state = (
             self.eye_state_detector.update(
                 eye_measurement,
-                timestamp=timestamp,
+
+                timestamp=(
+                    timestamp
+                ),
             )
         )
 
+        # ==================================================
+        # BLINK
+        # ==================================================
+
+        blink_result = (
+            self.blink_detector.update(
+                eye_state,
+
+                eye_measurement=(
+                    eye_measurement
+                ),
+
+                timestamp=(
+                    timestamp
+                ),
+            )
+        )
+
+        # ==================================================
+        # LONG EYE CLOSURE
+        # ==================================================
+
+        closure_result = (
+            self.eye_closure_detector.update(
+                eye_state,
+
+                eye_measurement=(
+                    eye_measurement
+                ),
+
+                timestamp=(
+                    timestamp
+                ),
+            )
+        )
 
         # ==================================================
         # FINAL OUTPUT
+        #
+        # Detection Contract Version 1.0
         # ==================================================
 
         return {
 
-            "timestamp": timestamp,
+            # ----------------------------------------------
+            # Contract
+            # ----------------------------------------------
 
-            # ------------------------------------------------
+            "contract_version": (
+                "1.0"
+            ),
+
+            # ----------------------------------------------
+            # Timestamp
+            # ----------------------------------------------
+
+            "timestamp": (
+                timestamp
+            ),
+
+            # ----------------------------------------------
             # Detection Availability
-            # ------------------------------------------------
+            # ----------------------------------------------
 
             "pose_detected": (
                 pose_detected
@@ -1169,11 +1500,26 @@ class DetectionPipeline:
                 face_detected
             ),
 
-            # ------------------------------------------------
-            # Posture / Geometry Features
-            # ------------------------------------------------
+            # ==============================================
+            # CONTEXT
+            #
+            # Session / Risk Layer
+            # ต้องดู allow_posture_evaluation
+            # ==============================================
+
+            "context": (
+                context
+            ),
+
+            # ==============================================
+            # FEATURES
+            # ==============================================
 
             "features": {
+
+                # ------------------------------------------
+                # Shoulder
+                # ------------------------------------------
 
                 "shoulder_tilt": (
                     shoulder_tilt
@@ -1183,6 +1529,10 @@ class DetectionPipeline:
                     shoulder_elevation
                 ),
 
+                # ------------------------------------------
+                # Neck
+                # ------------------------------------------
+
                 "neck_lateral_tilt": (
                     neck_lateral_tilt
                 ),
@@ -1191,14 +1541,9 @@ class DetectionPipeline:
                     neck_flexion
                 ),
 
-                # --------------------------------------------
-                # IMPORTANT:
-                #
-                # head_yaw ยังไม่เรียกว่า neck_rotation
-                #
-                # Neck Rotation ตัวจริงในอนาคตต้องใช้
-                # Head + Torso + Personal Baseline
-                # --------------------------------------------
+                # ------------------------------------------
+                # Head Orientation
+                # ------------------------------------------
 
                 "head_yaw": (
                     head_yaw
@@ -1208,6 +1553,10 @@ class DetectionPipeline:
                     head_roll
                 ),
 
+                # ------------------------------------------
+                # Experimental
+                # ------------------------------------------
+
                 "forward_head": (
                     forward_head
                 ),
@@ -1216,14 +1565,18 @@ class DetectionPipeline:
                     torso_orientation
                 ),
 
+                # ------------------------------------------
+                # Distance
+                # ------------------------------------------
+
                 "eye_distance": (
                     eye_distance
                 ),
             },
 
-            # ------------------------------------------------
-            # Eye
-            # ------------------------------------------------
+            # ==============================================
+            # EYE
+            # ==============================================
 
             "eye": {
 
@@ -1240,16 +1593,24 @@ class DetectionPipeline:
                     eye_state
                 ),
 
+                "blink": (
+                    blink_result
+                ),
+
+                "closure": (
+                    closure_result
+                ),
+
                 "validation": (
                     eye_validation
                 ),
             },
 
-            # ------------------------------------------------
-            # Selected Landmarks
+            # ==============================================
+            # LANDMARKS
             #
-            # ใช้ Debug / Test เท่านั้น
-            # ------------------------------------------------
+            # Debug / Test เท่านั้น
+            # ==============================================
 
             "landmarks": {
 
@@ -1263,7 +1624,6 @@ class DetectionPipeline:
             },
         }
 
-
     # ======================================================
     # Close
     # ======================================================
@@ -1271,10 +1631,6 @@ class DetectionPipeline:
     def close(
         self
     ):
-        """
-        ปิด MediaPipe resources
-        """
-
         self.pose_detector.close()
 
         self.face_detector.close()

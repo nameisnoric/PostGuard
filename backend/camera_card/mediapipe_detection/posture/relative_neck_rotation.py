@@ -2,174 +2,239 @@ import math
 
 
 # ==========================================================
-# Prototype Torso Mapping Factor
-#
-# Derived from:
-# torso_rotation_validation_...
-#
-# Median candidate:
-# k = -1.6409
+# Torso Mapping
 #
 # IMPORTANT:
-# ตอนนี้ยังเป็น Prototype Mapping Candidate
-# ไม่ถือว่าเป็นค่าถาวรของระบบ
+# ถ้า Torso Orientation formula เปลี่ยน
+# ค่า K ต้อง Re-calibrate ใหม่
 # ==========================================================
 
 TORSO_MAPPING_K = -1.6409
 
 
-def _is_finite_number(value):
-    """
-    ตรวจว่าค่าเป็นตัวเลขที่ใช้งานได้หรือไม่
-    """
+# ==========================================================
+# Numeric Helper
+# ==========================================================
+
+def _is_finite_number(
+    value
+):
 
     try:
+
         return math.isfinite(
             float(value)
         )
 
     except (
         TypeError,
-        ValueError
+        ValueError,
     ):
+
         return False
 
 
+# ==========================================================
+# Relative Neck Rotation
+# ==========================================================
+
 def calculate_relative_neck_rotation(
-    head_yaw,
-    torso_angle,
-    head_baseline,
-    torso_baseline,
+    current_head_yaw,
+    baseline_head_yaw,
+    current_torso_angle,
+    baseline_torso_angle,
     k=TORSO_MAPPING_K,
 ):
     """
-    Calculate head rotation relative to torso orientation.
-
-    Formula:
-
-        Head Delta
-        = Current Head Yaw - Head Baseline
-
-        Torso Delta
-        = Current Torso Angle - Torso Baseline
-
-        Torso Equivalent
-        = k * Torso Delta
-
-        Relative Neck Rotation
-        = Head Delta - Torso Equivalent
+    Relative Neck Rotation
 
 
-    Example:
+    Head Delta
 
-        Head Delta  = +30
-        Torso Delta = 0
-
-        Relative ≈ +30
-
-        => Head rotated relative to torso
+        current_head_yaw
+        -
+        baseline_head_yaw
 
 
-    Another example:
+    Torso Delta
 
-        Head Delta  = +30
-        Torso Delta = -18.3
-        k            = -1.6409
-
-        Torso Equivalent ≈ +30
-
-        Relative ≈ 0
-
-        => Head and torso rotated together
+        current_torso_angle
+        -
+        baseline_torso_angle
 
 
-    This file does NOT contain:
+    Torso Equivalent
 
-    - Risk thresholds
-    - RULA
-    - Alert logic
-    - Personal Baseline collection
+        k
+        *
+        torso_delta
+
+
+    Relative Neck Rotation
+
+        head_delta
+        -
+        torso_equivalent
+
+
+    NOTE
+
+    TORSO_MAPPING_K
+    ต้อง Calibration ตาม
+    Torso Orientation implementation
+    ที่ใช้งานจริง
     """
 
+    # ======================================================
+    # 1. Validate Inputs
+    # ======================================================
+
     values = (
-        head_yaw,
-        torso_angle,
-        head_baseline,
-        torso_baseline,
+
+        current_head_yaw,
+
+        baseline_head_yaw,
+
+        current_torso_angle,
+
+        baseline_torso_angle,
+
         k,
     )
 
 
-    # ======================================================
-    # Validate input
-    # ======================================================
-
     if not all(
-        _is_finite_number(value)
+
+        _is_finite_number(
+            value
+        )
+
         for value in values
     ):
-        return None
+
+        return {
+
+            "valid": False,
+
+            "reason": (
+                "invalid_input"
+            ),
+
+            "value": None,
+
+            "unit": (
+                "deg"
+            ),
+
+            "status": (
+                "candidate_prototype"
+            ),
+        }
 
 
     # ======================================================
-    # Head movement relative to neutral/reference
+    # 2. Head Delta
     # ======================================================
 
     head_delta = (
-        float(head_yaw)
+
+        float(
+            current_head_yaw
+        )
+
         -
-        float(head_baseline)
+
+        float(
+            baseline_head_yaw
+        )
     )
 
 
     # ======================================================
-    # Torso movement relative to neutral/reference
+    # 3. Torso Delta
     # ======================================================
 
     torso_delta = (
-        float(torso_angle)
+
+        float(
+            current_torso_angle
+        )
+
         -
-        float(torso_baseline)
+
+        float(
+            baseline_torso_angle
+        )
     )
 
 
     # ======================================================
-    # Convert torso signal into head-yaw-equivalent scale
+    # 4. Torso Equivalent
     # ======================================================
 
     torso_equivalent = (
-        float(k)
+
+        float(
+            k
+        )
+
         *
+
         torso_delta
     )
 
 
     # ======================================================
-    # Head rotation relative to torso
+    # 5. Relative Neck Rotation
     # ======================================================
 
     relative_neck_rotation = (
+
         head_delta
+
         -
+
         torso_equivalent
     )
 
 
+    # ======================================================
+    # 6. Return
+    # ======================================================
+
     return {
 
-        "head_delta": (
+        "valid": True,
+
+        "value": float(
+            relative_neck_rotation
+        ),
+
+        "relative_neck_rotation": float(
+            relative_neck_rotation
+        ),
+
+        "head_delta": float(
             head_delta
         ),
 
-        "torso_delta": (
+        "torso_delta": float(
             torso_delta
         ),
 
-        "torso_equivalent": (
+        "torso_equivalent": float(
             torso_equivalent
         ),
 
-        "relative_neck_rotation": (
-            relative_neck_rotation
+        "mapping_k": float(
+            k
+        ),
+
+        "unit": (
+            "deg"
+        ),
+
+        "status": (
+            "candidate_prototype"
         ),
     }
