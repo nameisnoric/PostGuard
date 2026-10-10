@@ -20,6 +20,7 @@ from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.ui.pages.history_page import HistoryPage
+from app.ui.pages.alert_history_dialog import add_alert_history_button
 
 from app.services.api_client import APIClient
 
@@ -88,6 +89,8 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(
             self.history_button
         )
+        
+        add_alert_history_button(sidebar_layout, self)
 
         sidebar_layout.addStretch()
 
