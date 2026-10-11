@@ -5,27 +5,16 @@ import sys
 import cv2
 import numpy as np
 
-
-# ==========================================================
-# Locate camera_card independently of working directory
-# ==========================================================
-
+# Locate camera_card independently of the working directory.
 BASE_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BASE_DIR))
 
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(
-        0,
-        str(BASE_DIR)
-    )
-
-
-from camera_setup.camera_roll import (
-    estimate_scene_tilt,
-    level_frame,
-)
+# Existing PostGuard implementations; do not alter them for this test.
+from camera_setup.camera_roll import estimate_scene_tilt, level_frame
 
 ANGLES = [-10, -8, -6, -4, -2, 2, 4, 6, 8, 10]
 REPEATS = 2
+DEVICE_ID = "A"  # Change to B when testing the second laptop
 CAMERA_INDEX = 0
 GRID_STEP = 80
 OUTPUT_DIR = BASE_DIR / "tests" / "tilt_results"
@@ -278,19 +267,113 @@ def run_test():
                     f"({feature_status}) | {status}"
                 )
 
-        csv_path = OUTPUT_DIR / "tilt_accuracy.csv"
-        fieldnames = [
-            "round", "reference_angle", "baseline_angle", "detected_angle",
-            "detected_change", "detection_error", "correction_angle",
-            "correction_applied", "geometric_residual_error",
-            "post_detected_angle", "post_detection_error",
-            "feature_residual_error", "feature_inliers",
-            "feature_inlier_ratio", "feature_status", "status",
+        # ==========================================================
+        # CSV 1: Report-ready summary
+        # ==========================================================
+        summary_csv_path = OUTPUT_DIR / "tilt_accuracy.csv"
+
+        summary_fieldnames = [
+            "device",
+            "round",
+            "reference_angle",
+            "detected_rotation",
+            "detection_error",
+            "feature_residual_error",
+            "feature_status",
         ]
-        with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+        with summary_csv_path.open(
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=summary_fieldnames
+            )
             writer.writeheader()
-            writer.writerows(rows)
+
+            for row in rows:
+                detected_rotation = (
+                    -row["detected_change"]
+                    if row["detected_change"] is not None
+                    else None
+                )
+
+                writer.writerow({
+                    "device": DEVICE_ID,
+                    "round": row["round"],
+                    "reference_angle": row["reference_angle"],
+                    "detected_rotation": detected_rotation,
+                    "detection_error": row["detection_error"],
+                    "feature_residual_error": row["feature_residual_error"],
+                    "feature_status": row["feature_status"],
+                })
+
+        # ==========================================================
+        # CSV 2: Detailed result data
+        # ==========================================================
+        detailed_csv_path = OUTPUT_DIR / "tilt_accuracy_detailed.csv"
+
+        detailed_fieldnames = [
+            "device",
+            "round",
+            "reference_angle",
+            "baseline_angle",
+            "detected_angle",
+            "detected_change",
+            "detected_rotation",
+            "detection_error",
+            "correction_angle",
+            "correction_applied",
+            "geometric_residual_error",
+            "post_detected_angle",
+            "post_detection_error",
+            "feature_residual_error",
+            "feature_inliers",
+            "feature_inlier_ratio",
+            "feature_status",
+            "status",
+        ]
+
+        with detailed_csv_path.open(
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=detailed_fieldnames
+            )
+            writer.writeheader()
+
+            for row in rows:
+                detected_rotation = (
+                    -row["detected_change"]
+                    if row["detected_change"] is not None
+                    else None
+                )
+
+                writer.writerow({
+                    "device": DEVICE_ID,
+                    "round": row["round"],
+                    "reference_angle": row["reference_angle"],
+                    "baseline_angle": row["baseline_angle"],
+                    "detected_angle": row["detected_angle"],
+                    "detected_change": row["detected_change"],
+                    "detected_rotation": detected_rotation,
+                    "detection_error": row["detection_error"],
+                    "correction_angle": row["correction_angle"],
+                    "correction_applied": row["correction_applied"],
+                    "geometric_residual_error": row["geometric_residual_error"],
+                    "post_detected_angle": row["post_detected_angle"],
+                    "post_detection_error": row["post_detection_error"],
+                    "feature_residual_error": row["feature_residual_error"],
+                    "feature_inliers": row["feature_inliers"],
+                    "feature_inlier_ratio": row["feature_inlier_ratio"],
+                    "feature_status": row["feature_status"],
+                    "status": row["status"],
+                })
 
         valid_detection = [r["detection_error"] for r in rows if r["detection_error"] is not None]
         valid_post = [r["post_detection_error"] for r in rows if r["post_detection_error"] is not None]
@@ -312,7 +395,8 @@ def run_test():
         if valid_feature:
             print(f"Feature residual MAE (valid only): {np.mean(valid_feature):.3f} deg")
         print(f"Results saved: {OUTPUT_DIR}")
-        print(f"CSV saved: {csv_path}")
+        print(f"Summary CSV saved: {summary_csv_path}")
+        print(f"Detailed CSV saved: {detailed_csv_path}")
     finally:
         cap.release()
         cv2.destroyAllWindows()
