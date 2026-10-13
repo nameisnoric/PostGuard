@@ -1,5 +1,4 @@
 from collections import deque
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -9,10 +8,7 @@ from system_state import SystemState
 from camera_setup.guide import get_guide_bounds, draw_guide
 from camera_setup.card_detection import detect_rectangle
 from camera_setup.card_validation import check_position, check_size
-from camera_setup.card_perspective import (
-    warp_card,
-    calculate_pixel_scale,
-)
+from camera_setup.card_perspective import warp_card, calculate_pixel_scale
 from camera_setup.camera_reference import (
     check_scale_consistency,
     create_camera_reference,
@@ -24,46 +20,14 @@ from camera_setup.camera_roll import (
     estimate_scene_tilt,
 )
 
-from mediapipe_detection.pose.pose_detector import PoseDetector
-
-
-# ==========================================================
-# PATH
-# ==========================================================
-# อ้างอิง path จากตำแหน่ง main.py
-#
-# backend/
-# └── camera_card/
-#     ├── main.py
-#     └── models/
-#         └── pose_landmarker_lite.task
-#
-# ทำให้ไม่ว่าจะสั่ง run จาก directory ไหน
-# โปรแกรมก็ยังหา model เจอ
-# ==========================================================
-
-BASE_DIR = Path(__file__).resolve().parent
-
-POSE_MODEL_PATH = (
-    BASE_DIR
-    / "models"
-    / "pose_landmarker_lite.task"
-)
+from mediapipe_detection.detection_pipeline import DetectionPipeline
 
 
 # ==========================================================
 # CONFIG
 # ==========================================================
 
-# ต้องผ่านต่อเนื่องกี่ Frame
-# ถึงจะถือว่าการ์ดนิ่ง
 STABLE_FRAMES = 15
-
-
-# ==========================================================
-# COLOR
-# OpenCV ใช้ BGR
-# ==========================================================
 
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
@@ -71,79 +35,35 @@ RED = (0, 0, 255)
 YELLOW = (0, 255, 255)
 BLUE = (255, 150, 0)
 
-
-# ==========================================================
-# TILT CONFIG
-# ==========================================================
-
 TILT_WINDOW = "Tilt Adjust"
-
-# ตรงกลาง = ไม่หมุนภาพ
 SLIDER_CENTER = 60
-
-# slider 0-120
-# ใช้ปรับประมาณ +30 ถึง -30 องศา
 SLIDER_MAX = 120
 
 
 # ==========================================================
-# TEXT HELPER
+# UI HELPERS
 # ==========================================================
 
-def put(
-    img,
-    text,
-    pos,
-    color,
-):
-    """
-    แสดงข้อความลงบน Frame
-    """
-
+def put(img, text, pos, color):
     cv2.putText(
         img,
-        text,
+        str(text),
         pos,
         cv2.FONT_HERSHEY_SIMPLEX,
         0.8,
         color,
         2,
+        cv2.LINE_AA,
     )
 
 
-# ==========================================================
-# TRACKBAR CALLBACK
-# ==========================================================
-
 def nothing(_):
-    """
-    OpenCV Trackbar ต้องการ callback function
-    แต่เราไม่ได้ต้องการทำอะไรทันทีตอน slider เปลี่ยน
-    """
     pass
 
 
-# ==========================================================
-# OPEN TILT WINDOW
-# ==========================================================
-
 def open_tilt_window():
-    """
-    เปิดหน้าต่าง slider
-    สำหรับปรับ Camera Roll
-    """
-
-    cv2.namedWindow(
-        TILT_WINDOW,
-        cv2.WINDOW_NORMAL,
-    )
-
-    cv2.resizeWindow(
-        TILT_WINDOW,
-        520,
-        80,
-    )
-
+    cv2.namedWindow(TILT_WINDOW, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(TILT_WINDOW, 520, 80)
     cv2.createTrackbar(
         "Tilt",
         TILT_WINDOW,
@@ -153,26 +73,106 @@ def open_tilt_window():
     )
 
 
-# ==========================================================
-# CLOSE TILT WINDOW
-# ==========================================================
-
 def close_tilt_window():
-    """
-    ปิดหน้าต่าง Tilt
-
-    try/except ป้องกันกรณี Window ถูกปิดไปแล้ว
-    """
-
     try:
-
-        cv2.destroyWindow(
-            TILT_WINDOW
-        )
-
+        cv2.destroyWindow(TILT_WINDOW)
     except cv2.error:
-
         pass
+
+
+# ==========================================================
+# DETECTION HELPERS
+# ==========================================================
+
+def get_feature_value(result, feature_name):
+    if not isinstance(result, dict):
+        return None
+
+    features = result.get("features")
+
+    if not isinstance(features, dict):
+        return None
+
+    feature = features.get(feature_name)
+
+    if not isinstance(feature, dict):
+        return None
+
+    if feature.get("valid") is not True:
+        return None
+
+    value = feature.get("value")
+
+    if not isinstance(value, (int, float)):
+        return None
+
+    return float(value)
+
+
+def format_feature(value, unit):
+    if value is None:
+        return "N/A"
+
+    return f"{value:.2f} {unit}"
+
+
+def get_context_text(result):
+    if not isinstance(result, dict):
+        return "UNKNOWN"
+
+    context = result.get("context") or {}
+
+    state = context.get("state")
+
+    if state is None:
+        state = context.get("status")
+
+    if state is None:
+        return "UNKNOWN"
+
+    if hasattr(state, "value"):
+        state = state.value
+
+    return str(state)
+
+
+def posture_evaluation_allowed(result):
+    if not isinstance(result, dict):
+        return False
+
+    context = result.get("context") or {}
+
+    return context.get("allow_posture_evaluation") is True
+
+
+# ==========================================================
+# FRAME FLOW
+# ==========================================================
+
+def build_detection_frame(raw_frame, mirror_roll_deg):
+    """
+    DetectionPipeline ต้องรับภาพ UNMIRRORED
+
+    Camera Setup เดิมคำนวณ Camera Roll บนภาพ Mirror
+    การ Mirror จะกลับเครื่องหมายของมุม Roll
+    ดังนั้น Raw Detection Frame ต้องใช้ -mirror_roll_deg
+    """
+
+    return level_frame(
+        raw_frame,
+        -float(mirror_roll_deg),
+    )
+
+
+def build_display_frame(raw_frame, mirror_roll_deg):
+    """ภาพสำหรับผู้ใช้ดู: Mirror แล้วแก้ Roll แบบเดิม"""
+
+    mirrored = cv2.flip(raw_frame, 1)
+
+    return level_frame(
+        mirrored,
+        float(mirror_roll_deg),
+    )
 
 
 # ==========================================================
@@ -180,1274 +180,729 @@ def close_tilt_window():
 # ==========================================================
 
 def main():
-
-    # ======================================================
-    # 1. ตรวจสอบ Pose Model
-    # ======================================================
-    #
-    # เช็กก่อนสร้าง PoseDetector
-    # เพื่อให้ Error อ่านง่าย
-    # ======================================================
-
-    if not POSE_MODEL_PATH.exists():
-
-        print(
-            "Error: Pose model not found"
-        )
-
-        print(
-            "Expected path:"
-        )
-
-        print(
-            POSE_MODEL_PATH
-        )
-
-        return
-
-
-    print(
-        "Pose model found:"
-    )
-
-    print(
-        POSE_MODEL_PATH
-    )
-
-
-    # ======================================================
-    # 2. เปิดกล้อง
-    # ======================================================
+    # ------------------------------------------------------
+    # Camera
+    # ------------------------------------------------------
 
     cap = cv2.VideoCapture(0)
 
-
-    # ======================================================
-    # ตรวจสอบว่ากล้องเปิดได้หรือไม่
-    # ======================================================
-
     if not cap.isOpened():
-
-        print(
-            "Error: Can't open camera"
-        )
-
+        print("Error: Can't open camera")
         return
 
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-    # ======================================================
-    # ตั้ง Resolution
-    # ======================================================
+    # ------------------------------------------------------
+    # DetectionPipeline
+    #
+    # Pipeline จัดการ model path เอง
+    # ไม่ต้องสร้าง PoseDetector ใน main.py อีก
+    # ------------------------------------------------------
 
-    cap.set(
-        cv2.CAP_PROP_FRAME_WIDTH,
-        1280,
-    )
+    try:
+        detection_pipeline = DetectionPipeline()
 
-    cap.set(
-        cv2.CAP_PROP_FRAME_HEIGHT,
-        720,
-    )
+    except Exception as error:
+        cap.release()
+        print("Error: Cannot start DetectionPipeline")
+        print(error)
+        raise
 
+    print("DetectionPipeline ready")
 
-    # ======================================================
-    # Main Window
-    # ======================================================
+    # ------------------------------------------------------
+    # Window
+    # ------------------------------------------------------
 
-    window = (
-        "PostGuard - Camera Setup"
-    )
+    window = "PostGuard - Camera Setup"
+    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
 
-    cv2.namedWindow(
-        window,
-        cv2.WINDOW_NORMAL,
-    )
+    # ------------------------------------------------------
+    # Runtime State
+    # ------------------------------------------------------
 
-
-    # ======================================================
-    # 3. ตัวแปรของระบบ
-    # ======================================================
-
-    # จำนวน Frame ที่ Card ผ่านเงื่อนไขต่อเนื่อง
     stable_count = 0
-
-
-    # ข้อมูลอ้างอิงของกล้อง
     camera_reference = None
-
-
-    # State เริ่มต้น
-    system_state = (
-        SystemState.CAMERA_SETUP
-    )
-
-
-    # ใช้บอกว่า Debug Window ถูกปิดแล้วหรือยัง
+    system_state = SystemState.CAMERA_SETUP
     debug_windows_closed = False
 
-
-    # ======================================================
-    # Camera Roll
-    # ======================================================
-
-    # ค่าแก้ความเอียงที่ผู้ใช้ปรับ
     adjust_roll = 0.0
-
-
-    # เก็บค่าความเอียงย้อนหลัง 15 Frame
-    #
-    # ใช้ Median ลด Noise
-    tilt_history = deque(
-        maxlen=15
-    )
-
-
-    # ค่ากลางของ Scene Tilt
-    #
-    # None = ยังหาไม่ได้
+    tilt_history = deque(maxlen=15)
     scene_roll = None
 
+    try:
+        while True:
+            # ==================================================
+            # RAW CAMERA FRAME
+            # ==================================================
 
-    # ======================================================
-    # 4. สร้าง Pose Detector
-    # ======================================================
-    #
-    # จุดสำคัญที่แก้จากโค้ดเดิม:
-    #
-    # เดิม:
-    # model_path="models/pose_landmarker_lite.task"
-    #
-    # ใหม่:
-    # ใช้ Absolute Path จาก main.py
-    # ======================================================
+            ret, raw_frame = cap.read()
 
-    pose_detector = PoseDetector(
-        model_path=str(
-            POSE_MODEL_PATH
-        )
-    )
+            if not ret:
+                print("Error: Can't read frame")
+                break
 
+            # Camera Setup เดิมทำงานบนภาพ Mirror
+            setup_frame = cv2.flip(raw_frame, 1)
+            frame = setup_frame
+            display = frame.copy()
 
-    print(
-        "PoseDetector ready"
-    )
+            # ==================================================
+            # STATE 1 : CAMERA SETUP
+            # ==================================================
 
+            if system_state == SystemState.CAMERA_SETUP:
+                debug_windows_closed = False
 
-    # ======================================================
-    # 5. MAIN LOOP
-    # ======================================================
+                bounds = get_guide_bounds(frame)
+                result, edges, debug = detect_rectangle(frame, bounds)
+                draw_guide(display, bounds)
 
-    while True:
+                card_valid = False
 
-        # ==================================================
-        # อ่าน Frame จาก Webcam
-        # ==================================================
+                # ----------------------------------------------
+                # Not found
+                # ----------------------------------------------
 
-        ret, frame = cap.read()
+                if result is None:
+                    stable_count = 0
+                    put(display, "Not found", (20, 40), RED)
 
+                # ----------------------------------------------
+                # Rectangle but not card
+                # ----------------------------------------------
 
-        if not ret:
-
-            print(
-                "Error: Can't read frame"
-            )
-
-            break
-
-
-        # ==================================================
-        # Mirror Webcam
-        # ==================================================
-        #
-        # ทำให้ภาพเหมือนกระจก
-        # ==================================================
-
-        frame = cv2.flip(
-            frame,
-            1,
-        )
-
-
-        # ==================================================
-        # หลัง Camera Setup เสร็จ
-        #
-        # หากเข้าสู่ Personal Baseline
-        # ให้หมุนภาพชดเชย Camera Roll ก่อน
-        # ==================================================
-
-        if (
-            camera_reference
-            is not None
-
-            and
-
-            system_state
-            == SystemState.PERSONAL_BASELINE
-        ):
-
-            frame = level_frame(
-                frame,
-                camera_reference[
-                    "camera_roll_deg"
-                ],
-            )
-
-
-        # Frame สำหรับวาด UI
-        display = frame.copy()
-
-
-        # ==================================================
-        # STATE 1
-        # CAMERA SETUP
-        # ==================================================
-
-        if (
-            system_state
-            == SystemState.CAMERA_SETUP
-        ):
-
-            debug_windows_closed = False
-
-
-            # ==============================================
-            # กำหนด Guide Area
-            # ==============================================
-
-            bounds = get_guide_bounds(
-                frame
-            )
-
-
-            # ==============================================
-            # ตรวจจับ Reference Card
-            # ==============================================
-
-            (
-                result,
-                edges,
-                debug,
-            ) = detect_rectangle(
-                frame,
-                bounds,
-            )
-
-
-            # ==============================================
-            # วาดกรอบ Guide
-            # ==============================================
-
-            draw_guide(
-                display,
-                bounds,
-            )
-
-
-            card_valid = False
-
-
-            # ==============================================
-            # ไม่พบ Rectangle
-            # ==============================================
-
-            if result is None:
-
-                stable_count = 0
-
-                put(
-                    display,
-                    "Not found",
-                    (20, 40),
-                    RED,
-                )
-
-
-            # ==============================================
-            # พบ Rectangle
-            # แต่ไม่ผ่านเงื่อนไข Card
-            # ==============================================
-
-            elif not result[
-                "is_card"
-            ]:
-
-                stable_count = 0
-
-
-                cv2.drawContours(
-                    display,
-                    [
-                        result[
-                            "box"
-                        ]
-                    ],
-                    -1,
-                    BLUE,
-                    3,
-                )
-
-
-                put(
-                    display,
-                    (
-                        "Rectangle found "
-                        "(not a card)"
-                    ),
-                    (20, 40),
-                    BLUE,
-                )
-
-
-                put(
-                    display,
-                    (
-                        f"ratio="
-                        f"{result['ratio']:.2f} "
-
-                        f"fill="
-                        f"{result['fill']:.0%} "
-
-                        f"fit="
-                        f"{result['fit']:.0%}"
-                    ),
-                    (20, 75),
-                    WHITE,
-                )
-
-
-            # ==============================================
-            # พบ Reference Card Candidate
-            # ==============================================
-
-            else:
-
-                cv2.drawContours(
-                    display,
-                    [
-                        result[
-                            "box"
-                        ]
-                    ],
-                    -1,
-                    GREEN,
-                    3,
-                )
-
-
-                put(
-                    display,
-                    "Reference Card Candidate",
-                    (20, 40),
-                    GREEN,
-                )
-
-
-                put(
-                    display,
-                    (
-                        f"ratio="
-                        f"{result['ratio']:.2f} "
-
-                        f"fill="
-                        f"{result['fill']:.0%} "
-
-                        f"fit="
-                        f"{result['fit']:.0%}"
-                    ),
-                    (20, 75),
-                    WHITE,
-                )
-
-
-                # ==========================================
-                # POSITION
-                # ==========================================
-
-                position = check_position(
-                    result[
-                        "box"
-                    ],
-                    bounds,
-                )
-
-
-                if position[
-                    "valid"
-                ]:
-
-                    put(
-                        display,
-                        "Position: OK",
-                        (20, 110),
-                        GREEN,
-                    )
-
-                else:
-
-                    put(
-                        display,
-                        (
-                            "Position: "
-                            f"{position['direction']}"
-                        ),
-                        (20, 110),
-                        YELLOW,
-                    )
-
-
-                # ==========================================
-                # SIZE
-                # ==========================================
-
-                size = check_size(
-                    result[
-                        "fill"
-                    ]
-                )
-
-
-                if size[
-                    "valid"
-                ]:
-
-                    put(
-                        display,
-                        "Card Size: OK",
-                        (20, 145),
-                        GREEN,
-                    )
-
-                else:
-
-                    put(
-                        display,
-                        (
-                            "Card Size: "
-                            f"{size['direction']}"
-                        ),
-                        (20, 145),
-                        YELLOW,
-                    )
-
-
-                # ==========================================
-                # ALIGNMENT
-                # ==========================================
-                #
-                # max_roll=45
-                #
-                # ไม่ Reject การ์ดเพราะ Roll
-                # เพราะ Roll จะไปแก้ในขั้นถัดไป
-                #
-                # จุดนี้เน้น Perspective
-                # ==========================================
-
-                alignment = check_alignment(
-                    result[
-                        "box"
-                    ],
-                    bounds,
-                    max_roll=45.0,
-                )
-
-
-                put(
-                    display,
-                    (
-                        "Card tilt: "
-                        f"{alignment['roll_error']:.2f} "
-                        "deg"
-                    ),
-                    (20, 215),
-                    WHITE,
-                )
-
-
-                put(
-                    display,
-                    (
-                        "H-Perspective: "
-                        f"{alignment['horizontal_perspective']:.1%}"
-                    ),
-                    (20, 250),
-                    WHITE,
-                )
-
-
-                put(
-                    display,
-                    (
-                        "V-Perspective: "
-                        f"{alignment['vertical_perspective']:.1%}"
-                    ),
-                    (20, 285),
-                    WHITE,
-                )
-
-
-                # ==========================================
-                # STABILITY
-                # ==========================================
-                #
-                # Card ต้อง:
-                #
-                # Position ผ่าน
-                # Size ผ่าน
-                # Alignment ผ่าน
-                #
-                # ติดต่อกัน 15 Frame
-                # ==========================================
-
-                if (
-                    position[
-                        "valid"
-                    ]
-
-                    and
-
-                    size[
-                        "valid"
-                    ]
-
-                    and
-
-                    alignment[
-                        "valid"
-                    ]
-                ):
-
-                    stable_count += 1
-
-                else:
-
+                elif not result["is_card"]:
                     stable_count = 0
 
+                    cv2.drawContours(
+                        display,
+                        [result["box"]],
+                        -1,
+                        BLUE,
+                        3,
+                    )
 
-                stable_count = min(
-                    stable_count,
-                    STABLE_FRAMES,
-                )
-
-
-                if (
-                    stable_count
-                    >= STABLE_FRAMES
-                ):
-
-                    card_valid = True
-
-
-                # ==========================================
-                # Card ยังไม่นิ่ง
-                # ==========================================
-
-                if not card_valid:
+                    put(
+                        display,
+                        "Rectangle found (not a card)",
+                        (20, 40),
+                        BLUE,
+                    )
 
                     put(
                         display,
                         (
-                            "Stability: "
-                            f"{stable_count}/"
-                            f"{STABLE_FRAMES}"
+                            f"ratio={result['ratio']:.2f} "
+                            f"fill={result['fill']:.0%} "
+                            f"fit={result['fit']:.0%}"
                         ),
-                        (20, 320),
-                        YELLOW,
+                        (20, 75),
+                        WHITE,
                     )
 
-
-                # ==========================================
-                # CARD VALID
-                # ==========================================
+                # ----------------------------------------------
+                # Card candidate
+                # ----------------------------------------------
 
                 else:
+                    cv2.drawContours(
+                        display,
+                        [result["box"]],
+                        -1,
+                        GREEN,
+                        3,
+                    )
 
                     put(
                         display,
-                        "Reference Card Valid",
-                        (20, 180),
+                        "Reference Card Candidate",
+                        (20, 40),
                         GREEN,
                     )
 
-
-                    # ======================================
-                    # Warp Card
-                    # ======================================
-
-                    perspective = warp_card(
-                        frame,
-                        result[
-                            "box"
-                        ],
+                    put(
+                        display,
+                        (
+                            f"ratio={result['ratio']:.2f} "
+                            f"fill={result['fill']:.0%} "
+                            f"fit={result['fit']:.0%}"
+                        ),
+                        (20, 75),
+                        WHITE,
                     )
 
+                    # Position
+                    position = check_position(
+                        result["box"],
+                        bounds,
+                    )
 
+                    if position["valid"]:
+                        put(
+                            display,
+                            "Position: OK",
+                            (20, 110),
+                            GREEN,
+                        )
+                    else:
+                        put(
+                            display,
+                            f"Position: {position['direction']}",
+                            (20, 110),
+                            YELLOW,
+                        )
+
+                    # Size
+                    size = check_size(result["fill"])
+
+                    if size["valid"]:
+                        put(
+                            display,
+                            "Card Size: OK",
+                            (20, 145),
+                            GREEN,
+                        )
+                    else:
+                        put(
+                            display,
+                            f"Card Size: {size['direction']}",
+                            (20, 145),
+                            YELLOW,
+                        )
+
+                    # Alignment
+                    alignment = check_alignment(
+                        result["box"],
+                        bounds,
+                        max_roll=45.0,
+                    )
+
+                    put(
+                        display,
+                        f"Card tilt: {alignment['roll_error']:.2f} deg",
+                        (20, 215),
+                        WHITE,
+                    )
+
+                    put(
+                        display,
+                        (
+                            "H-Perspective: "
+                            f"{alignment['horizontal_perspective']:.1%}"
+                        ),
+                        (20, 250),
+                        WHITE,
+                    )
+
+                    put(
+                        display,
+                        (
+                            "V-Perspective: "
+                            f"{alignment['vertical_perspective']:.1%}"
+                        ),
+                        (20, 285),
+                        WHITE,
+                    )
+
+                    # Stability
                     if (
-                        perspective
-                        is not None
+                        position["valid"]
+                        and size["valid"]
+                        and alignment["valid"]
                     ):
+                        stable_count += 1
+                    else:
+                        stable_count = 0
 
-                        # ==============================
-                        # PIXEL SCALE
-                        # ==============================
+                    stable_count = min(
+                        stable_count,
+                        STABLE_FRAMES,
+                    )
 
-                        scale = (
-                            calculate_pixel_scale(
-                                perspective[
-                                    "width_px"
-                                ],
-                                perspective[
-                                    "height_px"
-                                ],
+                    if stable_count >= STABLE_FRAMES:
+                        card_valid = True
+
+                    if not card_valid:
+                        put(
+                            display,
+                            (
+                                "Stability: "
+                                f"{stable_count}/{STABLE_FRAMES}"
+                            ),
+                            (20, 320),
+                            YELLOW,
+                        )
+
+                    # ------------------------------------------
+                    # Card valid
+                    # ------------------------------------------
+
+                    else:
+                        put(
+                            display,
+                            "Reference Card Valid",
+                            (20, 180),
+                            GREEN,
+                        )
+
+                        perspective = warp_card(
+                            frame,
+                            result["box"],
+                        )
+
+                        if perspective is not None:
+                            scale = calculate_pixel_scale(
+                                perspective["width_px"],
+                                perspective["height_px"],
                             )
-                        )
-
-
-                        put(
-                            display,
-                            (
-                                "Scale X: "
-                                f"{scale['x']:.2f} "
-                                "px/mm"
-                            ),
-                            (700, 40),
-                            GREEN,
-                        )
-
-
-                        put(
-                            display,
-                            (
-                                "Scale Y: "
-                                f"{scale['y']:.2f} "
-                                "px/mm"
-                            ),
-                            (700, 75),
-                            GREEN,
-                        )
-
-
-                        put(
-                            display,
-                            (
-                                "Scale AVG: "
-                                f"{scale['average']:.2f} "
-                                "px/mm"
-                            ),
-                            (700, 110),
-                            GREEN,
-                        )
-
-
-                        # ==============================
-                        # SCALE CONSISTENCY
-                        # ==============================
-
-                        if (
-                            check_scale_consistency(
-                                scale
-                            )
-                        ):
 
                             put(
                                 display,
-                                "Scale: OK",
-                                (20, 320),
+                                f"Scale X: {scale['x']:.2f} px/mm",
+                                (700, 40),
                                 GREEN,
                             )
 
-
-                            # ==========================
-                            # CREATE CAMERA REFERENCE
-                            # ==========================
-
-                            if (
-                                camera_reference
-                                is None
-                            ):
-
-                                camera_reference = (
-                                    create_camera_reference(
-                                        frame,
-                                        result,
-                                        perspective,
-                                        scale,
-                                    )
-                                )
-
-
-                                # ======================
-                                # Roll ยังไม่ได้ตั้งค่า
-                                # ======================
-
-                                camera_reference[
-                                    "camera_roll_deg"
-                                ] = 0.0
-
-
-                                camera_reference[
-                                    "roll_source"
-                                ] = "not_set"
-
-
-                                adjust_roll = 0.0
-
-
-                                tilt_history.clear()
-
-
-                                scene_roll = None
-
-
-                                # ======================
-                                # เปิด Tilt Adjustment
-                                # ======================
-
-                                open_tilt_window()
-
-
-                                system_state = (
-                                    SystemState
-                                    .CAMERA_SETUP_COMPLETE
-                                )
-
-
-                                print(
-                                    "Camera Reference Created"
-                                )
-
-
-                                print(
-                                    camera_reference
-                                )
-
-
-                                print(
-                                    "Current State:",
-                                    system_state,
-                                )
-
-
-                        # ==============================
-                        # Scale ไม่ Consistent
-                        # ==============================
-
-                        else:
+                            put(
+                                display,
+                                f"Scale Y: {scale['y']:.2f} px/mm",
+                                (700, 75),
+                                GREEN,
+                            )
 
                             put(
                                 display,
-                                "Scale: NOT CONSISTENT",
-                                (20, 320),
-                                RED,
+                                (
+                                    "Scale AVG: "
+                                    f"{scale['average']:.2f} px/mm"
+                                ),
+                                (700, 110),
+                                GREEN,
                             )
 
-
-                        # ==============================
-                        # แสดง Warped Card
-                        # ==============================
-
-                        cv2.imshow(
-                            "PostGuard - Warped Card",
-                            perspective[
-                                "image"
-                            ],
-                        )
-
-
-            # ==============================================
-            # DEBUG INFORMATION
-            # ==============================================
-
-            put(
-                display,
-                (
-                    "Contours: "
-                    f"{debug['contours']}"
-                ),
-                (20, 405),
-                WHITE,
-            )
-
-
-            put(
-                display,
-                (
-                    f"Size: "
-                    f"{debug['passed_size']} "
-
-                    f"4-corner: "
-                    f"{debug['passed_4_corners']} "
-
-                    f"Angles: "
-                    f"{debug['passed_angles']} "
-
-                    f"Fit: "
-                    f"{debug['passed_fit']} "
-
-                    f"Inside: "
-                    f"{debug['passed_inside']}"
-                ),
-                (20, 440),
-                WHITE,
-            )
-
-
-            cv2.imshow(
-                "PostGuard - Edge Debug",
-                edges,
-            )
-
-
-        # ==================================================
-        # STATE 2
-        # CAMERA SETUP COMPLETE
-        # ==================================================
-        #
-        # ใช้ปรับ Camera Roll
-        # ==================================================
-
-        elif (
-            system_state
-            == SystemState.CAMERA_SETUP_COMPLETE
-        ):
-
-            # ==============================================
-            # ปิด Debug Window จาก State ก่อนหน้า
-            # ==============================================
-
-            if not debug_windows_closed:
-
-                for name in (
-                    "PostGuard - Edge Debug",
-                    "PostGuard - Warped Card",
-                ):
-
-                    try:
-
-                        cv2.destroyWindow(
-                            name
-                        )
-
-                    except cv2.error:
-
-                        pass
-
-
-                debug_windows_closed = True
-
-
-            # ==============================================
-            # อ่านตำแหน่ง Slider
-            # ==============================================
-
-            slider = cv2.getTrackbarPos(
-                "Tilt",
-                TILT_WINDOW,
-            )
-
-
-            # ==============================================
-            # แปลง Slider → Degree
-            # ==============================================
-
-            adjust_roll = (
-                SLIDER_CENTER
-                - slider
-            ) * 0.5
-
-
-            # ==============================================
-            # ตรวจ Scene Tilt
-            # ==============================================
-
-            measured = estimate_scene_tilt(
-                frame
-            )
-
-
-            if measured is not None:
-
-                tilt_history.append(
-                    measured
-                )
-
-
-            # ==============================================
-            # Median หลาย Frame
-            #
-            # ต้องมีอย่างน้อย 5 ค่า
-            # ==============================================
-
-            scene_roll = (
-
-                float(
-                    np.median(
-                        tilt_history
-                    )
-                )
-
-                if len(
-                    tilt_history
-                ) >= 5
-
-                else None
-
-            )
-
-
-            # ==============================================
-            # หมุนภาพตาม Slider
-            # ==============================================
-
-            display = level_frame(
-                frame,
-                adjust_roll,
-            )
-
-
-            # ==============================================
-            # วาด Grid ช่วยดูแนวระดับ
-            # ==============================================
-
-            draw_level_grid(
-                display
-            )
-
-
-            put(
-                display,
-                (
-                    "Tilt correction: "
-                    f"{adjust_roll:+.1f} deg"
-                ),
-                (20, 40),
-                WHITE,
-            )
-
-
-            # ==============================================
-            # ถ้าหา Scene Line ไม่ได้
-            # ==============================================
-
-            if scene_roll is None:
-
-                put(
-                    display,
-                    (
-                        "Remaining: ? "
-                        "(no clear lines, "
-                        "adjust by eye)"
-                    ),
-                    (20, 75),
-                    YELLOW,
-                )
-
-
-            # ==============================================
-            # มี Scene Tilt
-            # ==============================================
-
-            else:
-
-                remaining = (
-                    scene_roll
-                    - adjust_roll
-                )
-
-
-                if (
-                    abs(
-                        remaining
-                    )
-                    <= 0.5
-                ):
-
-                    color = GREEN
-
-                else:
-
-                    color = YELLOW
-
-
-                put(
-                    display,
-                    (
-                        "Remaining: "
-                        f"{remaining:+.1f} "
-                        "deg (aim for 0)"
-                    ),
-                    (20, 75),
-                    color,
-                )
-
-
-            put(
-                display,
-                (
-                    "+ = drag slider LEFT, "
-                    "- = drag RIGHT"
-                ),
-                (20, 110),
-                WHITE,
-            )
-
-
-            put(
-                display,
-                (
-                    "SPACE = auto set   "
-                    "ENTER = confirm   "
-                    "BACKSPACE = redo"
-                ),
-                (20, 145),
-                WHITE,
-            )
-
-
-        # ==================================================
-        # STATE 3
-        # PERSONAL BASELINE
-        # ==================================================
-
-        elif (
-            system_state
-            == SystemState.PERSONAL_BASELINE
-        ):
-
-            put(
-                display,
-                "Personal Baseline",
-                (20, 40),
-                YELLOW,
-            )
-
-
-            put(
-                display,
-                (
-                    "Sit upright and "
-                    "look forward"
-                ),
-                (20, 75),
-                WHITE,
-            )
-
-
-            # ==============================================
-            # MEDIAPIPE POSE DETECTION
-            # ==============================================
-
-            pose_landmarks = (
-                pose_detector.detect(
-                    frame
-                )
-            )
-
-
-            # ==============================================
-            # ไม่พบ Pose
-            # ==============================================
-
-            if (
-                pose_landmarks
-                is None
-            ):
-
-                put(
-                    display,
-                    "Pose: NOT FOUND",
-                    (20, 110),
-                    RED,
-                )
-
-
-            # ==============================================
-            # พบ Pose
-            # ==============================================
-
-            else:
-
-                put(
-                    display,
-                    "Pose: OK",
-                    (20, 110),
-                    GREEN,
-                )
-
+                            if check_scale_consistency(scale):
+                                put(
+                                    display,
+                                    "Scale: OK",
+                                    (20, 320),
+                                    GREEN,
+                                )
+
+                                if camera_reference is None:
+                                    camera_reference = (
+                                        create_camera_reference(
+                                            frame,
+                                            result,
+                                            perspective,
+                                            scale,
+                                        )
+                                    )
+
+                                    camera_reference[
+                                        "camera_roll_deg"
+                                    ] = 0.0
+
+                                    camera_reference[
+                                        "roll_source"
+                                    ] = "not_set"
+
+                                    adjust_roll = 0.0
+                                    tilt_history.clear()
+                                    scene_roll = None
+
+                                    open_tilt_window()
+
+                                    system_state = (
+                                        SystemState.CAMERA_SETUP_COMPLETE
+                                    )
+
+                                    print("Camera Reference Created")
+                                    print(camera_reference)
+                                    print("Current State:", system_state)
+
+                            else:
+                                put(
+                                    display,
+                                    "Scale: NOT CONSISTENT",
+                                    (20, 320),
+                                    RED,
+                                )
+
+                            cv2.imshow(
+                                "PostGuard - Warped Card",
+                                perspective["image"],
+                            )
 
                 # Debug
-                print(
-                    pose_landmarks
+                put(
+                    display,
+                    f"Contours: {debug['contours']}",
+                    (20, 405),
+                    WHITE,
                 )
 
-
-        # ==================================================
-        # DISPLAY
-        # ==========================================================
-
-        cv2.imshow(
-            window,
-            display,
-        )
-
-
-        key = (
-            cv2.waitKey(1)
-            & 0xFF
-        )
-
-
-        # ==================================================
-        # QUIT
-        #
-        # Q / q / ESC
-        # ==========================================================
-
-        if key in (
-            ord("q"),
-            ord("Q"),
-            27,
-        ):
-
-            break
-
-
-        # ==================================================
-        # KEY CONTROL
-        # เฉพาะ CAMERA_SETUP_COMPLETE
-        # ==========================================================
-
-        if (
-            system_state
-            == SystemState.CAMERA_SETUP_COMPLETE
-        ):
-
-            # ==============================================
-            # SPACE
-            #
-            # Auto Set จาก Scene Roll
-            # ==============================================
-
-            if (
-                key == 32
-
-                and
-
-                scene_roll
-                is not None
-            ):
-
-                pos = int(
-                    round(
-                        SLIDER_CENTER
-                        - 2
-                        * scene_roll
-                    )
-                )
-
-
-                pos = max(
-                    0,
-                    min(
-                        SLIDER_MAX,
-                        pos,
+                put(
+                    display,
+                    (
+                        f"Size: {debug['passed_size']} "
+                        f"4-corner: {debug['passed_4_corners']} "
+                        f"Angles: {debug['passed_angles']} "
+                        f"Fit: {debug['passed_fit']} "
+                        f"Inside: {debug['passed_inside']}"
                     ),
+                    (20, 440),
+                    WHITE,
                 )
 
+                cv2.imshow(
+                    "PostGuard - Edge Debug",
+                    edges,
+                )
 
-                cv2.setTrackbarPos(
+            # ==================================================
+            # STATE 2 : CAMERA SETUP COMPLETE
+            # ==================================================
+
+            elif system_state == SystemState.CAMERA_SETUP_COMPLETE:
+                if not debug_windows_closed:
+                    for name in (
+                        "PostGuard - Edge Debug",
+                        "PostGuard - Warped Card",
+                    ):
+                        try:
+                            cv2.destroyWindow(name)
+                        except cv2.error:
+                            pass
+
+                    debug_windows_closed = True
+
+                slider = cv2.getTrackbarPos(
                     "Tilt",
                     TILT_WINDOW,
-                    pos,
                 )
 
+                adjust_roll = (
+                    SLIDER_CENTER - slider
+                ) * 0.5
 
-            # ==============================================
-            # ENTER
-            #
-            # Confirm Camera Roll
-            # ==============================================
+                measured = estimate_scene_tilt(frame)
 
-            elif key == 13:
+                if measured is not None:
+                    tilt_history.append(measured)
 
-                camera_reference[
-                    "camera_roll_deg"
-                ] = adjust_roll
-
-
-                camera_reference[
-                    "roll_source"
-                ] = "user_adjusted"
-
-
-                close_tilt_window()
-
-
-                system_state = (
-                    SystemState
-                    .PERSONAL_BASELINE
+                scene_roll = (
+                    float(np.median(tilt_history))
+                    if len(tilt_history) >= 5
+                    else None
                 )
 
-
-                print(
-                    "Camera roll saved:",
+                display = level_frame(
+                    frame,
                     adjust_roll,
                 )
 
+                draw_level_grid(display)
 
-                print(
-                    "Current State:",
-                    system_state,
+                put(
+                    display,
+                    f"Tilt correction: {adjust_roll:+.1f} deg",
+                    (20, 40),
+                    WHITE,
                 )
 
+                if scene_roll is None:
+                    put(
+                        display,
+                        (
+                            "Remaining: ? "
+                            "(no clear lines, adjust by eye)"
+                        ),
+                        (20, 75),
+                        YELLOW,
+                    )
+                else:
+                    remaining = scene_roll - adjust_roll
 
-            # ==============================================
-            # BACKSPACE / R
+                    color = (
+                        GREEN
+                        if abs(remaining) <= 0.5
+                        else YELLOW
+                    )
+
+                    put(
+                        display,
+                        (
+                            f"Remaining: {remaining:+.1f} "
+                            "deg (aim for 0)"
+                        ),
+                        (20, 75),
+                        color,
+                    )
+
+                put(
+                    display,
+                    "+ = drag slider LEFT, - = drag RIGHT",
+                    (20, 110),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    (
+                        "SPACE = auto set   "
+                        "ENTER = confirm   "
+                        "BACKSPACE = redo"
+                    ),
+                    (20, 145),
+                    WHITE,
+                )
+
+            # ==================================================
+            # STATE 3 : PERSONAL BASELINE
             #
-            # Reset Setup
-            # ==============================================
+            # รอบนี้ยังไม่เก็บ baseline จริง
+            # ใช้ตรวจ integration ของ DetectionPipeline ก่อน
+            # ==================================================
 
-            elif key in (
-                8,
-                ord("r"),
-                ord("R"),
+            elif system_state == SystemState.PERSONAL_BASELINE:
+                if camera_reference is None:
+                    print("Error: camera_reference is missing")
+                    system_state = SystemState.CAMERA_SETUP
+                    continue
+
+                camera_roll_deg = camera_reference[
+                    "camera_roll_deg"
+                ]
+
+                # ------------------------------------------
+                # Detection Frame
+                # UNMIRRORED + Roll Corrected
+                # ------------------------------------------
+
+                detection_frame = build_detection_frame(
+                    raw_frame,
+                    camera_roll_deg,
+                )
+
+                # ------------------------------------------
+                # Display Frame
+                # MIRRORED + Roll Corrected
+                # ------------------------------------------
+
+                display = build_display_frame(
+                    raw_frame,
+                    camera_roll_deg,
+                )
+
+                detection_result = (
+                    detection_pipeline.process_frame(
+                        detection_frame
+                    )
+                )
+
+                shoulder_tilt = get_feature_value(
+                    detection_result,
+                    "shoulder_tilt",
+                )
+
+                neck_lateral_tilt = get_feature_value(
+                    detection_result,
+                    "neck_lateral_tilt",
+                )
+
+                neck_flexion = get_feature_value(
+                    detection_result,
+                    "neck_flexion",
+                )
+
+                eye_distance = get_feature_value(
+                    detection_result,
+                    "eye_distance",
+                )
+
+                context_text = get_context_text(
+                    detection_result
+                )
+
+                allow_posture = posture_evaluation_allowed(
+                    detection_result
+                )
+
+                put(
+                    display,
+                    "Personal Baseline",
+                    (20, 40),
+                    YELLOW,
+                )
+
+                put(
+                    display,
+                    "Sit upright and look forward",
+                    (20, 75),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    f"Context: {context_text}",
+                    (20, 115),
+                    GREEN if allow_posture else YELLOW,
+                )
+
+                put(
+                    display,
+                    (
+                        "Evaluation: "
+                        f"{'ALLOW' if allow_posture else 'WAIT'}"
+                    ),
+                    (20, 150),
+                    GREEN if allow_posture else YELLOW,
+                )
+
+                put(
+                    display,
+                    (
+                        "Shoulder Tilt: "
+                        f"{format_feature(shoulder_tilt, 'deg')}"
+                    ),
+                    (20, 200),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    (
+                        "Neck Lateral: "
+                        f"{format_feature(neck_lateral_tilt, 'deg')}"
+                    ),
+                    (20, 235),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    (
+                        "Neck Flexion: "
+                        f"{format_feature(neck_flexion, 'deg')}"
+                    ),
+                    (20, 270),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    (
+                        "Eye Distance: "
+                        f"{format_feature(eye_distance, 'px')}"
+                    ),
+                    (20, 305),
+                    WHITE,
+                )
+
+                put(
+                    display,
+                    "Baseline collection will be added next.",
+                    (20, 355),
+                    YELLOW,
+                )
+
+            # ==================================================
+            # DISPLAY + KEYBOARD
+            # ==================================================
+
+            cv2.imshow(
+                window,
+                display,
+            )
+
+            key = cv2.waitKey(1) & 0xFF
+
+            if key in (
+                ord("q"),
+                ord("Q"),
+                27,
             ):
+                break
 
-                camera_reference = None
+            # --------------------------------------------------
+            # Key control in Camera Setup Complete
+            # --------------------------------------------------
 
+            if system_state == SystemState.CAMERA_SETUP_COMPLETE:
+                # SPACE = Auto Set
+                if key == 32 and scene_roll is not None:
+                    pos = int(
+                        round(
+                            SLIDER_CENTER
+                            - 2 * scene_roll
+                        )
+                    )
 
-                stable_count = 0
+                    cv2.setTrackbarPos(
+                        "Tilt",
+                        TILT_WINDOW,
+                        max(
+                            0,
+                            min(
+                                SLIDER_MAX,
+                                pos,
+                            ),
+                        ),
+                    )
 
+                # ENTER = Confirm Roll
+                elif key == 13:
+                    camera_reference[
+                        "camera_roll_deg"
+                    ] = adjust_roll
 
-                close_tilt_window()
+                    camera_reference[
+                        "roll_source"
+                    ] = "user_adjusted"
 
+                    close_tilt_window()
 
-                system_state = (
-                    SystemState
-                    .CAMERA_SETUP
-                )
+                    detection_pipeline.reset_runtime()
 
+                    system_state = SystemState.PERSONAL_BASELINE
 
-                print(
-                    "Current State:",
-                    system_state,
-                )
+                    print(
+                        "Camera roll saved:",
+                        adjust_roll,
+                    )
 
+                    print(
+                        "Current State:",
+                        system_state,
+                    )
 
-    # ======================================================
-    # CLEANUP
-    # ======================================================
+                # BACKSPACE / R = Reset
+                elif key in (
+                    8,
+                    ord("r"),
+                    ord("R"),
+                ):
+                    camera_reference = None
+                    stable_count = 0
 
-    pose_detector.close()
+                    close_tilt_window()
+                    detection_pipeline.reset_runtime()
 
-    cap.release()
+                    system_state = SystemState.CAMERA_SETUP
 
-    cv2.destroyAllWindows()
+                    print(
+                        "Current State:",
+                        system_state,
+                    )
 
+    finally:
+        close_tilt_window()
+        detection_pipeline.close()
+        cap.release()
+        cv2.destroyAllWindows()
 
-# ==========================================================
-# RUN
-# ==========================================================
 
 if __name__ == "__main__":
-
     main()
