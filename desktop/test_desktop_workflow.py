@@ -52,6 +52,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.end = self.stack.enter_context(patch.object(APIClient, "end_session", return_value=response({"session_id": 3, "status": "COMPLETED", "total_duration": 100})))
         self.save = self.stack.enter_context(patch.object(APIClient, "post", return_value=response({"session_id": 3}, 201)))
         self.window = MainWindow({"username": "test"})
+        self.stack.enter_context(patch.object(self.window.dashboard_page, "refresh"))
         self.window.show()
         self.addCleanup(self.cleanup_window)
 

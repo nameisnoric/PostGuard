@@ -125,6 +125,7 @@ class LoginWindow(QWidget):
         self.main_window.show()
         self.close()
         self.main_window.check_previous_sessions()
+        self.main_window.dashboard_page.refresh()
 
     def open_password_reset(self):
         from app.ui.password_reset_dialog import PasswordResetDialog

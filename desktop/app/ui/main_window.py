@@ -122,6 +122,8 @@ class MainWindow(QMainWindow):
         self.dashboard_page = DashboardPage(
             self.user_data
         )
+        self.dashboard_page.monitor_requested.connect(self.show_monitor)
+        self.dashboard_page.history_requested.connect(self.show_history)
 
         self.camera_setup_page = (
             CameraSetupPage()
@@ -279,6 +281,7 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentWidget(
             self.dashboard_page
         )
+        self.dashboard_page.refresh()
 
     # ============================================
     # Monitor Menu
@@ -361,6 +364,10 @@ class MainWindow(QMainWindow):
         can_control = active and not monitor.is_stopping
         self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
         self.global_stop_button.setEnabled(can_control)
+        self.dashboard_page.set_monitoring_state(
+            monitor.session_id, monitor.is_paused, monitor.is_stopping,
+            monitor.capture is not None,
+        )
 
     def check_previous_sessions(self) -> bool:
         if self.monitoring_page.session_id is not None:
