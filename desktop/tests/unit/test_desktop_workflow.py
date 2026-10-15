@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QSizePolicy
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtTest import QTest
@@ -34,6 +35,20 @@ class DesktopWorkflowTests(unittest.TestCase):
             self.stack.enter_context(patch("PySide6.QtWidgets.QMessageBox." + method))
         self.camera = dict(camera_id=1, device_index=0, camera_name="Test", resolution_width=640, resolution_height=360)
         self.baseline = dict(baseline_id=2, camera_id=1, shoulder_angle=1.0, lateral_tilt_baseline=2.0)
+        self.camera_reference = {
+            "status": "VALID",
+            "frame_width": 640,
+            "frame_height": 360,
+            "card_width_px": 300,
+            "card_height_px": 189,
+            "scale_x": 3.50,
+            "scale_y": 3.50,
+            "scale_avg": 3.50,
+            "card_roll_deg": 0.5,
+            "horizontal_perspective": 0.02,
+            "vertical_perspective": 0.03,
+            "captured_at": "2026-10-15T12:00:00+00:00",
+        }
         self.result = dict(pose_points={}, face_detected=True, shoulder_tilt=1.0, neck_lateral_tilt={"neck_tilt": 2.0})
         self.capture = Mock()
         self.capture.isOpened.return_value = True
@@ -45,7 +60,13 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.stack.enter_context(patch.object(APIClient, "get_cameras", return_value=response([])))
         self.stack.enter_context(patch.object(APIClient, "get_sessions", return_value=response([])))
         self.stack.enter_context(patch.object(APIClient, "create_camera", return_value=response(self.camera, 201)))
-        self.stack.enter_context(patch.object(APIClient, "create_personal_baseline", return_value=response(self.baseline, 201)))
+        self.create_baseline = self.stack.enter_context(
+            patch.object(
+                APIClient,
+                "create_personal_baseline",
+                return_value=response(self.baseline, 201),
+            )
+        )
         self.stack.enter_context(patch.object(APIClient, "get", return_value=response(self.baseline)))
         self.stack.enter_context(patch.object(APIClient, "get_session_alerts", return_value=response([])))
         self.user_settings = {
@@ -79,6 +100,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.monitoring_page.stop_monitoring()
         self.window.baseline_page.stop_camera_preview()
         self.window.camera_preview_page.stop_preview()
+        self.window.camera_calibration_page.stop_camera()
         self.window._exit_ready = True
         self.window.close()
         self.window.deleteLater()
@@ -110,15 +132,23 @@ class DesktopWorkflowTests(unittest.TestCase):
         preview = self.window.camera_preview_page.preview_label
         baseline = self.window.baseline_page.preview_label
         monitor = self.window.monitoring_page.preview_label
+        calibration = self.window.camera_calibration_page.preview_label
 
         self.assertEqual(
             preview.sizePolicy().horizontalPolicy(),
             QSizePolicy.Policy.Ignored,
         )
         self.assertEqual(preview.maximumWidth(), 960)
-        self.assertEqual(baseline.maximumWidth(), 820)
+        self.assertEqual(baseline.maximumWidth(), 720)
+        self.assertEqual(calibration.maximumWidth(), 820)
         self.assertEqual(monitor.size().width(), 720)
         self.assertEqual(monitor.size().height(), 405)
+        preview_item = self.window.camera_preview_page.layout().itemAt(6)
+        preview_label_item = preview_item.layout().itemAt(1)
+        self.assertEqual(
+            preview_label_item.alignment(),
+            Qt.AlignmentFlag.AlignCenter,
+        )
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
             "All Alert Events",
@@ -172,8 +202,17 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.show_monitor()
         self.window.show_camera_preview(self.camera)
         self.window.camera_preview_page.handle_continue()
+        camera_preparation = self.window.camera_calibration_page
+        self.assertIs(self.window.pages.currentWidget(), camera_preparation)
+        self.assertFalse(camera_preparation.continue_button.isEnabled())
+        camera_preparation.calibration_reference = self.camera_reference.copy()
+        camera_preparation.continue_button.setEnabled(True)
+        camera_preparation.handle_continue()
         baseline = self.window.baseline_page
         self.assertIs(self.window.pages.currentWidget(), baseline)
+        self.assertEqual(
+            baseline.selected_camera["camera_calibration"]["scale_avg"], 3.50
+        )
         baseline.start_calibration()
         for _ in range(30):
             baseline.collect_calibration_sample(self.result)
@@ -210,8 +249,26 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertTrue(summary_page.save_group.isHidden())
         self.assertEqual(monitor.stop_button.text(), "Stop Monitoring")
         self.assertEqual(self.save.call_args.args[1]["average_neck"], 2.0)
+        baseline_payload = self.create_baseline.call_args.kwargs["measurements"]
+        self.assertEqual(baseline_payload["camera_scale_avg"], 3.50)
+        self.assertEqual(
+            baseline_payload["camera_calibrated_at"],
+            "2026-10-15T12:00:00+00:00",
+        )
         self.assertIsNone(monitor.capture)
         self.assertFalse(monitor.timer.isActive())
+
+    def test_camera_preparation_completion_notifies_only_once(self):
+        page = self.window.camera_calibration_page
+        with patch(
+            "app.ui.pages.camera_calibration_page.QMessageBox.information"
+        ) as information:
+            page._complete_preparation(self.camera_reference)
+            page._complete_preparation(self.camera_reference)
+
+        self.assertTrue(page.continue_button.isEnabled())
+        self.assertEqual(page.calibration_reference, self.camera_reference)
+        information.assert_called_once()
 
     def test_experimental_threshold_requires_explicit_enable(self):
         monitor = self.window.monitoring_page

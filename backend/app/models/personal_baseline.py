@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, String, DateTime
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -27,6 +27,24 @@ class PersonalBaseline(Base):
         ForeignKey("cameras.camera_id"),
         nullable=False,
         index=True
+    )
+
+    # Numeric camera-preparation snapshot captured locally before this baseline.
+    # Frames and reference-card images are never persisted.
+    camera_frame_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    camera_frame_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    camera_scale_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    camera_scale_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    camera_scale_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    camera_card_roll: Mapped[float | None] = mapped_column(Float, nullable=True)
+    camera_horizontal_perspective: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    camera_vertical_perspective: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    camera_calibrated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     neck_flexion_baseline: Mapped[float | None] = mapped_column(

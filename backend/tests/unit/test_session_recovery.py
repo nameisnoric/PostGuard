@@ -62,6 +62,20 @@ class SessionRecoveryTests(unittest.TestCase):
         self.assertEqual(result.status_code, 201, result.text)
         self.assertNotEqual(result.json()["session_id"], 1)
 
+    def test_new_session_requires_camera_preparation_snapshot(self):
+        self.client.post("/sessions/1/interrupt")
+        baseline = self.db.get(fixtures.PersonalBaseline, 1)
+        baseline.camera_scale_avg = None
+        baseline.camera_calibrated_at = None
+        self.db.commit()
+
+        result = self.client.post(
+            "/sessions/start", json={"camera_id": 1, "baseline_id": 1}
+        )
+
+        self.assertEqual(result.status_code, 409)
+        self.assertIn("Camera preparation", result.json()["detail"])
+
     def test_unclosed_alert_is_incomplete_not_active_or_zero_duration(self):
         now = datetime.now(timezone.utc)
         open_alert = AlertEvent(session_id=1, event_type="NECK_LATERAL_TILT", risk_level="MEDIUM", started_at=now)

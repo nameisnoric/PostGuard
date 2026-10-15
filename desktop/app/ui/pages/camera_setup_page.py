@@ -45,7 +45,7 @@ class CameraSetupPage(QWidget):
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Step 1 of 3  ·  Select a camera, then check its preview."
+            "Step 1 of 4  ·  Select a camera, then check its preview."
         )
         self.description_label.setProperty("role", "muted")
 

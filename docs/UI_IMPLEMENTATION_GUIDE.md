@@ -146,6 +146,44 @@ Risk Score History และ Blink Rate History ยังไม่เชื่�
 `N/A` พร้อมคำอธิบาย ไม่มีตัวเลข mock ในโปรแกรมจริง ส่วน experimental neck alert
 ใน Monitoring ยังคงระบุว่าเป็น provisional/partial และไม่อ้างว่าเป็น full risk score
 
+### History and saved reports
+
+History loads the signed-in user's sessions from `GET /sessions` and the saved-report
+index from `GET /summaries`. It shows total, completed, interrupted, and saved-report
+counts; supports searching by session/camera/baseline ID; and filters by session status.
+Selecting a row shows local start/end times, total time, paused time, active time, pause
+count, camera, baseline, and report availability. Interrupted sessions keep unavailable
+duration fields as `N/A`.
+
+Saved reports show every persisted summary field that currently has a source, including
+detection counts, measured averages, risk-level alert counts and open durations, the
+stored alert total, and the most frequent event. Risk score and blink rate remain `N/A`
+when their complete calculations are unavailable. Alert Events use readable labels,
+local timestamps, `HH:MM:SS` durations, and explicit loading, empty, and error states.
+
+### Camera preparation and baseline flow
+
+The camera workflow has four UI steps before monitoring starts:
+
+1. `Camera Setup` selects and opens a local camera.
+2. `Camera Preview` confirms that the face, shoulders and image are visible.
+3. `Camera Preparation` detects a standard 85.60 x 53.98 mm reference card,
+   validates ten consecutive frames and calculates the numeric camera scale.
+4. `Personal Baseline` captures the user's neutral posture and saves it with
+   the camera-reference snapshot.
+
+The preparation processor lives in
+`desktop/app/services/camera_setup/reference_card.py`. It returns frame size,
+card size in pixels, X/Y/average scale, roll, perspective and capture time.
+The UI deliberately drops the frame, contour and card box before calling the
+backend. `POST /personal-baselines` stores only those numeric values alongside
+the posture baseline. `POST /sessions` rejects an old or incomplete baseline
+with HTTP 409 so a Session cannot start without camera preparation.
+
+The reference-card logic was adapted from `feature/camera` commit `04211ba`.
+The branch itself was not merged, and its posture-detection models remain out
+of the current desktop scope.
+
 หน้า Session Summary ซ่อนรายละเอียดฐานข้อมูลเมื่อบันทึกสำเร็จ เพราะเป็นรายละเอียด
 ภายในระบบ แต่ยังเก็บ save status ไว้ใน state และจะแสดง `Summary Save Problem` พร้อม
 ปุ่ม Retry เฉพาะเมื่อบันทึก summary ไม่สำเร็จ
@@ -158,6 +196,8 @@ Risk Score History และ Blink Rate History ยังไม่เชื่�
 - `desktop/app/ui/pages/monitoring_page.py` — camera/detection layout และ session controls
 - `desktop/app/ui/pages/camera_setup_page.py` — เลือกหรือ scan กล้อง
 - `desktop/app/ui/pages/camera_preview_page.py` — ตรวจภาพก่อนสร้าง baseline
+- `desktop/app/ui/pages/camera_calibration_page.py` — เตรียมกล้องด้วยบัตรอ้างอิงและส่งค่าตัวเลขไปยัง baseline
+- `desktop/app/services/camera_setup/reference_card.py` — ตรวจบัตรและคำนวณ camera reference ภายในเครื่อง
 - `desktop/app/ui/pages/baseline_page.py` — calibration และบันทึก baseline
 - `desktop/app/ui/pages/alert_history_dialog.py` — session alert viewer with loading, error and empty states
 - `desktop/app/ui/pages/profile_page.py` — Figma-aligned profile form, private photo management and persistent username/full-name edits

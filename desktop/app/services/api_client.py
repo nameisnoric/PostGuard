@@ -181,6 +181,10 @@ class APIClient:
             "neck_flexion_baseline", "shoulder_angle", "lateral_tilt_baseline",
             "shoulder_tilt_status", "forward_head_baseline", "neck_rotation_baseline",
             "shoulder_level_difference_baseline", "ipd_baseline", "screen_distance_baseline",
+            "camera_frame_width", "camera_frame_height", "camera_scale_x",
+            "camera_scale_y", "camera_scale_avg", "camera_card_roll",
+            "camera_horizontal_perspective", "camera_vertical_perspective",
+            "camera_calibrated_at",
         }
         unknown_fields = set(measurements) - allowed_fields
         if unknown_fields:

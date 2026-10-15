@@ -21,6 +21,7 @@ from app.core.token_store import TokenStore
 from app.ui.pages.dashboard_page import DashboardPage
 from app.ui.pages.camera_setup_page import CameraSetupPage
 from app.ui.pages.camera_preview_page import CameraPreviewPage
+from app.ui.pages.camera_calibration_page import CameraCalibrationPage
 from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
@@ -120,6 +121,8 @@ class MainWindow(QMainWindow):
             CameraPreviewPage()
         )
 
+        self.camera_calibration_page = CameraCalibrationPage()
+
         self.baseline_page = (
             BaselinePage()
         )
@@ -156,6 +159,8 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(
             self.camera_preview_page
         )
+
+        self.pages.addWidget(self.camera_calibration_page)
 
         self.pages.addWidget(
             self.baseline_page
@@ -215,14 +220,21 @@ class MainWindow(QMainWindow):
             self.show_camera_setup
         )
 
-        # Camera Preview -> Personal Baseline
+        # Camera Preview -> Camera Preparation
         self.camera_preview_page.continue_requested.connect(
             self.handle_preview_continue
         )
 
-        # Personal Baseline -> Camera Preview
-        self.baseline_page.back_requested.connect(
+        self.camera_calibration_page.back_requested.connect(
             self.show_camera_preview
+        )
+        self.camera_calibration_page.continue_requested.connect(
+            self.handle_camera_calibration_continue
+        )
+
+        # Personal Baseline -> Camera Preparation
+        self.baseline_page.back_requested.connect(
+            self.show_camera_calibration
         )
 
         # ========================================
@@ -274,6 +286,7 @@ class MainWindow(QMainWindow):
         monitor_pages = {
             self.camera_setup_page,
             self.camera_preview_page,
+            self.camera_calibration_page,
             self.baseline_page,
             self.monitoring_page,
         }
@@ -301,6 +314,7 @@ class MainWindow(QMainWindow):
     def show_dashboard(self):
 
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
 
         self.pages.setCurrentWidget(
             self.dashboard_page
@@ -322,6 +336,7 @@ class MainWindow(QMainWindow):
             return
 
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
 
         self.pages.setCurrentWidget(
             self.camera_setup_page
@@ -335,6 +350,7 @@ class MainWindow(QMainWindow):
 
         # Stop camera preview before switching pages
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
 
         # Display History page
         self.pages.setCurrentWidget(
@@ -346,11 +362,13 @@ class MainWindow(QMainWindow):
 
     def show_profile(self):
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
         self.profile_page.reset_form()
         self.pages.setCurrentWidget(self.profile_page)
 
     def show_settings(self):
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
         self.settings_page.load_settings()
         self.pages.setCurrentWidget(self.settings_page)
 
@@ -429,6 +447,7 @@ class MainWindow(QMainWindow):
 
         # Stop Camera Preview
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
 
         # Clear Authentication Token
         TokenStore.clear_token()
@@ -537,6 +556,7 @@ class MainWindow(QMainWindow):
             if self._show_unsaved_summary():
                 return False
             self.camera_preview_page.stop_preview()
+            self.camera_calibration_page.stop_camera()
             self.baseline_page.stop_camera_preview()
             return True
         finally:
@@ -559,6 +579,7 @@ class MainWindow(QMainWindow):
         camera: dict
     ):
 
+        self.camera_calibration_page.stop_camera()
         self.camera_preview_page.start_preview(
             camera
         )
@@ -567,6 +588,12 @@ class MainWindow(QMainWindow):
             self.camera_preview_page
         )
 
+    def show_camera_calibration(self, camera: dict) -> None:
+        """Open local reference-card preparation before personal baseline."""
+        self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.set_camera(camera)
+        self.pages.setCurrentWidget(self.camera_calibration_page)
+
     # ============================================
     # Camera Setup
     # ============================================
@@ -574,6 +601,7 @@ class MainWindow(QMainWindow):
     def show_camera_setup(self):
 
         self.camera_preview_page.stop_preview()
+        self.camera_calibration_page.stop_camera()
 
         self.pages.setCurrentWidget(
             self.camera_setup_page
@@ -711,15 +739,26 @@ class MainWindow(QMainWindow):
 
             return
 
-        # 7. Send Camera Data to Baseline
-        self.baseline_page.set_camera(
-            camera_data
-        )
+        # 7. Prepare physical camera placement before collecting a baseline.
+        self.show_camera_calibration(camera_data)
 
-        # 8. Open Personal Baseline Page
-        self.pages.setCurrentWidget(
-            self.baseline_page
-        )
+    def handle_camera_calibration_continue(
+        self,
+        camera: dict,
+        calibration_reference: dict,
+    ) -> None:
+        """Attach the numeric camera reference to the baseline capture flow."""
+        if calibration_reference.get("status") != "VALID":
+            QMessageBox.warning(
+                self,
+                "Camera Preparation",
+                "Complete camera preparation before creating a Personal Baseline.",
+            )
+            return
+        camera_data = camera.copy()
+        camera_data["camera_calibration"] = calibration_reference.copy()
+        self.baseline_page.set_camera(camera_data)
+        self.pages.setCurrentWidget(self.baseline_page)
 
     # ============================================
     # Real-time Monitoring

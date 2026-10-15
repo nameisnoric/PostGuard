@@ -38,7 +38,20 @@ class SessionSummaryTests(unittest.TestCase):
         self.db.flush()
         self.db.add(Camera(camera_id=1, user_id=1, device_id="test", camera_name="test", resolution_width=640, resolution_height=360))
         self.db.flush()
-        self.db.add(PersonalBaseline(baseline_id=1, user_id=1, camera_id=1))
+        self.db.add(PersonalBaseline(
+            baseline_id=1,
+            user_id=1,
+            camera_id=1,
+            camera_frame_width=640,
+            camera_frame_height=360,
+            camera_scale_x=3.5,
+            camera_scale_y=3.5,
+            camera_scale_avg=3.5,
+            camera_card_roll=0.0,
+            camera_horizontal_perspective=0.0,
+            camera_vertical_perspective=0.0,
+            camera_calibrated_at=datetime.now(timezone.utc),
+        ))
         self.db.flush()
         self.db.add(PostureSession(session_id=1, user_id=1, camera_id=1, baseline_id=1, status="COMPLETED"))
         self.db.commit()

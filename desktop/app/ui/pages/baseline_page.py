@@ -194,8 +194,8 @@ class BaselinePage(QWidget):
 
         layout = QVBoxLayout(self)
         self.setProperty("page", True)
-        layout.setContentsMargins(48, 24, 48, 32)
-        layout.setSpacing(10)
+        layout.setContentsMargins(32, 18, 32, 20)
+        layout.setSpacing(8)
 
         # -------------------------
         # Title
@@ -207,7 +207,7 @@ class BaselinePage(QWidget):
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Step 3 of 3  ·  Sit naturally and hold still while PostGuard captures your reference."
+            "Step 4 of 4  ·  Sit naturally and hold still while PostGuard captures your reference."
         )
         self.description_label.setProperty("role", "muted")
 
@@ -219,7 +219,7 @@ class BaselinePage(QWidget):
             "Selected Camera"
         )
 
-        camera_layout = QVBoxLayout(
+        camera_layout = QGridLayout(
             camera_group
         )
         camera_group.setSizePolicy(
@@ -242,29 +242,25 @@ class BaselinePage(QWidget):
         self.resolution_label = QLabel(
             "Resolution: -"
         )
+        self.camera_reference_label = QLabel("Camera preparation: Not completed")
         for label in (
             self.camera_name_label,
             self.device_label,
             self.camera_id_label,
             self.resolution_label,
+            self.camera_reference_label,
         ):
             label.setProperty("role", "muted")
 
-        camera_layout.addWidget(
-            self.camera_name_label
-        )
-
-        camera_layout.addWidget(
-            self.device_label
-        )
-
-        camera_layout.addWidget(
-            self.camera_id_label
-        )
-
-        camera_layout.addWidget(
-            self.resolution_label
-        )
+        camera_layout.setHorizontalSpacing(32)
+        camera_layout.setVerticalSpacing(6)
+        camera_layout.addWidget(self.camera_name_label, 0, 0)
+        camera_layout.addWidget(self.device_label, 0, 1)
+        camera_layout.addWidget(self.camera_id_label, 1, 0)
+        camera_layout.addWidget(self.resolution_label, 1, 1)
+        camera_layout.addWidget(self.camera_reference_label, 2, 0, 1, 2)
+        camera_layout.setColumnStretch(0, 1)
+        camera_layout.setColumnStretch(1, 1)
 
         # -------------------------
         # Camera Preview
@@ -279,10 +275,10 @@ class BaselinePage(QWidget):
         )
 
         self.preview_label.setMinimumSize(
-            520,
-            280
+            420,
+            236
         )
-        self.preview_label.setMaximumSize(820, 460)
+        self.preview_label.setMaximumSize(720, 405)
         self.preview_label.setSizePolicy(
             QSizePolicy.Policy.Ignored,
             QSizePolicy.Policy.Ignored,
@@ -360,7 +356,7 @@ class BaselinePage(QWidget):
         button_layout = QHBoxLayout()
 
         self.back_button = QPushButton(
-            "Back to Camera Preview"
+            "Back to Camera Preparation"
         )
 
         self.calibrate_button = QPushButton(
@@ -499,6 +495,18 @@ class BaselinePage(QWidget):
 
         self.resolution_label.setText(
             f"Resolution: {width}x{height}"
+        )
+
+        camera_reference = camera.get("camera_calibration")
+        if not isinstance(camera_reference, dict) or camera_reference.get("status") != "VALID":
+            self.camera_reference_label.setText("Camera preparation: Required")
+            self.status_label.setText("Status: Complete camera preparation first")
+            self.calibrate_button.setEnabled(False)
+            return
+        self.camera_reference_label.setText(
+            "Camera preparation: Ready | "
+            f"Scale {camera_reference.get('scale_avg', 0):.2f} px/mm | "
+            f"Roll {camera_reference.get('card_roll_deg', 0):+.2f}°"
         )
 
         print(
@@ -820,7 +828,16 @@ class BaselinePage(QWidget):
             ),
             "lateral_tilt_baseline": (
                 self.baseline_result["neck_lateral_tilt"]
-            )
+            ),
+            "camera_frame_width": self.selected_camera["camera_calibration"]["frame_width"],
+            "camera_frame_height": self.selected_camera["camera_calibration"]["frame_height"],
+            "camera_scale_x": self.selected_camera["camera_calibration"]["scale_x"],
+            "camera_scale_y": self.selected_camera["camera_calibration"]["scale_y"],
+            "camera_scale_avg": self.selected_camera["camera_calibration"]["scale_avg"],
+            "camera_card_roll": self.selected_camera["camera_calibration"]["card_roll_deg"],
+            "camera_horizontal_perspective": self.selected_camera["camera_calibration"]["horizontal_perspective"],
+            "camera_vertical_perspective": self.selected_camera["camera_calibration"]["vertical_perspective"],
+            "camera_calibrated_at": self.selected_camera["camera_calibration"]["captured_at"],
         }
 
         # -------------------------

@@ -63,6 +63,12 @@ def start_session(
             detail="Personal baseline does not belong to this camera"
         )
 
+    if baseline.camera_scale_avg is None or baseline.camera_calibrated_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Camera preparation is required before starting a session",
+        )
+
     # 4. ตรวจสอบว่า User ไม่มี Session ที่กำลังทำงานอยู่
     active_session_statement = select(PostureSession).where(
         PostureSession.user_id == current_user.id,

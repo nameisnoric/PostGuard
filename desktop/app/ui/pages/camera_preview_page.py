@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
+from app.ui.preview_sizing import fit_preview_label
 
 
 class CameraPreviewPage(QWidget):
@@ -94,7 +95,7 @@ class CameraPreviewPage(QWidget):
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Step 2 of 3  ·  Keep your face and shoulders visible before continuing."
+            "Step 2 of 4  ·  Confirm that the selected camera is available."
         )
         self.description_label.setProperty("role", "muted")
 
@@ -142,7 +143,7 @@ class CameraPreviewPage(QWidget):
         )
 
         self.continue_button = QPushButton(
-            "Continue to Baseline"
+            "Continue to Camera Preparation"
         )
         self.continue_button.setProperty("variant", "primary")
 
@@ -188,7 +189,11 @@ class CameraPreviewPage(QWidget):
         
         preview_row = QHBoxLayout()
         preview_row.addStretch()
-        preview_row.addWidget(self.preview_label, 1)
+        preview_row.addWidget(
+            self.preview_label,
+            0,
+            Qt.AlignmentFlag.AlignCenter,
+        )
         preview_row.addStretch()
         layout.addLayout(preview_row, 1)
 
@@ -455,6 +460,14 @@ class CameraPreviewPage(QWidget):
             frame_rgb.shape
         )
 
+        fit_preview_label(
+            self.preview_label,
+            width,
+            height,
+            960,
+            540,
+        )
+
         bytes_per_line = (
             channels * width
         )
@@ -533,6 +546,12 @@ class CameraPreviewPage(QWidget):
 
         self.preview_label.setText(
             "Camera preview will appear here."
+        )
+        self.preview_label.setMinimumSize(640, 360)
+        self.preview_label.setMaximumSize(960, 540)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Ignored,
         )
 
         # -------------------------

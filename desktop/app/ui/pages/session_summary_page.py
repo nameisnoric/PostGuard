@@ -3,7 +3,7 @@
 
 import requests
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -12,6 +12,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGroupBox,
     QMessageBox,
+    QLayout,
+    QScrollArea,
+    QSizePolicy,
 )
 
 from app.services.api_client import APIClient
@@ -37,9 +40,25 @@ class SessionSummaryPage(QWidget):
         self.current_session_id = None
         self.current_summary = None
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 20)
+        page_layout = QVBoxLayout(self)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        content = QWidget()
+        content.setProperty("page", True)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(24, 18, 24, 20)
         layout.setSpacing(12)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+
+        scroll_area.setWidget(content)
+        page_layout.addWidget(scroll_area)
 
         self.title_label = QLabel("Session Summary")
         self.title_label.setProperty("role", "title")
@@ -50,6 +69,10 @@ class SessionSummaryPage(QWidget):
 
         # Session information
         info_group = QGroupBox("Session Information")
+        info_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         info_layout = QVBoxLayout(info_group)
 
         self.session_label = QLabel("Session ID: --")
@@ -77,6 +100,10 @@ class SessionSummaryPage(QWidget):
 
         # Detection summary
         detection_group = QGroupBox("Detection Summary")
+        detection_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         detection_layout = QVBoxLayout(detection_group)
 
         self.count_label = QLabel("Detection Cycles: --")
@@ -103,6 +130,10 @@ class SessionSummaryPage(QWidget):
             detection_layout.addWidget(widget)
 
         report_group = QGroupBox("Stored Report Metrics")
+        report_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         report_layout = QVBoxLayout(report_group)
         self.average_risk_label = QLabel("Average Risk Score: N/A")
         self.maximum_risk_label = QLabel("Maximum Risk Score: N/A")
@@ -123,6 +154,10 @@ class SessionSummaryPage(QWidget):
 
         # Database save status
         self.save_group = QGroupBox("Summary Save Problem")
+        self.save_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         save_layout = QVBoxLayout(self.save_group)
 
         self.save_status_label = QLabel("No report save status is available.")
@@ -142,6 +177,10 @@ class SessionSummaryPage(QWidget):
         # Alert overview
         alert_group = QGroupBox(
             "Alert Events (Experimental)"
+        )
+        alert_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
         )
         alert_layout = QVBoxLayout(alert_group)
 
@@ -210,7 +249,6 @@ class SessionSummaryPage(QWidget):
         layout.addWidget(self.save_group)
         layout.addWidget(alert_group)
         layout.addWidget(self.note_label)
-        layout.addStretch()
         layout.addWidget(self.back_button)
 
     @staticmethod

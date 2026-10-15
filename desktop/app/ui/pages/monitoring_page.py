@@ -35,6 +35,7 @@ from app.services.posture_duration_tracker import (
     classify_neck_side_bending,
 )
 from app.services.session_summary_service import save_session_summary
+from app.ui.preview_sizing import fit_preview_label
 
 
 class MonitoringPage(QWidget):
@@ -602,6 +603,13 @@ class MonitoringPage(QWidget):
     def _update_preview(self, frame) -> None:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, channels = frame_rgb.shape
+        fit_preview_label(
+            self.preview_label,
+            width,
+            height,
+            720,
+            480,
+        )
         image = QImage(
             frame_rgb.data, width, height, channels * width,
             QImage.Format.Format_RGB888,

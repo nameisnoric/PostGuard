@@ -9,9 +9,9 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 2. The proposal clarifies implementation details where the TOR is ambiguous.
 3. The current product is a Desktop Application. The proposal specifies
    Python, PySide6, FastAPI, JWT, Argon2, Resend and PostgreSQL/Supabase.
-4. Detection, posture scoring, blink analysis and camera calibration are
-   deferred temporarily. Existing code remains available, but current work
-   prioritizes the surrounding desktop system.
+4. Posture detection, posture scoring and blink analysis are deferred
+   temporarily. Camera preparation is implemented as a local reference-card
+   step before the personal posture baseline.
 5. Authentication uses the existing email/password flow and accepts only
    `@ku.th` email addresses. Google OAuth is not in the current scope.
 6. Existing email and password validation rules are frozen for the current
@@ -80,16 +80,37 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Missing | Add consent model, API and desktop flow |
 | Settings | Implemented | Final live sound and persistence acceptance test |
-| Dashboard and history | Partial | Complete TOR report fields when source data is available |
+| Dashboard, history and reports | Implemented for available data | Complete detection-derived TOR fields when their source calculations are available |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
+| Camera preparation | Implemented | Run final acceptance test with the printed 85.60 x 53.98 mm reference card |
 | Image/video privacy | Implemented by design | Add explicit user-facing notice and acceptance test |
 | Desktop packaging | Missing | Produce and test the Windows executable/installer |
 
 ## Implementation order for the current desktop phase
 
-1. Implement Privacy Notice and stored consent management.
-2. Finish report/history UX using currently available session data.
-3. Package and test the Windows application.
+1. Run the physical reference-card acceptance test for camera preparation.
+2. Implement Privacy Notice and stored consent management.
+3. Run final live acceptance tests for history, reports and account-specific data.
+4. Package and test the Windows application.
 
 Detection-related requirements remain part of the TOR and must be completed
 later, but they are outside the current desktop-system phase.
+
+## Camera preparation traceability
+
+The desktop flow is `Camera Setup -> Camera Preview -> Camera Preparation ->
+Personal Baseline -> Session`. Camera Preparation was adapted from the latest
+`feature/camera` reference-card implementation at commit `04211ba` without
+merging that branch or importing its posture-detection models.
+
+The preparation page uses the standard 85.60 x 53.98 mm card dimensions and
+requires ten consecutive valid frames. It checks card size, position, aspect
+ratio, roll and perspective locally. Only the resulting numeric reference is
+attached to the Personal Baseline: frame dimensions, X/Y/average scale, card
+roll, horizontal/vertical perspective and capture time. Camera frames, card
+images, contours and transform matrices are not persisted or uploaded.
+
+The Session API accepts a new session only when its Personal Baseline contains
+the camera scale and preparation timestamp. Existing baseline records remain
+readable because the new database columns are nullable, but they must be
+recreated through Camera Preparation before starting another session.
