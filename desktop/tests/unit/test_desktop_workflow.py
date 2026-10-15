@@ -14,6 +14,10 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtTest import QTest
 from app.core.token_store import TokenStore
 from app.services.api_client import APIClient
+from app.services.personal_baseline_service import (
+    PersonalBaselineCollector,
+    PersonalBaselineConfig,
+)
 from app.ui.main_window import MainWindow
 
 
@@ -48,7 +52,39 @@ class DesktopWorkflowTests(unittest.TestCase):
             "vertical_perspective": 0.03,
             "captured_at": "2026-10-15T12:00:00+00:00",
         }
-        self.result = dict(pose_points={}, face_detected=True, shoulder_tilt=1.0, neck_lateral_tilt={"neck_tilt": 2.0})
+        self.result = dict(
+            contract_version="1.0",
+            timestamp=1.0,
+            context={
+                "state": "VALID",
+                "reason": "OK",
+                "allow_posture_evaluation": True,
+            },
+            features={
+                "shoulder_tilt": {
+                    "valid": True, "value": 1.0, "unit": "deg",
+                    "reason": "OK", "status": "validated_prototype",
+                },
+                "neck_lateral_tilt": {
+                    "valid": True, "value": 2.0, "unit": "deg",
+                    "reason": "OK", "status": "validated_prototype",
+                },
+                "neck_flexion": {
+                    "valid": True, "value": 3.0, "unit": "deg",
+                    "reason": "OK", "status": "validated_prototype",
+                },
+                "eye_distance": {
+                    "valid": True, "value": 70.0, "unit": "px",
+                    "reason": "OK", "status": "validated_prototype",
+                },
+            },
+            pose_points={},
+            face_detected=True,
+            shoulder_tilt=1.0,
+            neck_lateral_tilt={"neck_tilt": 2.0},
+            neck_flexion=3.0,
+            eye_distance=70.0,
+        )
         self.capture = Mock()
         self.capture.isOpened.return_value = True
         self.capture.read.return_value = (True, np.zeros((360, 640, 3), dtype=np.uint8))
@@ -215,12 +251,28 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(
             baseline.selected_camera["camera_calibration"]["scale_avg"], 3.50
         )
+        clock_value = [0.0]
+
+        def fake_clock():
+            clock_value[0] += 0.01
+            return clock_value[0]
+
+        baseline.baseline_collector = PersonalBaselineCollector(
+            PersonalBaselineConfig(
+                target_samples=30,
+                min_calibration_seconds=0.1,
+                max_calibration_seconds=5.0,
+            ),
+            monotonic_fn=fake_clock,
+        )
         baseline.start_calibration()
         for _ in range(30):
             baseline.collect_calibration_sample(self.result)
-        self.assertEqual(baseline.baseline_result["sample_count"], 30)
         self.assertTrue(baseline.calibration_dialog.isVisible())
         baseline.calibration_dialog.accept()
+        self.assertEqual(baseline.baseline_result["sample_count"], 30)
+        self.assertEqual(baseline.baseline_result["neck_flexion"], 3.0)
+        self.assertEqual(baseline.baseline_result["eye_distance"], 70.0)
         self.assertFalse(baseline.monitor_button.isEnabled())
         self.assertTrue(baseline.save_button.isEnabled())
         baseline.save_baseline()
@@ -253,6 +305,12 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(self.save.call_args.args[1]["average_neck"], 2.0)
         baseline_payload = self.create_baseline.call_args.kwargs["measurements"]
         self.assertEqual(baseline_payload["camera_scale_avg"], 3.50)
+        self.assertEqual(baseline_payload["neck_flexion_baseline"], 3.0)
+        self.assertEqual(baseline_payload["ipd_baseline"], 70.0)
+        self.assertEqual(baseline_payload["baseline_status"], "SUCCESS")
+        self.assertEqual(baseline_payload["confirmation_status"], "CONFIRMED")
+        self.assertEqual(baseline_payload["baseline_sample_count"], 30)
+        self.assertEqual(baseline_payload["baseline_valid_ratio"], 1.0)
         self.assertEqual(
             baseline_payload["camera_calibrated_at"],
             "2026-10-15T12:00:00+00:00",

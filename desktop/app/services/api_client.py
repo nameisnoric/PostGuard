@@ -185,6 +185,10 @@ class APIClient:
             "camera_scale_y", "camera_scale_avg", "camera_card_roll",
             "camera_horizontal_perspective", "camera_vertical_perspective",
             "camera_calibrated_at",
+            "baseline_status", "confirmation_status", "baseline_sample_count",
+            "baseline_duration_seconds", "baseline_valid_ratio",
+            "shoulder_tilt_sd", "neck_lateral_tilt_sd", "neck_flexion_sd",
+            "eye_distance_sd",
         }
         unknown_fields = set(measurements) - allowed_fields
         if unknown_fields:

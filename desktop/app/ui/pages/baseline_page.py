@@ -1,4 +1,4 @@
-import cv2, math, statistics
+import cv2
 
 from PySide6.QtCore import (
     Qt,
@@ -27,6 +27,14 @@ from PySide6.QtWidgets import (
 
 from app.services.detection_service import DetectionService
 from app.services.api_client import APIClient
+from app.services.personal_baseline_service import (
+    BASELINE_COLLECTING,
+    BASELINE_FAILED,
+    BASELINE_NEED_CONFIRMATION,
+    BASELINE_SUCCESS,
+    CONFIRMATION_CONFIRMED,
+    PersonalBaselineCollector,
+)
 from app.ui.theme import APP_QSS
 
 
@@ -69,8 +77,12 @@ class CalibrationCompletedDialog(QDialog):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        note = QLabel("Review the calculated reference before saving it.")
+        note = QLabel(
+            "Technical validation passed. Confirm that this is your natural "
+            "starting posture."
+        )
         note.setProperty("role", "muted")
+        note.setWordWrap(True)
         note.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(note)
 
@@ -81,19 +93,30 @@ class CalibrationCompletedDialog(QDialog):
         add_detail_rows(details, (
             ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
             ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
+            ("Neck flexion", f"{result['neck_flexion']:+.2f}°"),
+            ("Eye distance", f"{result['eye_distance']:.2f} px"),
             ("Samples", result["sample_count"]),
+            ("Valid frames", f"{result['valid_ratio']:.0%}"),
         ))
         layout.addWidget(card)
 
-        state = QLabel("Not saved to the database yet")
+        state = QLabel(
+            "Confirming this reference does not mean the posture is medically safe."
+        )
         state.setProperty("role", "muted")
+        state.setWordWrap(True)
         state.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(state)
 
-        done = QPushButton("Continue")
+        actions = QHBoxLayout()
+        retry = QPushButton("Calibrate Again")
+        retry.clicked.connect(self.reject)
+        done = QPushButton("Use This Baseline")
         done.setProperty("variant", "primary")
         done.clicked.connect(self.accept)
-        layout.addWidget(done)
+        actions.addWidget(retry)
+        actions.addWidget(done)
+        layout.addLayout(actions)
 
 
 class BaselineSavedDialog(QDialog):
@@ -138,6 +161,8 @@ class BaselineSavedDialog(QDialog):
             ("Camera ID", camera_id),
             ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
             ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
+            ("Neck flexion", f"{result['neck_flexion']:+.2f}°"),
+            ("Eye distance", f"{result['eye_distance']:.2f} px"),
         )
         add_detail_rows(details, rows)
         layout.addWidget(card)
@@ -170,11 +195,10 @@ class BaselinePage(QWidget):
         #Calibrate State
         
         self.is_calibrating = False
-        self.calibration_samples = []
         self.baseline_result = None
-        self.required_samples = 30
-        #ความนิ่งของผู้ใช้
-        self.stability_threshold = 2.0
+        self.baseline_collection_result = None
+        self.baseline_collector = PersonalBaselineCollector()
+        self.required_samples = self.baseline_collector.config.target_samples
 
         self.saved_baseline_id = None   
         # -------------------------
@@ -454,8 +478,9 @@ class BaselinePage(QWidget):
 
         self.selected_camera = camera.copy()
         self.is_calibrating = False
-        self.calibration_samples = []
+        self.baseline_collector.reset()
         self.baseline_result = None
+        self.baseline_collection_result = None
         self.saved_baseline_id = None
         self.save_button.setEnabled(False)
         self.monitor_button.setEnabled(False)
@@ -631,9 +656,10 @@ class BaselinePage(QWidget):
         # เริ่มเก็บข้อมูลใหม่
         self.is_calibrating = True
 
-        self.calibration_samples = []
-
+        self.baseline_collector.reset()
+        self.required_samples = self.baseline_collector.config.target_samples
         self.baseline_result = None
+        self.baseline_collection_result = None
         
         self.saved_baseline_id = None
         self.save_button.setEnabled(False)
@@ -642,7 +668,9 @@ class BaselinePage(QWidget):
         self.calibrate_button.setEnabled(False)
 
         self.status_label.setText(
-            "Status: Calibrating 0/30"
+            "Status: Calibrating 0/"
+            f"{self.required_samples} · 0.0/"
+            f"{self.baseline_collector.config.min_calibration_seconds:.0f} s"
         )
         
     def collect_calibration_sample(
@@ -653,119 +681,99 @@ class BaselinePage(QWidget):
         if not self.is_calibrating:
             return
 
-        shoulder = result.get("shoulder_tilt")
-        neck_result = result.get("neck_lateral_tilt")
+        status = self.baseline_collector.add_detection_result(result)
+        state = status.get("status")
 
-        # ต้องพบ Pose และ Face
-        if (
-            result.get("pose_points") is None
-            or not result.get("face_detected")
-            or shoulder is None
-            or neck_result is None
-        ):
-            self.calibration_samples.clear()
-
+        if state == BASELINE_COLLECTING:
+            count = status.get("sample_count", 0)
+            target = status.get("target_samples", self.required_samples)
+            elapsed = status.get("elapsed_seconds", 0.0)
+            minimum = status.get(
+                "min_calibration_seconds",
+                self.baseline_collector.config.min_calibration_seconds,
+            )
+            rejected = status.get("rejected_frames", 0)
             self.status_label.setText(
-                "Status: Face and shoulders must be visible"
+                f"Status: Calibrating {count}/{target} valid frames · "
+                f"{elapsed:.1f}/{minimum:.0f} s · Rejected {rejected}"
             )
             return
-
-        neck = neck_result.get("neck_tilt")
-
-        if neck is None:
-            self.calibration_samples.clear()
-            return
-
-        # ตรวจสอบว่าค่าเป็นตัวเลขที่ใช้คำนวณได้
-        if not (
-            math.isfinite(shoulder)
-            and math.isfinite(neck)
-        ):
-            self.calibration_samples.clear()
-            return
-
-        self.calibration_samples.append({
-            "shoulder_tilt": shoulder,
-            "neck_tilt": neck
-        })
-
-        count = len(self.calibration_samples)
-
-        self.status_label.setText(
-            f"Status: Calibrating {count}/{self.required_samples}"
-        )
-
-        if count < self.required_samples:
-            return
-
-        # แยกชุดข้อมูลสองประเภท
-        shoulder_values = [
-            sample["shoulder_tilt"]
-            for sample in self.calibration_samples
-        ]
-
-        neck_values = [
-            sample["neck_tilt"]
-            for sample in self.calibration_samples
-        ]
-
-        # ตรวจสอบความกระจายของข้อมูล
-        shoulder_std = statistics.pstdev(
-            shoulder_values
-        )
-
-        neck_std = statistics.pstdev(
-            neck_values
-        )
-
-        if (
-            shoulder_std > self.stability_threshold
-            or neck_std > self.stability_threshold
-        ):
-            self.calibration_samples.clear()
-
-            self.status_label.setText(
-                "Status: Movement detected. "
-                "Collecting again..."
-            )
-            return
-
-        # คำนวณค่าเฉลี่ยพื้นฐาน
-        self.baseline_result = {
-            "shoulder_tilt": statistics.mean(
-                shoulder_values
-            ),
-            "neck_lateral_tilt": statistics.mean(
-                neck_values
-            ),
-            "shoulder_std": shoulder_std,
-            "neck_std": neck_std,
-            "sample_count": count
-        }   
 
         self.is_calibrating = False
-        self.save_button.setEnabled(True)
         self.calibrate_button.setEnabled(True)
-        self.calibrate_button.setText(
-            "Recalibrate"
-        )
+        self.calibrate_button.setText("Recalibrate")
+        self.baseline_collection_result = status
 
+        if state == BASELINE_FAILED:
+            issues = status.get("validation", {}).get("issues", [])
+            reason = status.get("failure_reason") or (
+                ", ".join(issues) if issues else "Technical validation failed"
+            )
+            self.status_label.setText(f"Status: Baseline failed · {reason}")
+            QMessageBox.warning(
+                self,
+                "Personal Baseline",
+                "The baseline could not be validated. Keep your face and shoulders "
+                f"visible, then try again.\n\nReason: {reason}",
+            )
+            return
+
+        if state != BASELINE_NEED_CONFIRMATION:
+            self.status_label.setText("Status: Unexpected baseline state")
+            return
+
+        candidate = status.get("baseline") or {}
+        dialog_result = {
+            **candidate,
+            "sample_count": status.get("sample_count", 0),
+            "valid_ratio": status.get("valid_ratio", 0.0),
+        }
         self.status_label.setText(
-            "Status: Calibration completed"
+            "Status: Technical validation passed · Waiting for your confirmation"
         )
-
-        if hasattr(self, "calibration_dialog"):
-            self.calibration_dialog.close()
-        self.calibration_dialog = CalibrationCompletedDialog(
-            self.baseline_result,
-            self,
-        )
+        self.calibration_dialog = CalibrationCompletedDialog(dialog_result, self)
+        self.calibration_dialog.accepted.connect(self.confirm_baseline)
+        self.calibration_dialog.rejected.connect(self.reject_baseline)
         self.calibration_dialog.open()
 
-        print(
-            "PERSONAL BASELINE:",
-            self.baseline_result
-        )
+    def confirm_baseline(self) -> None:
+        """Make a technically valid candidate usable only after user confirmation."""
+        try:
+            confirmed = self.baseline_collector.confirm()
+            usable = self.baseline_collector.get_usable_baseline()
+        except RuntimeError as error:
+            QMessageBox.warning(self, "Personal Baseline", str(error))
+            return
+
+        statistics_by_feature = confirmed.get("statistics", {})
+        self.baseline_result = {
+            **usable,
+            "shoulder_std": statistics_by_feature.get("shoulder_tilt", {}).get("sd"),
+            "neck_std": statistics_by_feature.get("neck_lateral_tilt", {}).get("sd"),
+            "neck_flexion_std": statistics_by_feature.get("neck_flexion", {}).get("sd"),
+            "eye_distance_std": statistics_by_feature.get("eye_distance", {}).get("sd"),
+            "sample_count": confirmed.get("sample_count", 0),
+            "valid_ratio": confirmed.get("valid_ratio", 0.0),
+            "duration_seconds": confirmed.get("duration_seconds", 0.0),
+        }
+        self.baseline_collection_result = confirmed
+        self.save_button.setEnabled(True)
+        self.status_label.setText("Status: Personal baseline confirmed and ready to save")
+
+    def reject_baseline(self) -> None:
+        """Discard the candidate while keeping technical validation distinct."""
+        if (
+            self.baseline_collection_result
+            and self.baseline_collection_result.get("status")
+            == BASELINE_NEED_CONFIRMATION
+        ):
+            try:
+                self.baseline_collection_result = self.baseline_collector.reject()
+            except RuntimeError:
+                pass
+        self.baseline_result = None
+        self.save_button.setEnabled(False)
+        self.status_label.setText("Status: Baseline rejected · Select Recalibrate to try again")
     
     # =========================================================
     # Save Personal Baseline
@@ -829,6 +837,18 @@ class BaselinePage(QWidget):
             "lateral_tilt_baseline": (
                 self.baseline_result["neck_lateral_tilt"]
             ),
+            "neck_flexion_baseline": self.baseline_result["neck_flexion"],
+            "ipd_baseline": self.baseline_result["eye_distance"],
+            "shoulder_tilt_status": "validated_prototype",
+            "baseline_status": BASELINE_SUCCESS,
+            "confirmation_status": CONFIRMATION_CONFIRMED,
+            "baseline_sample_count": self.baseline_result["sample_count"],
+            "baseline_duration_seconds": self.baseline_result["duration_seconds"],
+            "baseline_valid_ratio": self.baseline_result["valid_ratio"],
+            "shoulder_tilt_sd": self.baseline_result["shoulder_std"],
+            "neck_lateral_tilt_sd": self.baseline_result["neck_std"],
+            "neck_flexion_sd": self.baseline_result["neck_flexion_std"],
+            "eye_distance_sd": self.baseline_result["eye_distance_std"],
             "camera_frame_width": self.selected_camera["camera_calibration"]["frame_width"],
             "camera_frame_height": self.selected_camera["camera_calibration"]["frame_height"],
             "camera_scale_x": self.selected_camera["camera_calibration"]["scale_x"],
@@ -1173,9 +1193,9 @@ class BaselinePage(QWidget):
         self.monitor_button.setEnabled(False)
         self.is_calibrating = False
 
-        self.calibration_samples.clear()
-
+        self.baseline_collector.reset()
         self.baseline_result = None
+        self.baseline_collection_result = None
 
         self.calibrate_button.setEnabled(False)
 
