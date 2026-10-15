@@ -1,13 +1,24 @@
-"""Session Summary with read-only Alert Events overview."""
+
+"""PostGuard Session Summary with database save status and retry."""
 
 import requests
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QGroupBox, QHBoxLayout,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QGroupBox,
+    QMessageBox,
 )
 
 from app.services.api_client import APIClient
 from app.services.alert_history_service import summarize_alerts
+from app.services.session_summary_service import (
+    save_session_summary,
+)
 from app.ui.pages.alert_history_dialog import AlertHistoryDialog
 
 
@@ -16,82 +27,155 @@ class SessionSummaryPage(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.current_session_id = None
-        layout = QVBoxLayout(self)
-        self.title_label = QLabel("Session Summary")
-        self.description_label = QLabel("Summary of the completed monitoring session.")
 
+        self.current_session_id = None
+        self.current_summary = None
+
+        layout = QVBoxLayout(self)
+
+        self.title_label = QLabel("Session Summary")
+        self.description_label = QLabel(
+            "Completed monitoring session report"
+        )
+
+        # Session information
         info_group = QGroupBox("Session Information")
         info_layout = QVBoxLayout(info_group)
+
         self.session_label = QLabel("Session ID: --")
-        self.database_label = QLabel("Database Status: --")
+        self.database_label = QLabel("Session Status: --")
         self.camera_label = QLabel("Camera: --")
         self.baseline_label = QLabel("Baseline ID: --")
         self.start_label = QLabel("Started: --")
         self.end_label = QLabel("Ended: --")
         self.duration_label = QLabel("Duration: --")
-        for label in (
-            self.session_label, self.database_label, self.camera_label,
-            self.baseline_label, self.start_label, self.end_label,
+
+        for widget in (
+            self.session_label,
+            self.database_label,
+            self.camera_label,
+            self.baseline_label,
+            self.start_label,
+            self.end_label,
             self.duration_label,
         ):
-            info_layout.addWidget(label)
+            info_layout.addWidget(widget)
 
-        result_group = QGroupBox("Detection Summary")
-        result_layout = QVBoxLayout(result_group)
+        # Detection summary
+        detection_group = QGroupBox("Detection Summary")
+        detection_layout = QVBoxLayout(detection_group)
+
         self.count_label = QLabel("Detection Cycles: --")
         self.pose_label = QLabel("Pose Detected: --")
         self.face_label = QLabel("Face Detected: --")
-        self.shoulder_label = QLabel("Average Shoulder Tilt: --")
-        self.neck_label = QLabel("Average Neck Lateral Tilt: --")
-        self.baseline_shoulder_label = QLabel("Baseline Shoulder Tilt: --")
-        self.baseline_neck_label = QLabel("Baseline Neck Lateral Tilt: --")
-        for label in (
-            self.count_label, self.pose_label, self.face_label,
-            self.shoulder_label, self.neck_label,
-            self.baseline_shoulder_label, self.baseline_neck_label,
-        ):
-            result_layout.addWidget(label)
+        self.shoulder_label = QLabel("Average Shoulder: --")
+        self.neck_label = QLabel("Average Neck: --")
+        self.baseline_shoulder_label = QLabel(
+            "Baseline Shoulder: --"
+        )
+        self.baseline_neck_label = QLabel(
+            "Baseline Neck: --"
+        )
 
-        alert_group = QGroupBox("Alert Events (Experimental)")
+        for widget in (
+            self.count_label,
+            self.pose_label,
+            self.face_label,
+            self.shoulder_label,
+            self.neck_label,
+            self.baseline_shoulder_label,
+            self.baseline_neck_label,
+        ):
+            detection_layout.addWidget(widget)
+
+        # Database save status
+        save_group = QGroupBox("Summary Database Status")
+        save_layout = QVBoxLayout(save_group)
+
+        self.save_status_label = QLabel(
+            "ยังไม่มีข้อมูลการบันทึก"
+        )
+        self.save_status_label.setWordWrap(True)
+
+        self.retry_button = QPushButton(
+            "Retry Save Summary"
+        )
+        self.retry_button.setEnabled(False)
+        self.retry_button.clicked.connect(
+            self.retry_save
+        )
+
+        save_layout.addWidget(self.save_status_label)
+        save_layout.addWidget(self.retry_button)
+
+        # Alert overview
+        alert_group = QGroupBox(
+            "Alert Events (Experimental)"
+        )
         alert_layout = QVBoxLayout(alert_group)
+
         self.alert_total_label = QLabel("Total Alerts: --")
         self.alert_closed_label = QLabel("Closed Alerts: --")
         self.alert_active_label = QLabel("Active Alerts: --")
-        self.alert_duration_label = QLabel("Total Closed Alert Duration: --")
+        self.alert_duration_label = QLabel(
+            "Closed Alert Duration: --"
+        )
         self.alert_error_label = QLabel("")
         self.alert_error_label.setWordWrap(True)
-        for label in (
-            self.alert_total_label, self.alert_closed_label,
-            self.alert_active_label, self.alert_duration_label,
+
+        for widget in (
+            self.alert_total_label,
+            self.alert_closed_label,
+            self.alert_active_label,
+            self.alert_duration_label,
             self.alert_error_label,
         ):
-            alert_layout.addWidget(label)
+            alert_layout.addWidget(widget)
 
-        buttons = QHBoxLayout()
-        self.refresh_alerts_button = QPushButton("Refresh Alert Summary")
-        self.refresh_alerts_button.clicked.connect(self.refresh_alerts)
-        buttons.addWidget(self.refresh_alerts_button)
-        self.view_alerts_button = QPushButton("View Alert History")
-        self.view_alerts_button.clicked.connect(self.open_alert_history)
-        buttons.addWidget(self.view_alerts_button)
-        alert_layout.addLayout(buttons)
+        alert_buttons = QHBoxLayout()
+
+        self.refresh_alerts_button = QPushButton(
+            "Refresh Alert Summary"
+        )
+        self.refresh_alerts_button.clicked.connect(
+            self.refresh_alerts
+        )
+
+        self.view_alerts_button = QPushButton(
+            "View Alert History"
+        )
+        self.view_alerts_button.clicked.connect(
+            self.open_alert_history
+        )
+
+        alert_buttons.addWidget(
+            self.refresh_alerts_button
+        )
+        alert_buttons.addWidget(
+            self.view_alerts_button
+        )
+
+        alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Session lifecycle is stored in the database. Detection averages shown "
-            "here are local-only and are not persisted in Session Summary. "
-            "Alert Duration is the time AFTER an alert was created, not full "
-            "posture exposure. API risk level MEDIUM is provisional. "
-            "Full PostGuard Risk Score and blink rate are not available yet."
+            "Risk Score และ Blink Rate ยังไม่พร้อมใช้งาน "
+            "จึงไม่สร้างค่า 0 แทนข้อมูลที่ไม่มี "
+            "ระยะเวลา Alert ไม่ใช่ระยะเวลาท่าทางเสี่ยงทั้งหมด"
         )
         self.note_label.setWordWrap(True)
-        self.back_button = QPushButton("Back to Dashboard")
-        self.back_button.clicked.connect(lambda: self.back_requested.emit())
+
+        self.back_button = QPushButton(
+            "Back to Dashboard"
+        )
+        self.back_button.clicked.connect(
+            self.go_back
+        )
 
         layout.addWidget(self.title_label)
         layout.addWidget(self.description_label)
         layout.addWidget(info_group)
-        layout.addWidget(result_group)
+        layout.addWidget(detection_group)
+        layout.addWidget(save_group)
         layout.addWidget(alert_group)
         layout.addWidget(self.note_label)
         layout.addStretch()
@@ -99,71 +183,243 @@ class SessionSummaryPage(QWidget):
 
     @staticmethod
     def format_angle(value):
-        return "--" if value is None else f"{value:+.2f}°"
+        if value is None:
+            return "N/A"
+        return f"{float(value):+.2f}°"
+
+    def set_saved_report(self, session: dict, saved: dict) -> None:
+        """Display database measurements without recalculating detection."""
+        report = {
+            **saved,
+            "database_status": session.get("status", "N/A"),
+            "camera_name": session.get("camera_name") or f"ID {session.get('camera_id', 'N/A')}",
+            "baseline_id": session.get("baseline_id", "N/A"),
+            "started_at": session.get("started_at", "N/A"),
+            "ended_at": session.get("ended_at", "N/A"),
+            "duration_seconds": session.get("total_duration"),
+            "summary_save_status": "LOADED",
+        }
+        self.set_summary(report)
+        self.title_label.setText("Saved Session Report")
+        self.back_button.setText("Close Report")
 
     def set_summary(self, summary: dict) -> None:
+        self.current_summary = summary.copy()
         self.current_session_id = summary.get("session_id")
-        self.session_label.setText(f"Session ID: {summary.get('session_id', '--')}")
+
+        self.session_label.setText(
+            f"Session ID: {self.current_session_id}"
+        )
         self.database_label.setText(
-            "Database Status: " + str(summary.get("database_status", "--"))
+            "Session Status: "
+            + str(summary.get("database_status", "--"))
         )
-        self.camera_label.setText(f"Camera: {summary.get('camera_name', '--')}")
-        self.baseline_label.setText(f"Baseline ID: {summary.get('baseline_id', '--')}")
-        self.start_label.setText(f"Started: {summary.get('started_at', '--')}")
-        self.end_label.setText(f"Ended: {summary.get('ended_at', '--')}")
-        seconds = summary.get("duration_seconds") or 0
-        minutes, remaining = divmod(int(seconds), 60)
-        self.duration_label.setText(f"Duration: {minutes:02d}:{remaining:02d}")
-        self.count_label.setText(
-            "Detection Cycles: " + str(summary.get("detection_count", 0))
+        self.camera_label.setText(
+            "Camera: "
+            + str(summary.get("camera_name", "--"))
         )
-        self.pose_label.setText(
-            "Pose Detected: " + str(summary.get("pose_detected_count", 0))
+        self.baseline_label.setText(
+            "Baseline ID: "
+            + str(summary.get("baseline_id", "--"))
         )
-        self.face_label.setText(
-            "Face Detected: " + str(summary.get("face_detected_count", 0))
+        self.start_label.setText(
+            "Started: "
+            + str(summary.get("started_at", "--"))
         )
+        self.end_label.setText(
+            "Ended: "
+            + str(summary.get("ended_at", "--"))
+        )
+
+        seconds = summary.get("duration_seconds")
+        if seconds is None:
+            self.duration_label.setText("Duration: N/A")
+        else:
+            minutes, remaining = divmod(int(seconds), 60)
+            self.duration_label.setText(f"Duration: {minutes:02d}:{remaining:02d}")
+
+        for label, title, key in (
+            (self.count_label, "Detection Cycles", "detection_count"),
+            (self.pose_label, "Pose Detected", "pose_detected_count"),
+            (self.face_label, "Face Detected", "face_detected_count"),
+        ):
+            value = summary.get(key)
+            label.setText(f"{title}: {value if value is not None else 'N/A'}")
         self.shoulder_label.setText(
-            "Average Shoulder Tilt: " + self.format_angle(summary.get("average_shoulder"))
+            "Average Shoulder: "
+            + self.format_angle(
+                summary.get("average_shoulder")
+            )
         )
         self.neck_label.setText(
-            "Average Neck Lateral Tilt: " + self.format_angle(summary.get("average_neck"))
+            "Average Neck: "
+            + self.format_angle(
+                summary.get("average_neck")
+            )
         )
         self.baseline_shoulder_label.setText(
-            "Baseline Shoulder Tilt: " + self.format_angle(summary.get("baseline_shoulder"))
+            "Baseline Shoulder: "
+            + self.format_angle(
+                summary.get("baseline_shoulder")
+            )
         )
         self.baseline_neck_label.setText(
-            "Baseline Neck Lateral Tilt: " + self.format_angle(summary.get("baseline_neck"))
+            "Baseline Neck: "
+            + self.format_angle(
+                summary.get("baseline_neck")
+            )
         )
+
+        self.update_save_status()
         self.refresh_alerts()
 
-    def refresh_alerts(self):
-        self.alert_total_label.setText("Total Alerts: --")
-        self.alert_closed_label.setText("Closed Alerts: --")
-        self.alert_active_label.setText("Active Alerts: --")
-        self.alert_duration_label.setText("Total Closed Alert Duration: --")
-        self.alert_error_label.setText("")
-        session_id = self.current_session_id
-        if type(session_id) is not int or session_id <= 0:
-            self.alert_error_label.setText("No valid session ID available.")
-            return
-        try:
-            response = APIClient.get_session_alerts(session_id)
-            if not response.ok:
-                raise RuntimeError(f"GET alerts returned HTTP {response.status_code}")
-            stats = summarize_alerts(response.json())
-        except (requests.RequestException, RuntimeError, ValueError) as exc:
-            self.alert_error_label.setText(
-                f"Alert data unavailable (not zero): {exc}"
+    def update_save_status(self):
+        summary = self.current_summary or {}
+        status = summary.get("summary_save_status")
+        error = summary.get("summary_save_error")
+
+        if status == "LOADED":
+            self.save_status_label.setText("Loaded saved report from database")
+            self.retry_button.setEnabled(False)
+
+        elif status == "SAVED":
+            self.save_status_label.setText(
+                "บันทึก Session Summary ลงฐานข้อมูลสำเร็จ"
             )
+            self.retry_button.setEnabled(False)
+
+        elif status == "ALREADY_EXISTS":
+            self.save_status_label.setText(
+                "Session นี้มี Summary อยู่แล้วในฐานข้อมูล "
+                "โปรดตรวจสอบข้อมูลเดิมก่อนใช้งาน"
+            )
+            self.retry_button.setEnabled(False)
+
+        else:
+            self.save_status_label.setText(
+                "ยังบันทึก Summary ไม่สำเร็จ\n"
+                + str(error or "Unknown error")
+            )
+            self.retry_button.setEnabled(
+                self.current_session_id is not None
+            )
+
+    def retry_save(self):
+        if not self.current_summary:
             return
-        self.alert_total_label.setText(f"Total Alerts: {stats['total_alerts']}")
-        self.alert_closed_label.setText(f"Closed Alerts: {stats['closed_alerts']}")
-        self.alert_active_label.setText(f"Active Alerts: {stats['active_alerts']}")
-        self.alert_duration_label.setText(
-            f"Total Closed Alert Duration: {stats['closed_alert_seconds']} seconds"
-        )
+
+        self.retry_button.setEnabled(False)
+
+        try:
+            result = save_session_summary(
+                self.current_summary
+            )
+
+            self.current_summary["summary_save_status"] = (
+                result["status"]
+            )
+            self.current_summary["saved_summary"] = (
+                result["summary"]
+            )
+            self.current_summary["summary_save_error"] = None
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
+            self.current_summary["summary_save_status"] = (
+                "FAILED"
+            )
+            self.current_summary["summary_save_error"] = (
+                str(error)
+            )
+
+        self.update_save_status()
+
+    def refresh_alerts(self):
+        for label in (
+            self.alert_total_label,
+            self.alert_closed_label,
+            self.alert_active_label,
+            self.alert_duration_label,
+        ):
+            label.setText("--")
+
+        self.alert_error_label.setText("")
+
+        session_id = self.current_session_id
+
+        if type(session_id) is not int or session_id <= 0:
+            return
+
+        try:
+            response = APIClient.get_session_alerts(
+                session_id
+            )
+
+            if not response.ok:
+                raise RuntimeError(
+                    f"Alert API HTTP {response.status_code}"
+                )
+
+            stats = summarize_alerts(
+                response.json()
+            )
+
+            self.alert_total_label.setText(
+                f"Total Alerts: {stats['total_alerts']}"
+            )
+            self.alert_closed_label.setText(
+                f"Closed Alerts: {stats['closed_alerts']}"
+            )
+            self.alert_active_label.setText(
+                f"Active Alerts: {stats['active_alerts']}"
+            )
+            self.alert_duration_label.setText(
+                "Closed Alert Duration: "
+                f"{stats['closed_alert_seconds']} seconds"
+            )
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+        ) as error:
+            self.alert_error_label.setText(
+                f"Alert data unavailable: {error}"
+            )
 
     def open_alert_history(self):
-        dialog = AlertHistoryDialog(self, session_id=self.current_session_id)
+        dialog = AlertHistoryDialog(
+            self,
+            session_id=self.current_session_id,
+        )
         dialog.exec()
+
+    def go_back(self):
+        status = (
+            (self.current_summary or {}).get(
+                "summary_save_status"
+            )
+        )
+
+        if status not in ("SAVED", "ALREADY_EXISTS", "LOADED"):
+            answer = QMessageBox.question(
+                self,
+                "Unsaved Summary",
+                "Summary ยังไม่ได้บันทึกสำเร็จ\n"
+                "หากออกจากหน้านี้ อาจไม่สามารถ "
+                "Retry ข้อมูลเดิมได้\n\n"
+                "ต้องการออกหรือไม่?",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        self.back_requested.emit()

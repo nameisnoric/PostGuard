@@ -11,8 +11,15 @@ import requests
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QMessageBox, QGroupBox, QDoubleSpinBox, QApplication,
+    QApplication,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 from app.services.detection_service import DetectionService
@@ -23,13 +30,16 @@ from app.services.posture_duration_tracker import (
     PostureDurationTracker,
     classify_neck_side_bending,
 )
+from app.services.session_summary_service import save_session_summary
 
 
 class MonitoringPage(QWidget):
     stop_requested = Signal(dict)
+    state_changed = Signal()
 
     def __init__(self):
         super().__init__()
+        self.is_stopping = False
         self.selected_camera = None
         self.baseline_id = None
         self.baseline_data = None
@@ -37,6 +47,7 @@ class MonitoringPage(QWidget):
         self.detector = None
         self.frame_count = 0
         self.session_id = None
+        self.is_paused = False
         self.session_started_at = None
         self.session_started_monotonic = None
         self.detection_count = 0
@@ -52,12 +63,31 @@ class MonitoringPage(QWidget):
         self.timer.setInterval(30)
         self.timer.timeout.connect(self.update_frame)
 
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        """Create the monitoring widgets and arrange the page."""
         layout = QVBoxLayout(self)
         self.title_label = QLabel("Real-time Monitoring")
         self.description_label = QLabel(
             "Live posture detection (complete risk assessment not enabled yet)."
         )
 
+        info_group = self._create_information_group()
+        self._setup_preview()
+        detection_group = self._create_detection_group()
+        risk_group = self._create_risk_group()
+        button_layout = self._create_button_layout()
+
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.description_label)
+        layout.addWidget(info_group)
+        layout.addWidget(self.preview_label, 1)
+        layout.addWidget(detection_group)
+        layout.addWidget(risk_group)
+        layout.addLayout(button_layout)
+
+    def _create_information_group(self) -> QGroupBox:
         info_group = QGroupBox("Monitoring Information")
         info_layout = QVBoxLayout(info_group)
         self.camera_label = QLabel("Camera: -")
@@ -73,6 +103,9 @@ class MonitoringPage(QWidget):
         ):
             info_layout.addWidget(label)
 
+        return info_group
+
+    def _setup_preview(self) -> None:
         self.preview_label = QLabel("Monitoring preview will appear here.")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setMinimumSize(640, 360)
@@ -81,6 +114,7 @@ class MonitoringPage(QWidget):
             "border-radius: 8px; }"
         )
 
+    def _create_detection_group(self) -> QGroupBox:
         detection_group = QGroupBox("Live Detection")
         detection_layout = QVBoxLayout(detection_group)
         self.detection_label = QLabel("Pose: Waiting | Face: Waiting")
@@ -94,6 +128,9 @@ class MonitoringPage(QWidget):
         ):
             detection_layout.addWidget(label)
 
+        return detection_group
+
+    def _create_risk_group(self) -> QGroupBox:
         # This is a test control, NOT a validated clinical cutoff.
         risk_group = QGroupBox("Partial Risk Assessment (Experimental)")
         risk_layout = QVBoxLayout(risk_group)
@@ -133,26 +170,35 @@ class MonitoringPage(QWidget):
         ):
             risk_layout.addWidget(label)
 
+        return risk_group
+
+    def _create_button_layout(self) -> QHBoxLayout:
         button_layout = QHBoxLayout()
+
+        self.pause_button = QPushButton("Pause Monitoring")
+        self.pause_button.setEnabled(False)
+        self.pause_button.clicked.connect(self.handle_pause_resume)
+
         self.stop_button = QPushButton("Stop Monitoring")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.handle_stop)
+
         button_layout.addStretch()
+        button_layout.addWidget(self.pause_button)
         button_layout.addWidget(self.stop_button)
 
-        layout.addWidget(self.title_label)
-        layout.addWidget(self.description_label)
-        layout.addWidget(info_group)
-        layout.addWidget(self.preview_label, 1)
-        layout.addWidget(detection_group)
-        layout.addWidget(risk_group)
-        layout.addLayout(button_layout)
+        return button_layout
 
     @staticmethod
     def _response_error(response):
+
         try:
             payload = response.json()
-            detail = payload.get("detail", response.text) if isinstance(payload, dict) else response.text
+            detail = (
+                payload.get("detail", response.text)
+                if isinstance(payload, dict)
+                else response.text
+            )
         except ValueError:
             detail = response.text
         return f"HTTP {response.status_code}: {detail}"
@@ -160,6 +206,7 @@ class MonitoringPage(QWidget):
     def _end_remote_session(self) -> dict | None:
         if self.session_id is None:
             return None
+
         try:
             response = APIClient.end_session(self.session_id)
         except requests.RequestException as error:
@@ -186,6 +233,7 @@ class MonitoringPage(QWidget):
         if data.get("session_id") != self.session_id:
             raise ValueError("Backend returned an unexpected session_id.")
         self.session_id = None
+
         return data
 
     def load_personal_baseline(self, baseline_id: int, camera_id: int) -> dict:
@@ -207,6 +255,7 @@ class MonitoringPage(QWidget):
         self.baseline_shoulder_label.setText(f"Baseline Shoulder Tilt: {shoulder:+.2f}°")
         self.baseline_neck_label.setText(f"Baseline Neck Lateral Tilt: {neck:+.2f}°")
         self.baseline_data = baseline
+
         return baseline
 
     def start_monitoring(self, camera: dict, baseline_id: int) -> bool:
@@ -217,6 +266,7 @@ class MonitoringPage(QWidget):
                 "Check your connection and retry.",
             )
             return False
+
         self.selected_camera = camera.copy()
         self.baseline_id = baseline_id
         device_index = camera.get("device_index")
@@ -227,6 +277,7 @@ class MonitoringPage(QWidget):
         if type(baseline_id) is not int or baseline_id <= 0:
             QMessageBox.warning(self, "Monitoring", "A saved Baseline ID is required.")
             return False
+
         try:
             if type(camera_id) is not int or camera_id <= 0:
                 raise ValueError("Invalid Camera ID.")
@@ -234,8 +285,10 @@ class MonitoringPage(QWidget):
         except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
             QMessageBox.warning(self, "Baseline Error", str(error))
             return False
+
         self.camera_label.setText("Camera: " + camera.get("camera_name", "Unknown Camera"))
         self.baseline_label.setText(f"Baseline ID: {baseline_id}")
+
         try:
             self.capture = cv2.VideoCapture(int(device_index))
             if not self.capture.isOpened():
@@ -256,7 +309,9 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(self, "Monitoring Error", str(error))
             return False
         self.frame_count = 0
-        self.session_started_at = session.get("started_at") or datetime.now().astimezone().isoformat(timespec="seconds")
+        self.session_started_at = session.get("started_at") or (
+            datetime.now().astimezone().isoformat(timespec="seconds")
+        )
         self.session_started_monotonic = time.monotonic()
         self.detection_count = 0
         self.pose_detected_count = 0
@@ -268,8 +323,12 @@ class MonitoringPage(QWidget):
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText("Status: Monitoring (RUNNING)")
+        self.is_paused = False
+        self.pause_button.setText("Pause Monitoring")
+        self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
         self.timer.start()
+        self.state_changed.emit()
         print("MONITORING STARTED: SESSION ID", self.session_id)
         return True
 
@@ -278,11 +337,10 @@ class MonitoringPage(QWidget):
         if self.session_id is not None and self.alert_service.active_event_id is not None:
             self._alert_force_close = not self.alert_service.close_if_active()
             if self._alert_force_close:
-                self.alert_label.setText(
-                    "Experimental Alert: End pending (API unavailable)"
-                )
+                self.alert_label.setText("Experimental Alert: End pending (API unavailable)")
             else:
                 self.alert_label.setText("Experimental Alert: Cleared")
+
         self.posture_tracker.reset()
         self.side_bending_label.setText("Neck Side-bending: N/A")
         self.duration_label.setText("Continuous Side-bending: N/A")
@@ -293,6 +351,7 @@ class MonitoringPage(QWidget):
 
     def update_partial_risk(self, result: dict) -> None:
         """Use existing neck_tilt only. Never change teammate's detector math."""
+
         neck_result = result.get("neck_lateral_tilt")
         neck_angle = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
         baseline = self.baseline_data or {}
@@ -343,6 +402,7 @@ class MonitoringPage(QWidget):
 
         if self.session_id is None:
             return
+
         action = self.alert_service.update(self.session_id, direction, seconds)
         if action == "created":
             self.alert_label.setText(
@@ -368,8 +428,10 @@ class MonitoringPage(QWidget):
         if self.baseline_data is None:
             return
         current_shoulder = result.get("shoulder_tilt")
+
         neck_result = result.get("neck_lateral_tilt")
         current_neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
+
         baseline_shoulder = self.baseline_data.get("shoulder_angle")
         baseline_neck = self.baseline_data.get("lateral_tilt_baseline")
         if (
@@ -399,22 +461,26 @@ class MonitoringPage(QWidget):
             self.pose_detected_count += 1
         if result.get("face_detected"):
             self.face_detected_count += 1
+
         shoulder = result.get("shoulder_tilt")
         if type(shoulder) in (int, float) and math.isfinite(shoulder):
             self.shoulder_samples.append(float(shoulder))
+
         neck_result = result.get("neck_lateral_tilt")
         neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
         if type(neck) in (int, float) and math.isfinite(neck):
             self.neck_samples.append(float(neck))
 
     def update_frame(self) -> None:
-        if self.capture is None:
+        if self.capture is None or self.is_paused or self.is_stopping:
             return
+
         success, frame = self.capture.read()
         if not success or frame is None:
-            self.stop_monitoring()
+            self._finish_after_capture_error()
             QMessageBox.warning(self, "Camera Error", "Unable to read camera frame.")
             return
+
         self.frame_count += 1
         if self.detector is not None and self.frame_count % 5 == 0:
             try:
@@ -422,22 +488,28 @@ class MonitoringPage(QWidget):
                 self.record_detection_sample(result)
                 self.update_baseline_comparison(result)
                 self.update_partial_risk(result)
-                pose_text = "Detected" if result["pose_points"] is not None else "Not Found"
-                face_text = "Detected" if result["face_detected"] else "Not Found"
-                self.detection_label.setText(f"Pose: {pose_text} | Face: {face_text}")
-                shoulder = result["shoulder_tilt"]
-                self.shoulder_label.setText(
-                    f"Shoulder Tilt: {shoulder:+.2f}°" if shoulder is not None else "Shoulder Tilt: --"
-                )
-                neck_result = result["neck_lateral_tilt"]
-                neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
-                self.neck_label.setText(
-                    f"Neck Lateral Tilt: {neck:+.2f}°" if neck is not None else "Neck Lateral Tilt: --"
-                )
+                self._update_detection_labels(result)
             except Exception as error:
-                self.stop_monitoring()
+                self._finish_after_capture_error()
                 QMessageBox.warning(self, "Detection Error", str(error))
                 return
+        self._update_preview(frame)
+
+    def _update_detection_labels(self, result: dict) -> None:
+        pose_text = "Detected" if result["pose_points"] is not None else "Not Found"
+        face_text = "Detected" if result["face_detected"] else "Not Found"
+        self.detection_label.setText(f"Pose: {pose_text} | Face: {face_text}")
+        shoulder = result["shoulder_tilt"]
+        self.shoulder_label.setText(
+            f"Shoulder Tilt: {shoulder:+.2f}°" if shoulder is not None else "Shoulder Tilt: --"
+        )
+        neck_result = result["neck_lateral_tilt"]
+        neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
+        self.neck_label.setText(
+            f"Neck Lateral Tilt: {neck:+.2f}°" if neck is not None else "Neck Lateral Tilt: --"
+        )
+
+    def _update_preview(self, frame) -> None:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, channels = frame_rgb.shape
         image = QImage(
@@ -451,7 +523,13 @@ class MonitoringPage(QWidget):
         )
         self.preview_label.setPixmap(pixmap)
 
-    def _release_local_resources(self) -> None:
+    def _finish_after_capture_error(self) -> None:
+        self._close_capture_resources()
+        self.pause_button.setEnabled(False)
+        self.status_label.setText("Status: Detection stopped; ending session")
+        self.handle_stop()
+
+    def _close_capture_resources(self) -> None:
         self.timer.stop()
         if self.detector is not None:
             try:
@@ -465,6 +543,9 @@ class MonitoringPage(QWidget):
                 self.capture.release()
             finally:
                 self.capture = None
+
+    def _release_local_resources(self) -> None:
+        self._close_capture_resources()
         self.frame_count = 0
         self.detection_label.setText("Pose: Waiting | Face: Waiting")
         self.shoulder_label.setText("Shoulder Tilt: --")
@@ -474,6 +555,9 @@ class MonitoringPage(QWidget):
         self.preview_label.clear()
         self.preview_label.setText("Monitoring preview will appear here.")
         self.stop_button.setEnabled(False)
+        self.pause_button.setEnabled(False)
+        self.pause_button.setText("Pause Monitoring")
+        self.is_paused = False
         self.session_started_at = None
         self.session_started_monotonic = None
         self.baseline_data = None
@@ -484,6 +568,7 @@ class MonitoringPage(QWidget):
         self.face_detected_count = 0
         self.shoulder_samples.clear()
         self.neck_samples.clear()
+
         self.posture_tracker.reset()
         self.side_bending_label.setText("Neck Side-bending: N/A")
         self.duration_label.setText("Continuous Side-bending: N/A")
@@ -509,6 +594,7 @@ class MonitoringPage(QWidget):
                     f"Session {self.session_id} may still be RUNNING on the server.\n"
                     f"{error}\nReconnect and retry before starting another session.",
                 )
+
         self._release_local_resources()
         if ended:
             self.status_label.setText("Status: Stopped")
@@ -516,6 +602,8 @@ class MonitoringPage(QWidget):
         else:
             self.status_label.setText("Status: Database session end pending")
             self.session_label.setText(f"Session ID: {self.session_id} (pending)")
+
+        self.state_changed.emit()
         return ended
 
     def build_session_summary(self) -> dict:
@@ -536,33 +624,286 @@ class MonitoringPage(QWidget):
             "detection_count": self.detection_count,
             "pose_detected_count": self.pose_detected_count,
             "face_detected_count": self.face_detected_count,
-            "average_shoulder": statistics.mean(self.shoulder_samples) if self.shoulder_samples else None,
-            "average_neck": statistics.mean(self.neck_samples) if self.neck_samples else None,
+            "average_shoulder": (
+                statistics.mean(self.shoulder_samples) if self.shoulder_samples else None
+            ),
+            "average_neck": (
+                statistics.mean(self.neck_samples) if self.neck_samples else None
+            ),
             "baseline_shoulder": baseline.get("shoulder_angle"),
             "baseline_neck": baseline.get("lateral_tilt_baseline"),
         }
 
-    def handle_stop(self) -> None:
-        if self.session_started_monotonic is None or self.session_id is None:
-            return
-        summary = self.build_session_summary()
+    def _change_remote_session_status(
+        self,
+        action: str,
+        expected_status: str,
+    ) -> dict:
+        """
+        Change session state and verify Backend result.
+        Recover if a request succeeded but its response was lost.
+        """
+        session_id = self.session_id
+
+        if type(session_id) is not int or session_id <= 0:
+            raise ValueError("No valid active session")
+
+        if action == "pause":
+            request_function = APIClient.pause_session
+        elif action == "resume":
+            request_function = APIClient.resume_session
+        else:
+            raise ValueError("Unsupported session action")
+
+        response = None
+
         try:
-            remote = self._end_remote_session()
-        except (requests.RequestException, RuntimeError, ValueError) as error:
+            response = request_function(session_id)
+        except requests.RequestException:
+            # The server may have committed the change.
+            # Check its authoritative state before reporting failure.
+            pass
+
+        if response is not None and response.ok:
+            data = response.json()
+        else:
+            check = APIClient.get_session(session_id)
+
+            if not check.ok:
+                if response is not None:
+                    raise RuntimeError(
+                        self._response_error(response)
+                    )
+                raise RuntimeError(
+                    "Session state could not be confirmed"
+                )
+
+            data = check.json()
+
+            if data.get("status") != expected_status:
+                if response is not None:
+                    raise RuntimeError(
+                        self._response_error(response)
+                    )
+                raise RuntimeError(
+                    "Backend did not confirm "
+                    + expected_status
+                )
+
+        if not isinstance(data, dict):
+            raise ValueError("Invalid session response")
+
+        if data.get("session_id") != session_id:
+            raise ValueError("Session ID mismatch")
+
+        if data.get("status") != expected_status:
+            raise RuntimeError(
+                f"Expected {expected_status}, "
+                f"received {data.get('status')}"
+            )
+
+        return data
+
+    def handle_pause_resume(self) -> None:
+        """Pause or resume without creating a new session."""
+
+        if self.session_id is None or self.is_stopping or self.capture is None:
+            return
+
+        self.pause_button.setEnabled(False)
+
+        if self.is_paused:
+            self._resume_monitoring()
+        else:
+            self._pause_monitoring()
+
+        if self.session_id is not None:
+            self.pause_button.setEnabled(True)
+        self.state_changed.emit()
+
+    def _pause_monitoring(self) -> None:
+
+        try:
+            remote = self._change_remote_session_status(
+                action="pause",
+                expected_status="PAUSED",
+            )
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+            TypeError,
+        ) as error:
             QMessageBox.warning(
-                self, "Cannot End Session",
-                "The database session was not confirmed as completed.\n"
-                f"{error}\nMonitoring remains active. Check the Backend and press Stop again.",
+                self,
+                "Pause Failed",
+                "ไม่สามารถยืนยันสถานะ PAUSED ได้\n"
+                f"{error}\n"
+                "กรุณาตรวจสอบการเชื่อมต่อ",
             )
             return
+
+        # Backend confirmed PAUSED.
+        self.timer.stop()
+        self.is_paused = True
+
+        # Backend closes active alerts when pausing.
+        # Clear stale local alert state.
+        self.alert_service.reset()
+        self._alert_force_close = False
+
+        # A continuous posture episode must not span a pause.
+
+        self.posture_tracker.reset()
+
+        self.preview_label.clear()
+        self.preview_label.setText("Monitoring Paused")
+
+        self.side_bending_label.setText("Neck Side-bending: Paused")
+        self.duration_label.setText("Continuous Side-bending: Paused")
+        self.alert_label.setText("Experimental Alert: Paused")
+
+        self.status_label.setText(
+            "Status: PAUSED "
+            f"(Pause count: {remote['pause_count']})"
+        )
+        self.pause_button.setText("Resume Monitoring")
+
+    def _resume_monitoring(self) -> None:
+
+        try:
+            remote = self._change_remote_session_status(
+                action="resume",
+                expected_status="RUNNING",
+            )
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+            TypeError,
+        ) as error:
+            QMessageBox.warning(
+                self,
+                "Resume Failed",
+                "ไม่สามารถยืนยันสถานะ RUNNING ได้\n"
+                f"{error}\n"
+                "กรุณาตรวจสอบการเชื่อมต่อ",
+            )
+            return
+
+        # Resume only after Backend confirms RUNNING.
+        self.is_paused = False
+
+        self.posture_tracker.reset()
+        self.alert_service.reset()
+        self._alert_force_close = False
+
+        self.preview_label.setText("Resuming Monitoring...")
+        self.alert_label.setText("Experimental Alert: Waiting")
+        self.side_bending_label.setText("Neck Side-bending: Waiting")
+        self.duration_label.setText("Continuous Side-bending: Waiting")
+
+        self.status_label.setText(
+            "Status: Monitoring (RUNNING) "
+            f"| Paused total: "
+            f"{remote['paused_duration']} s"
+        )
+        self.pause_button.setText("Pause Monitoring")
+
+        self.timer.start()
+
+    def handle_stop(self) -> None:
+        if self.is_stopping:
+            return
+        self.is_stopping = True
+        self.state_changed.emit()
+        try:
+            self._finish_session()
+        finally:
+            self.is_stopping = False
+            self.state_changed.emit()
+
+    def _finish_session(self) -> None:
+        if (
+            self.session_started_monotonic is None
+            or self.session_id is None
+        ):
+            return
+
+        # 1. Snapshot detection statistics before resetting
+        summary = self.build_session_summary()
+
+        # 2. End the remote session
+
+        try:
+            remote = self._end_remote_session()
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+        ) as error:
+            QMessageBox.warning(
+                self,
+                "Cannot End Session",
+                "Backend ยังไม่ยืนยันว่า Session สิ้นสุด\n"
+                f"{error}\n"
+                "กรุณาตรวจสอบ Backend แล้วกด Stop อีกครั้ง",
+            )
+            return
+
+        # 3. Use authoritative session data from Backend
         summary["database_status"] = remote["status"]
         summary["session_id"] = remote["session_id"]
-        summary["started_at"] = remote.get("started_at") or summary["started_at"]
-        summary["ended_at"] = remote.get("ended_at") or summary["ended_at"]
-        summary["duration_seconds"] = remote.get("total_duration", summary["duration_seconds"])
+        summary["started_at"] = (
+            remote.get("started_at")
+            or summary["started_at"]
+        )
+        summary["ended_at"] = (
+            remote.get("ended_at")
+            or summary["ended_at"]
+        )
+        summary["duration_seconds"] = (
+            remote.get("total_duration")
+            if remote.get("total_duration") is not None
+            else summary["duration_seconds"]
+        )
+
+        # 4. Release camera and local resources
         self.stop_monitoring()
+
+        # 5. Save the measured summary to Backend
+        summary["summary_save_status"] = "FAILED"
+        summary["summary_save_error"] = None
+
+        try:
+            result = save_session_summary(summary)
+
+            summary["summary_save_status"] = result["status"]
+            summary["saved_summary"] = result["summary"]
+
+        except (
+            requests.RequestException,
+            RuntimeError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
+            summary["summary_save_error"] = str(error)
+
+            QMessageBox.warning(
+                self,
+                "Summary Save Error",
+                "Session สิ้นสุดแล้ว แต่ยังบันทึก Summary "
+                "ไม่สำเร็จ\n\n"
+                f"{error}\n\n"
+                "สามารถกด Retry ที่หน้า Summary ได้",
+            )
+
+        # 6. Show summary page
         self.stop_requested.emit(summary)
 
-    def hideEvent(self, event) -> None:
-        self.stop_monitoring()
-        super().hideEvent(event)
+    # Page visibility does not own session lifetime. MainWindow explicitly ends
+    # and saves the session on Stop, logout or application close.

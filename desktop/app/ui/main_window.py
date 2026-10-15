@@ -30,6 +30,8 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.user_data = user_data
+        self._exit_ready = False
+        self._exit_in_progress = False
 
         self.setWindowTitle("PostGuard")
         self.resize(1200, 750)
@@ -91,6 +93,14 @@ class MainWindow(QMainWindow):
         )
         
         add_alert_history_button(sidebar_layout, self)
+
+        self.monitoring_status_label = QLabel("Monitoring: Not started")
+        self.monitoring_status_label.setWordWrap(True)
+        self.global_pause_button = QPushButton("Pause Monitoring")
+        self.global_stop_button = QPushButton("Stop Monitoring")
+        sidebar_layout.addWidget(self.monitoring_status_label)
+        sidebar_layout.addWidget(self.global_pause_button)
+        sidebar_layout.addWidget(self.global_stop_button)
 
         sidebar_layout.addStretch()
 
@@ -235,6 +245,10 @@ class MainWindow(QMainWindow):
         self.monitoring_page.stop_requested.connect(
             self.show_session_summary
         )
+        self.monitoring_page.state_changed.connect(self.update_monitoring_controls)
+        self.global_pause_button.clicked.connect(self.monitoring_page.handle_pause_resume)
+        self.global_stop_button.clicked.connect(self.monitoring_page.handle_stop)
+        self.update_monitoring_controls()
 
         # Session Summary -> Dashboard
         self.session_summary_page.back_requested.connect(
@@ -267,6 +281,12 @@ class MainWindow(QMainWindow):
 
     def show_monitor(self):
 
+        if self.monitoring_page.session_id is not None:
+            self.pages.setCurrentWidget(self.monitoring_page)
+            return
+        if self._show_unsaved_summary():
+            return
+
         self.camera_preview_page.stop_preview()
 
         self.pages.setCurrentWidget(
@@ -296,11 +316,12 @@ class MainWindow(QMainWindow):
 
     def logout(self):
 
+        if not self._finish_before_exit():
+            return
+        self._exit_ready = True
+
         # Stop Camera Preview
         self.camera_preview_page.stop_preview()
-
-        # Stop Monitoring
-        self.monitoring_page.stop_monitoring()
 
         # Clear Authentication Token
         TokenStore.clear_token()
@@ -313,6 +334,70 @@ class MainWindow(QMainWindow):
         self.login_window.show()
 
         self.close()
+
+    def update_monitoring_controls(self):
+        monitor = self.monitoring_page
+        active = monitor.session_id is not None
+        if monitor.is_stopping:
+            status = "Monitoring: Ending and saving..."
+        elif active:
+            state = "Paused" if monitor.is_paused else "Running (camera on)"
+            if monitor.capture is None:
+                state = "Stopped locally; session end pending"
+            status = f"Session {monitor.session_id}: {state}"
+        else:
+            status = "Monitoring: Not running"
+        self.monitoring_status_label.setText(status)
+        self.global_pause_button.setText(
+            "Resume Monitoring" if monitor.is_paused else "Pause Monitoring"
+        )
+        can_control = active and not monitor.is_stopping
+        self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
+        self.global_stop_button.setEnabled(can_control)
+
+    def _show_unsaved_summary(self) -> bool:
+        summary = self.session_summary_page.current_summary
+        if summary and summary.get("summary_save_status") not in ("SAVED", "ALREADY_EXISTS"):
+            self.pages.setCurrentWidget(self.session_summary_page)
+            QMessageBox.warning(
+                self, "Unsaved Summary",
+                "Please retry saving this summary before starting another session or exiting.",
+            )
+            return True
+        return False
+
+    def _finish_before_exit(self) -> bool:
+        """Keep credentials and statistics until both end and save succeed."""
+        if self._exit_ready:
+            return True
+        if self._exit_in_progress or self.monitoring_page.is_stopping:
+            return False
+        self._exit_in_progress = True
+        try:
+            monitor = self.monitoring_page
+            if monitor.session_id is not None:
+                if monitor.session_started_monotonic is not None:
+                    monitor.handle_stop()
+                else:
+                    monitor.stop_monitoring()
+                if monitor.session_id is not None:
+                    self.pages.setCurrentWidget(monitor)
+                    return False
+            if self._show_unsaved_summary():
+                return False
+            self.camera_preview_page.stop_preview()
+            self.baseline_page.stop_camera_preview()
+            return True
+        finally:
+            self._exit_in_progress = False
+
+    def closeEvent(self, event):
+        if not self._finish_before_exit():
+            event.ignore()
+            return
+        self._exit_ready = True
+        TokenStore.clear_token()
+        event.accept()
 
     # ============================================
     # Camera Preview
@@ -494,6 +579,12 @@ class MainWindow(QMainWindow):
         camera: dict,
         baseline_id: int
     ) -> None:
+
+        if self.monitoring_page.session_id is not None:
+            self.pages.setCurrentWidget(self.monitoring_page)
+            return
+        if self._show_unsaved_summary():
+            return
 
         # Switch to Monitoring Page
         self.pages.setCurrentWidget(

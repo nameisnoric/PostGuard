@@ -129,3 +129,23 @@ class APIClient:
     @staticmethod
     def get_alert_event(event_id: int):
         return APIClient.get(f"/alerts/{event_id}")
+
+    @staticmethod
+    def pause_session(session_id: int):
+        """Pause an existing RUNNING session."""
+        if type(session_id) is not int or session_id <= 0:
+            raise ValueError("A valid session_id is required.")
+
+        return APIClient.post(
+            f"/sessions/{session_id}/pause"
+        )
+
+    @staticmethod
+    def resume_session(session_id: int):
+        """Resume an existing PAUSED session."""
+        if type(session_id) is not int or session_id <= 0:
+            raise ValueError("A valid session_id is required.")
+
+        return APIClient.post(
+            f"/sessions/{session_id}/resume"
+        )

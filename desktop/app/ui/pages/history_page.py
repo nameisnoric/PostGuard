@@ -16,9 +16,13 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QGroupBox,
     QMessageBox,
+    QDialog,
+    QScrollArea,
 )
 
 from app.services.api_client import APIClient
+from app.services.session_summary_service import load_session_summary
+from app.ui.pages.session_summary_page import SessionSummaryPage
 
 
 class HistoryPage(QWidget):
@@ -126,6 +130,11 @@ class HistoryPage(QWidget):
             self.details_label
         )
 
+        self.report_button = QPushButton("View Saved Report")
+        self.report_button.setEnabled(False)
+        self.report_button.clicked.connect(self.open_saved_report)
+        details_layout.addWidget(self.report_button)
+
         # Main layout
         layout.addLayout(header_layout)
         layout.addWidget(self.description_label)
@@ -186,6 +195,10 @@ class HistoryPage(QWidget):
 
     def load_sessions(self):
         self.refresh_button.setEnabled(False)
+        self.report_button.setEnabled(False)
+        self.sessions = []
+        self.table.setRowCount(0)
+        self.details_label.setText("Select a session to view its details.")
 
         try:
             response = APIClient.get(
@@ -279,11 +292,13 @@ class HistoryPage(QWidget):
 
     def show_selected_session(self):
         row = self.table.currentRow()
+        self.report_button.setEnabled(False)
 
         if row < 0 or row >= len(self.sessions):
             return
 
         session = self.sessions[row]
+        self.report_button.setEnabled(session.get("status") == "COMPLETED")
 
         details = [
             f"Session ID: {session.get('session_id', '--')}",
@@ -312,3 +327,38 @@ class HistoryPage(QWidget):
         self.details_label.setText(
             "\n".join(details)
         )
+
+    def open_saved_report(self):
+        row = self.table.currentRow()
+        if row < 0 or row >= len(self.sessions):
+            return
+
+        session = self.sessions[row]
+        if session.get("status") != "COMPLETED":
+            return
+
+        self.report_button.setEnabled(False)
+        try:
+            saved = load_session_summary(session.get("session_id"))
+            if saved is None:
+                QMessageBox.information(
+                    self, "Saved Report", "No saved report is available for this session."
+                )
+                return
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Saved Session Report")
+            dialog.resize(760, 720)
+            layout = QVBoxLayout(dialog)
+            scroll = QScrollArea(dialog)
+            scroll.setWidgetResizable(True)
+            report = SessionSummaryPage()
+            report.set_saved_report(session, saved)
+            report.back_requested.connect(dialog.accept)
+            scroll.setWidget(report)
+            layout.addWidget(scroll)
+            dialog.exec()
+        except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
+            QMessageBox.warning(self, "Saved Report Error", str(error))
+        finally:
+            self.show_selected_session()

@@ -2,6 +2,7 @@ from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -132,6 +133,12 @@ def create_session_summary(
         average_risk_score=request.average_risk_score,
         maximum_risk_score=request.maximum_risk_score,
 
+        detection_count=request.detection_count,
+        pose_detected_count=request.pose_detected_count,
+        face_detected_count=request.face_detected_count,
+        average_shoulder=request.average_shoulder,
+        average_neck=request.average_neck,
+
         low_risk_duration=low_risk_duration,
         medium_risk_duration=medium_risk_duration,
         high_risk_duration=high_risk_duration,
@@ -148,7 +155,17 @@ def create_session_summary(
     )
 
     db.add(session_summary)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Another request may have saved the same session during our insert.
+        if db.scalar(existing_summary_statement) is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Session summary already exists",
+            )
+        raise
     db.refresh(session_summary)
 
     return session_summary
