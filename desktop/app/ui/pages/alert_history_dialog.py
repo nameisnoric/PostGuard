@@ -4,23 +4,33 @@ import requests
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QLabel, QMessageBox,
-    QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel,
+    QListView, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from app.services.api_client import APIClient
 from app.services.alert_history_service import (
     local_datetime, summarize_alerts, validate_session_id,
 )
+from app.ui.theme import APP_QSS
 
 
 class AlertHistoryDialog(QDialog):
     def __init__(self, parent=None, session_id=None):
         super().__init__(parent)
         self.setWindowTitle("PostGuard - Alert Events History")
-        self.resize(940, 550)
+        self.resize(980, 600)
+        self.setMinimumSize(760, 480)
+        self.setStyleSheet(APP_QSS)
         self.initial_session_id = session_id
         self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(24, 22, 24, 22)
+        self.layout().setSpacing(14)
+
+        title = QLabel("Alert Events")
+        title.setProperty("role", "title")
+        self.layout().addWidget(title)
 
         self.description = QLabel(
             "Experimental posture alerts. The duration column is alert-open time, "
@@ -32,6 +42,12 @@ class AlertHistoryDialog(QDialog):
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Session:"))
         self.session_selector = QComboBox()
+        selector_view = QListView(self.session_selector)
+        selector_view.setUniformItemSizes(True)
+        selector_view.setMaximumHeight(260)
+        self.session_selector.setView(selector_view)
+        self.session_selector.setMaxVisibleItems(8)
+        self.session_selector.currentIndexChanged.connect(self.load_selected_alerts)
         controls.addWidget(self.session_selector, 1)
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.load_selected_alerts)
@@ -39,7 +55,15 @@ class AlertHistoryDialog(QDialog):
         self.layout().addLayout(controls)
 
         self.stats_label = QLabel("Select a session to load alerts.")
+        self.stats_label.setWordWrap(True)
         self.layout().addWidget(self.stats_label)
+
+        self.empty_label = QLabel("No alert events were recorded for this session.")
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.setProperty("role", "muted")
+        self.empty_label.setMinimumHeight(90)
+        self.empty_label.hide()
+        self.layout().addWidget(self.empty_label)
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels([
@@ -48,6 +72,11 @@ class AlertHistoryDialog(QDialog):
         ])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.layout().addWidget(self.table)
 
@@ -96,7 +125,6 @@ class AlertHistoryDialog(QDialog):
                 if index >= 0:
                     self.session_selector.setCurrentIndex(index)
             self.session_selector.blockSignals(False)
-            self.session_selector.currentIndexChanged.connect(self.load_selected_alerts)
             self.load_selected_alerts()
         except (requests.RequestException, ValueError, RuntimeError) as exc:
             self.stats_label.setText("Could not load sessions.")
@@ -107,6 +135,9 @@ class AlertHistoryDialog(QDialog):
         if session_id is None:
             self.table.setRowCount(0)
             self.stats_label.setText("No sessions available.")
+            self.empty_label.setText("No monitoring sessions are available yet.")
+            self.empty_label.show()
+            self.table.hide()
             return
         try:
             validate_session_id(session_id)
@@ -121,6 +152,9 @@ class AlertHistoryDialog(QDialog):
         except (requests.RequestException, ValueError, RuntimeError) as exc:
             self.table.setRowCount(0)
             self.stats_label.setText("Alert data unavailable (not zero).")
+            self.empty_label.setText("Alert events could not be loaded. Use Refresh to try again.")
+            self.empty_label.show()
+            self.table.hide()
             QMessageBox.warning(self, "Alert History", str(exc))
             return
 
@@ -130,6 +164,8 @@ class AlertHistoryDialog(QDialog):
             f"Incomplete: {stats['incomplete_alerts']} | "
             f"Sum of closed alert-open durations: {stats['closed_alert_seconds']} s"
         )
+        self.empty_label.setVisible(not alerts)
+        self.table.setVisible(bool(alerts))
         self.table.setRowCount(len(alerts))
         for row, alert in enumerate(alerts):
             ended = alert.get("ended_at")
@@ -146,7 +182,8 @@ class AlertHistoryDialog(QDialog):
                 item = QTableWidgetItem(str(value))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table.setItem(row, column, item)
-        self.table.resizeColumnsToContents()
+        if alerts:
+            self.table.resizeColumnsToContents()
 
 
 def add_alert_history_button(sidebar_layout, main_window):

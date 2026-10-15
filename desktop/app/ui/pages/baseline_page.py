@@ -18,11 +18,134 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QGroupBox,
-    QMessageBox
+    QSizePolicy,
+    QMessageBox,
+    QDialog,
+    QFrame,
+    QGridLayout,
 )
 
 from app.services.detection_service import DetectionService
 from app.services.api_client import APIClient
+from app.ui.theme import APP_QSS
+
+
+def add_detail_rows(layout, rows):
+    """Add readable label/value pairs to a popup details card."""
+    layout.setColumnStretch(0, 1)
+    layout.setColumnStretch(1, 1)
+    for row, (label, value) in enumerate(rows):
+        name = QLabel(label)
+        name.setProperty("role", "muted")
+        value_label = QLabel(str(value))
+        value_label.setProperty("role", "heading")
+        value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(name, row, 0)
+        layout.addWidget(value_label, row, 1)
+
+
+class CalibrationCompletedDialog(QDialog):
+    """Show calculated values before the user saves them to the database."""
+
+    def __init__(self, result, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("PostGuard - Calibration Completed")
+        self.setModal(True)
+        self.setFixedWidth(460)
+        self.setStyleSheet(APP_QSS)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 26, 28, 26)
+        layout.setSpacing(14)
+
+        icon = QLabel("i")
+        icon.setProperty("role", "infoIcon")
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setFixedSize(50, 50)
+        layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        title = QLabel("Calibration completed")
+        title.setProperty("role", "title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        note = QLabel("Review the calculated reference before saving it.")
+        note.setProperty("role", "muted")
+        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(note)
+
+        card = QFrame()
+        card.setProperty("card", True)
+        details = QGridLayout(card)
+        details.setContentsMargins(18, 16, 18, 16)
+        add_detail_rows(details, (
+            ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
+            ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
+            ("Samples", result["sample_count"]),
+        ))
+        layout.addWidget(card)
+
+        state = QLabel("Not saved to the database yet")
+        state.setProperty("role", "muted")
+        state.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(state)
+
+        done = QPushButton("Continue")
+        done.setProperty("variant", "primary")
+        done.clicked.connect(self.accept)
+        layout.addWidget(done)
+
+
+class BaselineSavedDialog(QDialog):
+    """Non-blocking confirmation shown after the API saves a baseline."""
+
+    def __init__(self, baseline_id, camera_id, result, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("PostGuard - Baseline Saved")
+        self.setModal(True)
+        self.setFixedWidth(460)
+        self.setStyleSheet(APP_QSS)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 26, 28, 26)
+        layout.setSpacing(14)
+
+        icon = QLabel("✓")
+        icon.setProperty("role", "successIcon")
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setFixedSize(50, 50)
+        layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        title = QLabel("Personal baseline saved")
+        title.setProperty("role", "title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        note = QLabel(
+            "Your reference posture is ready. You can now start monitoring."
+        )
+        note.setProperty("role", "muted")
+        note.setWordWrap(True)
+        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(note)
+
+        card = QFrame()
+        card.setProperty("card", True)
+        details = QGridLayout(card)
+        details.setContentsMargins(18, 16, 18, 16)
+        rows = (
+            ("Baseline ID", baseline_id),
+            ("Camera ID", camera_id),
+            ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
+            ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
+        )
+        add_detail_rows(details, rows)
+        layout.addWidget(card)
+
+        done = QPushButton("Done")
+        done.setProperty("variant", "primary")
+        done.clicked.connect(self.accept)
+        layout.addWidget(done)
 
 
 class BaselinePage(QWidget):
@@ -70,19 +193,23 @@ class BaselinePage(QWidget):
         # -------------------------
 
         layout = QVBoxLayout(self)
+        self.setProperty("page", True)
+        layout.setContentsMargins(48, 24, 48, 32)
+        layout.setSpacing(10)
 
         # -------------------------
         # Title
         # -------------------------
 
         self.title_label = QLabel(
-            "Personal Baseline"
+            "Set your baseline posture"
         )
+        self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Prepare your sitting posture "
-            "before starting calibration."
+            "Step 3 of 3  ·  Sit naturally and hold still while PostGuard captures your reference."
         )
+        self.description_label.setProperty("role", "muted")
 
         # -------------------------
         # Camera Information
@@ -94,6 +221,10 @@ class BaselinePage(QWidget):
 
         camera_layout = QVBoxLayout(
             camera_group
+        )
+        camera_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
         )
 
         self.camera_name_label = QLabel(
@@ -111,6 +242,13 @@ class BaselinePage(QWidget):
         self.resolution_label = QLabel(
             "Resolution: -"
         )
+        for label in (
+            self.camera_name_label,
+            self.device_label,
+            self.camera_id_label,
+            self.resolution_label,
+        ):
+            label.setProperty("role", "muted")
 
         camera_layout.addWidget(
             self.camera_name_label
@@ -141,19 +279,16 @@ class BaselinePage(QWidget):
         )
 
         self.preview_label.setMinimumSize(
-            640,
-            360
+            520,
+            280
+        )
+        self.preview_label.setMaximumSize(820, 460)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Ignored,
         )
 
-        self.preview_label.setStyleSheet(
-            """
-            QLabel {
-                background-color: #111111;
-                border: 1px solid #444444;
-                border-radius: 8px;
-            }
-            """
-        )
+        self.preview_label.setProperty("preview", True)
 
         # -------------------------
         # Calibration Information
@@ -165,6 +300,10 @@ class BaselinePage(QWidget):
 
         calibration_layout = QVBoxLayout(
             calibration_group
+        )
+        calibration_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
         )
 
         self.instruction_label = QLabel(
@@ -237,6 +376,7 @@ class BaselinePage(QWidget):
         self.monitor_button = QPushButton(
             "Start Monitoring"  
         )
+        self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.setEnabled(False)
         # ยังไม่เปิดจนกว่าจะทำ Calibration Logic
         self.calibrate_button.setEnabled(False)
@@ -273,10 +413,11 @@ class BaselinePage(QWidget):
             camera_group
         )
 
-        layout.addWidget(
-            self.preview_label,
-            1
-        )
+        preview_row = QHBoxLayout()
+        preview_row.addStretch()
+        preview_row.addWidget(self.preview_label, 1)
+        preview_row.addStretch()
+        layout.addLayout(preview_row, 1)
 
         layout.addWidget(
             calibration_group
@@ -316,6 +457,12 @@ class BaselinePage(QWidget):
     ) -> None:
 
         self.selected_camera = camera.copy()
+        self.is_calibrating = False
+        self.calibration_samples = []
+        self.baseline_result = None
+        self.saved_baseline_id = None
+        self.save_button.setEnabled(False)
+        self.monitor_button.setEnabled(False)
 
         camera_id = camera.get(
             "camera_id"
@@ -599,19 +746,13 @@ class BaselinePage(QWidget):
             "Status: Calibration completed"
         )
 
-        QMessageBox.information(
+        if hasattr(self, "calibration_dialog"):
+            self.calibration_dialog.close()
+        self.calibration_dialog = CalibrationCompletedDialog(
+            self.baseline_result,
             self,
-            "Calibration Completed",
-            (
-                "Personal Baseline calculated.\n\n"
-                f"Shoulder Tilt: "
-                f"{self.baseline_result['shoulder_tilt']:+.2f}°\n"
-                f"Neck Lateral Tilt: "
-                f"{self.baseline_result['neck_lateral_tilt']:+.2f}°\n\n"
-                f"Samples: {count}\n"
-                "Not saved to database yet."
-            )   
         )
+        self.calibration_dialog.open()
 
         print(
             "PERSONAL BASELINE:",
@@ -745,19 +886,13 @@ class BaselinePage(QWidget):
                 saved_data
             )
 
-            QMessageBox.information(
+            self.saved_dialog = BaselineSavedDialog(
+                baseline_id,
+                camera_id,
+                self.baseline_result,
                 self,
-                "Baseline Saved",
-                (
-                    "Personal Baseline saved successfully!\n\n"
-                    f"Baseline ID: {baseline_id}\n"
-                    f"Camera ID: {camera_id}\n\n"
-                    f"Shoulder Tilt: "
-                    f"{self.baseline_result['shoulder_tilt']:+.2f}°\n"
-                    f"Neck Lateral Tilt: "
-                    f"{self.baseline_result['neck_lateral_tilt']:+.2f}°"
-                )
             )
+            self.saved_dialog.open()
 
         except Exception as error:
 

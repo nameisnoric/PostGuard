@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QPushButton,
     QLabel,
+    QFrame,
     QStackedWidget,
     QMessageBox,
 )
@@ -20,7 +21,7 @@ from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.ui.pages.history_page import HistoryPage
-from app.ui.pages.alert_history_dialog import add_alert_history_button
+from app.ui.theme import APP_QSS, polish, set_centered_window
 
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import (
@@ -39,85 +40,55 @@ class MainWindow(QMainWindow):
         self._recovery_in_progress = False
 
         self.setWindowTitle("PostGuard")
-        self.resize(1200, 750)
-
-        # ========================================
-        # 1. Central Widget
-        # ========================================
+        set_centered_window(self, 1280, 800, 980, 680)
+        self.setStyleSheet(APP_QSS)
 
         central_widget = QWidget()
+        central_widget.setObjectName("appRoot")
         self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        main_layout = QHBoxLayout(
-            central_widget
-        )
-
-        # ========================================
-        # 2. Sidebar
-        # ========================================
-
-        sidebar = QWidget()
-        sidebar.setFixedWidth(220)
-
-        sidebar_layout = QVBoxLayout(
-            sidebar
-        )
+        navigation = QWidget()
+        navigation.setObjectName("topNavigation")
+        navigation.setFixedHeight(72)
+        navigation_layout = QHBoxLayout(navigation)
+        navigation_layout.setContentsMargins(32, 0, 24, 0)
+        navigation_layout.setSpacing(6)
 
         app_title = QLabel("PostGuard")
+        app_title.setObjectName("brandLabel")
+        navigation_layout.addWidget(app_title)
+        navigation_layout.addStretch()
 
-        self.dashboard_button = QPushButton(
-            "Dashboard"
-        )
+        self.monitor_button = self._nav_button("Monitoring")
+        self.dashboard_button = self._nav_button("Dashboard")
+        self.history_button = self._nav_button("History")
+        navigation_layout.addWidget(self.monitor_button)
+        navigation_layout.addWidget(self.dashboard_button)
+        navigation_layout.addWidget(self.history_button)
 
-        self.monitor_button = QPushButton(
-            "Monitor"
-        )
+        self.logout_button = QPushButton("Log out")
+        navigation_layout.addWidget(self.logout_button)
+        main_layout.addWidget(navigation)
 
-        self.history_button = QPushButton(
-            "History"
-        )
-
-        self.logout_button = QPushButton(
-            "Logout"
-        )
-
-        sidebar_layout.addWidget(
-            app_title
-        )
-
-        sidebar_layout.addWidget(
-            self.dashboard_button
-        )
-
-        sidebar_layout.addWidget(
-            self.monitor_button
-        )
-
-        sidebar_layout.addWidget(
-            self.history_button
-        )
-        
-        add_alert_history_button(sidebar_layout, self)
-
+        self.session_bar = QFrame()
+        self.session_bar.setProperty("variant", "sessionBar")
+        session_layout = QHBoxLayout(self.session_bar)
+        session_layout.setContentsMargins(32, 8, 24, 8)
         self.monitoring_status_label = QLabel("Monitoring: Not started")
-        self.monitoring_status_label.setWordWrap(True)
+        self.monitoring_status_label.setProperty("status", "idle")
         self.global_pause_button = QPushButton("Pause Monitoring")
         self.global_stop_button = QPushButton("Stop Monitoring")
-        sidebar_layout.addWidget(self.monitoring_status_label)
-        sidebar_layout.addWidget(self.global_pause_button)
-        sidebar_layout.addWidget(self.global_stop_button)
-
-        sidebar_layout.addStretch()
-
-        sidebar_layout.addWidget(
-            self.logout_button
-        )
-
-        # ========================================
-        # 3. Create Pages
-        # ========================================
+        self.global_stop_button.setProperty("variant", "danger")
+        session_layout.addWidget(self.monitoring_status_label, 1)
+        session_layout.addWidget(self.global_pause_button)
+        session_layout.addWidget(self.global_stop_button)
+        main_layout.addWidget(self.session_bar)
 
         self.pages = QStackedWidget()
+        self.pages.setObjectName("pageStack")
 
         self.dashboard_page = DashboardPage(
             self.user_data
@@ -183,21 +154,7 @@ class MainWindow(QMainWindow):
             self.history_page
         )
 
-        # ========================================
-        # 5. Main Layout
-        # ========================================
-
-        main_layout.addWidget(
-            sidebar
-        )
-
-        main_layout.addWidget(
-            self.pages
-        )
-
-        # ========================================
-        # 6. Sidebar Events
-        # ========================================
+        main_layout.addWidget(self.pages, 1)
 
         self.dashboard_button.clicked.connect(
             self.show_dashboard
@@ -214,6 +171,7 @@ class MainWindow(QMainWindow):
         self.logout_button.clicked.connect(
             self.logout
         )
+        self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================
         # 7. Camera Page Events
@@ -269,6 +227,34 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentWidget(
             self.dashboard_page
         )
+
+    @staticmethod
+    def _nav_button(text: str) -> QPushButton:
+        button = QPushButton(text)
+        button.setProperty("nav", True)
+        button.setProperty("navActive", False)
+        return button
+
+    def _sync_navigation(self, _index: int = 0) -> None:
+        current = self.pages.currentWidget()
+        monitor_pages = {
+            self.camera_setup_page,
+            self.camera_preview_page,
+            self.baseline_page,
+            self.monitoring_page,
+        }
+        active = self.monitor_button if current in monitor_pages else (
+            self.dashboard_button if current is self.dashboard_page else (
+                self.history_button if current is self.history_page else None
+            )
+        )
+        for button in (
+            self.monitor_button,
+            self.dashboard_button,
+            self.history_button,
+        ):
+            button.setProperty("navActive", button is active)
+            polish(button)
 
     # ============================================
     # Dashboard
@@ -358,10 +344,18 @@ class MainWindow(QMainWindow):
         else:
             status = "Monitoring: Not running"
         self.monitoring_status_label.setText(status)
+        self.monitoring_status_label.setProperty(
+            "status",
+            "paused" if active and monitor.is_paused else (
+                "running" if active else "idle"
+            ),
+        )
+        polish(self.monitoring_status_label)
         self.global_pause_button.setText(
             "Resume Monitoring" if monitor.is_paused else "Pause Monitoring"
         )
         can_control = active and not monitor.is_stopping
+        self.session_bar.setVisible(active or monitor.is_stopping)
         self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
         self.global_stop_button.setEnabled(can_control)
         self.dashboard_page.set_monitoring_state(

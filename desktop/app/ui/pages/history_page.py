@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 from app.services.api_client import APIClient
 from app.services.session_summary_service import load_session_summary
 from app.ui.pages.session_summary_page import SessionSummaryPage
+from app.ui.pages.alert_history_dialog import AlertHistoryDialog
+from app.ui.theme import APP_QSS
 
 
 class HistoryPage(QWidget):
@@ -58,11 +60,22 @@ class HistoryPage(QWidget):
             self.load_sessions
         )
 
+        self.alert_history_button = QPushButton(
+            "Alert Events"
+        )
+        self.alert_history_button.clicked.connect(
+            self.open_alert_history
+        )
+
         header_layout.addWidget(
             self.title_label
         )
 
         header_layout.addStretch()
+
+        header_layout.addWidget(
+            self.alert_history_button
+        )
 
         header_layout.addWidget(
             self.refresh_button
@@ -141,6 +154,17 @@ class HistoryPage(QWidget):
         layout.addWidget(self.status_label)
         layout.addWidget(self.table, 1)
         layout.addWidget(details_group)
+
+    def open_alert_history(self):
+        session_id = None
+        row = self.table.currentRow()
+        if row >= 0:
+            item = self.table.item(row, 0)
+            try:
+                session_id = int(item.text()) if item is not None else None
+            except (TypeError, ValueError):
+                session_id = None
+        AlertHistoryDialog(self, session_id=session_id).exec()
 
     @staticmethod
     def format_datetime(value):
@@ -355,9 +379,12 @@ class HistoryPage(QWidget):
             dialog = QDialog(self)
             dialog.setWindowTitle("Saved Session Report")
             dialog.resize(760, 720)
+            dialog.setStyleSheet(APP_QSS)
             layout = QVBoxLayout(dialog)
+            layout.setContentsMargins(12, 12, 12, 12)
             scroll = QScrollArea(dialog)
             scroll.setWidgetResizable(True)
+            scroll.viewport().setStyleSheet("background: #f8fafc;")
             report = SessionSummaryPage()
             report.set_saved_report(session, saved)
             report.back_requested.connect(dialog.accept)

@@ -1,10 +1,13 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
-    QMessageBox
+    QMessageBox,
+    QFrame,
+    QHBoxLayout,
 )
 
 import requests
@@ -12,6 +15,7 @@ import requests
 from app.core.token_store import TokenStore
 from app.services.api_client import APIClient
 from app.ui.main_window import MainWindow
+from app.ui.theme import APP_QSS, set_centered_window
 
 
 class LoginWindow(QWidget):
@@ -20,9 +24,17 @@ class LoginWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle("PostGuard - Login")
-        self.resize(400, 400)
+        set_centered_window(self, 900, 580, 720, 500)
+        self.setObjectName("authWindow")
+        self.setStyleSheet(APP_QSS)
 
         self.title_label = QLabel("PostGuard")
+        self.title_label.setProperty("role", "title")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        subtitle = QLabel("Sign in to continue posture monitoring")
+        subtitle.setProperty("role", "muted")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("KU Email")
@@ -34,6 +46,7 @@ class LoginWindow(QWidget):
         )
 
         self.login_button = QPushButton("Login")
+        self.login_button.setProperty("variant", "primary")
         self.register_button = QPushButton("Create Account")
         self.forgot_password_button = QPushButton("Forgot Password?")
         self.forgot_password_button.clicked.connect(self.open_password_reset)
@@ -44,16 +57,28 @@ class LoginWindow(QWidget):
             self.open_register
         )
 
-        layout = QVBoxLayout()
-
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(32, 32, 32, 32)
+        outer.addStretch()
+        card = QFrame()
+        card.setProperty("card", True)
+        card.setMaximumWidth(460)
+        card.setMinimumWidth(400)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(42, 40, 42, 40)
+        layout.setSpacing(14)
         layout.addWidget(self.title_label)
+        layout.addWidget(subtitle)
+        layout.addSpacing(12)
+        layout.addWidget(QLabel("KU Email"))
         layout.addWidget(self.email_input)
+        layout.addWidget(QLabel("Password"))
         layout.addWidget(self.password_input)
+        layout.addWidget(self.forgot_password_button, alignment=Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.login_button)
         layout.addWidget(self.register_button)
-        layout.addWidget(self.forgot_password_button)
-
-        self.setLayout(layout)
+        outer.addWidget(card, alignment=Qt.AlignmentFlag.AlignCenter)
+        outer.addStretch()
 
     def handle_login(self) -> None:
         email = self.email_input.text().strip()

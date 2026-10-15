@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 import requests
 
 from app.services.api_client import APIClient
+from app.ui.theme import set_centered_window
 
 
 class OTPWindow(QWidget):
@@ -23,10 +24,7 @@ class OTPWindow(QWidget):
             "PostGuard - Verify OTP"
         )
 
-        self.resize(
-            400,
-            300
-        )
+        set_centered_window(self, 440, 360, 400, 320)
 
         # -------------------------
         # Title

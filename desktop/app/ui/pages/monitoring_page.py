@@ -8,16 +8,20 @@ from datetime import datetime
 import cv2
 import requests
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QLocale, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QDoubleSpinBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -67,11 +71,26 @@ class MonitoringPage(QWidget):
 
     def _setup_ui(self) -> None:
         """Create the monitoring widgets and arrange the page."""
-        layout = QVBoxLayout(self)
+        self.setProperty("page", True)
+        page_layout = QVBoxLayout(self)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        page_layout.addWidget(scroll)
+
+        content = QWidget()
+        content.setProperty("page", True)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(24, 20, 24, 24)
+        layout.setSpacing(12)
+        scroll.setWidget(content)
+
         self.title_label = QLabel("Real-time Monitoring")
+        self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
-            "Live posture detection (complete risk assessment not enabled yet)."
+            "Camera detection continues while you visit Dashboard or History."
         )
+        self.description_label.setProperty("role", "muted")
 
         info_group = self._create_information_group()
         self._setup_preview()
@@ -81,14 +100,41 @@ class MonitoringPage(QWidget):
 
         layout.addWidget(self.title_label)
         layout.addWidget(self.description_label)
-        layout.addWidget(info_group)
-        layout.addWidget(self.preview_label, 1)
-        layout.addWidget(detection_group)
-        layout.addWidget(risk_group)
-        layout.addLayout(button_layout)
+        columns = QHBoxLayout()
+        columns.setSpacing(16)
+
+        camera_panel = QFrame()
+        camera_panel.setProperty("card", True)
+        camera_layout = QVBoxLayout(camera_panel)
+        camera_layout.setContentsMargins(14, 14, 14, 14)
+        camera_layout.setSpacing(10)
+        camera_layout.addWidget(info_group)
+        camera_layout.addWidget(
+            self.preview_label,
+            1,
+            Qt.AlignmentFlag.AlignCenter,
+        )
+        camera_layout.addLayout(button_layout)
+
+        metrics_panel = QFrame()
+        metrics_panel.setProperty("card", True)
+        metrics_layout = QVBoxLayout(metrics_panel)
+        metrics_layout.setContentsMargins(14, 14, 14, 14)
+        metrics_layout.setSpacing(10)
+        metrics_layout.addWidget(detection_group)
+        metrics_layout.addWidget(risk_group)
+        metrics_layout.addStretch()
+
+        columns.addWidget(camera_panel, 3)
+        columns.addWidget(metrics_panel, 2)
+        layout.addLayout(columns, 1)
 
     def _create_information_group(self) -> QGroupBox:
         info_group = QGroupBox("Monitoring Information")
+        info_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         info_layout = QVBoxLayout(info_group)
         self.camera_label = QLabel("Camera: -")
         self.baseline_label = QLabel("Baseline ID: -")
@@ -108,14 +154,19 @@ class MonitoringPage(QWidget):
     def _setup_preview(self) -> None:
         self.preview_label = QLabel("Monitoring preview will appear here.")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumSize(640, 360)
-        self.preview_label.setStyleSheet(
-            "QLabel { background-color: #111111; border: 1px solid #444444; "
-            "border-radius: 8px; }"
+        self.preview_label.setFixedSize(720, 405)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
         )
+        self.preview_label.setProperty("preview", True)
 
     def _create_detection_group(self) -> QGroupBox:
         detection_group = QGroupBox("Live Detection")
+        detection_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         detection_layout = QVBoxLayout(detection_group)
         self.detection_label = QLabel("Pose: Waiting | Face: Waiting")
         self.shoulder_label = QLabel("Shoulder Tilt: --")
@@ -133,16 +184,32 @@ class MonitoringPage(QWidget):
     def _create_risk_group(self) -> QGroupBox:
         # This is a test control, NOT a validated clinical cutoff.
         risk_group = QGroupBox("Partial Risk Assessment (Experimental)")
+        risk_group.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         risk_layout = QVBoxLayout(risk_group)
         threshold_layout = QHBoxLayout()
         threshold_layout.addWidget(QLabel("Neck side-bending test threshold:"))
+        self._last_neck_threshold = 10.0
+        self.threshold_enabled = QCheckBox("Enable")
+        self.threshold_enabled.setToolTip(
+            "Enable the experimental neck side-bending threshold."
+        )
+        self.threshold_enabled.toggled.connect(self.set_threshold_enabled)
+        threshold_layout.addWidget(self.threshold_enabled)
         self.neck_threshold_spin = QDoubleSpinBox()
+        # Keep numeric controls readable regardless of the Windows regional locale.
+        self.neck_threshold_spin.setLocale(QLocale.c())
         self.neck_threshold_spin.setRange(0.0, 45.0)
         self.neck_threshold_spin.setDecimals(1)
         self.neck_threshold_spin.setSingleStep(0.5)
         self.neck_threshold_spin.setSuffix("°")
         self.neck_threshold_spin.setSpecialValueText("Disabled (0°)")
         self.neck_threshold_spin.setValue(0.0)
+        self.neck_threshold_spin.setMinimumWidth(120)
+        self.neck_threshold_spin.setKeyboardTracking(False)
+        self.neck_threshold_spin.setEnabled(False)
         self.neck_threshold_spin.setToolTip(
             "For experimentation only. 0 disables classification; "
             "no validated side-bending cutoff has been selected."
@@ -172,20 +239,34 @@ class MonitoringPage(QWidget):
 
         return risk_group
 
+    def set_threshold_enabled(self, enabled: bool) -> None:
+        """Make the experimental cutoff an explicit opt-in control."""
+        if not enabled and self.neck_threshold_spin.value() > 0:
+            self._last_neck_threshold = self.neck_threshold_spin.value()
+        self.neck_threshold_spin.blockSignals(True)
+        self.neck_threshold_spin.setEnabled(enabled)
+        self.neck_threshold_spin.setValue(
+            self._last_neck_threshold if enabled else 0.0
+        )
+        self.neck_threshold_spin.blockSignals(False)
+        self.reset_risk_tracking()
+
     def _create_button_layout(self) -> QHBoxLayout:
         button_layout = QHBoxLayout()
 
-        self.pause_button = QPushButton("Pause Monitoring")
+        self.pause_button = QPushButton("Pause")
         self.pause_button.setEnabled(False)
         self.pause_button.clicked.connect(self.handle_pause_resume)
 
         self.stop_button = QPushButton("Stop Monitoring")
+        self.stop_button.setProperty("variant", "danger")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.handle_stop)
 
-        button_layout.addStretch()
-        button_layout.addWidget(self.pause_button)
         button_layout.addWidget(self.stop_button)
+        button_layout.addWidget(self.pause_button)
+        button_layout.setStretch(0, 1)
+        button_layout.setStretch(1, 1)
 
         return button_layout
 

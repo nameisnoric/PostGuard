@@ -4,18 +4,20 @@ import re
 
 import requests
 from PySide6.QtWidgets import (
-    QDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QStackedWidget,
-    QVBoxLayout, QWidget,
+    QDialog, QFrame, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from app.services.api_client import APIClient
+from app.ui.theme import APP_QSS
 
 
 class PasswordResetDialog(QDialog):
     def __init__(self, parent=None, email=""):
         super().__init__(parent)
         self.setWindowTitle("PostGuard - Reset Password")
-        self.resize(440, 430)
+        self.resize(520, 510)
+        self.setStyleSheet(APP_QSS)
         self.email = ""
         self._reset_token = None
         self._busy = False
@@ -28,6 +30,7 @@ class PasswordResetDialog(QDialog):
         self.email_input = QLineEdit(email)
         self.email_input.setPlaceholderText("KU Email (@ku.th)")
         self.send_button = QPushButton("Send Reset OTP")
+        self.send_button.setProperty("variant", "primary")
         self.send_button.clicked.connect(self.request_code)
         self._add_page("Forgot Password", [self.email_input, self.send_button])
 
@@ -37,6 +40,7 @@ class PasswordResetDialog(QDialog):
         self.otp_input.setPlaceholderText("6-digit OTP")
         self.otp_input.setMaxLength(6)
         self.verify_button = QPushButton("Verify OTP")
+        self.verify_button.setProperty("variant", "primary")
         self.verify_button.clicked.connect(self.verify_code)
         self.resend_button = QPushButton("Send New OTP")
         self.resend_button.clicked.connect(self.request_code)
@@ -53,18 +57,26 @@ class PasswordResetDialog(QDialog):
         for field in (self.password_input, self.confirm_input):
             field.setEchoMode(QLineEdit.EchoMode.Password)
         self.reset_button = QPushButton("Save New Password")
+        self.reset_button.setProperty("variant", "primary")
         self.reset_button.clicked.connect(self.save_password)
         self._add_page("Set New Password", [rules, self.password_input, self.confirm_input, self.reset_button])
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(14)
         layout.addWidget(self.pages)
         layout.addWidget(self.status_label)
         layout.addWidget(self.back_button)
 
     def _add_page(self, title, widgets):
-        page = QWidget()
+        page = QFrame()
+        page.setProperty("card", True)
         layout = QVBoxLayout(page)
-        layout.addWidget(QLabel(title))
+        layout.setContentsMargins(30, 28, 30, 28)
+        layout.setSpacing(13)
+        title_label = QLabel(title)
+        title_label.setProperty("role", "title")
+        layout.addWidget(title_label)
         for widget in widgets:
             layout.addWidget(widget)
         layout.addStretch()

@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtTest import QTest
 from app.core.token_store import TokenStore
@@ -69,6 +69,52 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.show_monitoring_page(self.camera, 2)
         self.assertEqual(self.window.monitoring_page.session_id, 3)
 
+    def test_saved_camera_selection_opens_preview(self):
+        setup = self.window.camera_setup_page
+        setup.saved_cameras = [self.camera]
+        setup.current_source = "saved"
+        setup.camera_list.clear()
+        setup.camera_list.addItem("Test (640x360)")
+        setup.camera_list.setCurrentRow(0)
+
+        setup.handle_continue()
+
+        self.assertIs(
+            self.window.pages.currentWidget(),
+            self.window.camera_preview_page,
+        )
+        self.assertEqual(
+            self.window.camera_preview_page.selected_camera,
+            self.camera,
+        )
+
+    def test_camera_previews_are_bounded_and_alerts_live_in_history(self):
+        preview = self.window.camera_preview_page.preview_label
+        baseline = self.window.baseline_page.preview_label
+        monitor = self.window.monitoring_page.preview_label
+
+        self.assertEqual(
+            preview.sizePolicy().horizontalPolicy(),
+            QSizePolicy.Policy.Ignored,
+        )
+        self.assertEqual(preview.maximumWidth(), 960)
+        self.assertEqual(baseline.maximumWidth(), 820)
+        self.assertEqual(monitor.size().width(), 720)
+        self.assertEqual(monitor.size().height(), 405)
+        self.assertEqual(
+            self.window.history_page.alert_history_button.text(),
+            "Alert Events",
+        )
+        self.assertFalse(hasattr(self.window, "alert_history_button"))
+
+    def test_main_window_uses_centered_resizable_desktop_size(self):
+        self.assertEqual(self.window.width(), 1280)
+        self.assertEqual(self.window.height(), 800)
+        self.assertEqual(self.window.minimumWidth(), 980)
+        self.assertEqual(self.window.minimumHeight(), 680)
+        self.assertGreater(self.window.maximumWidth(), self.window.width())
+        self.assertGreater(self.window.maximumHeight(), self.window.height())
+
     def test_preview_calibrate_save_monitor_pause_stop_summary(self):
         self.window.show_monitor()
         self.window.show_camera_preview(self.camera)
@@ -79,8 +125,15 @@ class DesktopWorkflowTests(unittest.TestCase):
         for _ in range(30):
             baseline.collect_calibration_sample(self.result)
         self.assertEqual(baseline.baseline_result["sample_count"], 30)
+        self.assertTrue(baseline.calibration_dialog.isVisible())
+        baseline.calibration_dialog.accept()
+        self.assertFalse(baseline.monitor_button.isEnabled())
+        self.assertTrue(baseline.save_button.isEnabled())
         baseline.save_baseline()
         self.assertEqual(baseline.saved_baseline_id, 2)
+        self.assertTrue(baseline.monitor_button.isEnabled())
+        self.assertTrue(baseline.saved_dialog.isVisible())
+        baseline.saved_dialog.accept()
         baseline.handle_start_monitoring()
         monitor = self.window.monitoring_page
         self.assertIs(self.window.pages.currentWidget(), monitor)
@@ -101,9 +154,30 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertIs(self.window.pages.currentWidget(), summary_page)
         self.assertEqual(summary_page.current_summary["summary_save_status"], "SAVED")
         self.assertEqual(summary_page.current_summary["detection_count"], 2)
+        self.assertTrue(summary_page.save_group.isHidden())
+        self.assertEqual(monitor.stop_button.text(), "Stop Monitoring")
         self.assertEqual(self.save.call_args.args[1]["average_neck"], 2.0)
         self.assertIsNone(monitor.capture)
         self.assertFalse(monitor.timer.isActive())
+
+    def test_experimental_threshold_requires_explicit_enable(self):
+        monitor = self.window.monitoring_page
+        self.assertEqual(monitor.neck_threshold_spin.locale().zeroDigit(), "0")
+        self.assertFalse(monitor.threshold_enabled.isChecked())
+        self.assertFalse(monitor.neck_threshold_spin.isEnabled())
+        self.assertEqual(monitor.neck_threshold_spin.value(), 0.0)
+
+        monitor.threshold_enabled.setChecked(True)
+        self.assertTrue(monitor.neck_threshold_spin.isEnabled())
+        self.assertEqual(monitor.neck_threshold_spin.value(), 10.0)
+        monitor.neck_threshold_spin.setValue(12.5)
+        self.assertEqual(monitor.neck_threshold_spin.value(), 12.5)
+
+        monitor.threshold_enabled.setChecked(False)
+        self.assertFalse(monitor.neck_threshold_spin.isEnabled())
+        self.assertEqual(monitor.neck_threshold_spin.value(), 0.0)
+        monitor.threshold_enabled.setChecked(True)
+        self.assertEqual(monitor.neck_threshold_spin.value(), 12.5)
 
     def test_failed_end_preserves_samples_for_retry(self):
         self.start_monitoring()
@@ -126,6 +200,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         summary = self.window.session_summary_page
         self.assertEqual(summary.current_summary["summary_save_status"], "FAILED")
         self.assertTrue(summary.retry_button.isEnabled())
+        self.assertFalse(summary.save_group.isHidden())
         self.save.return_value = response({"session_id": 3}, 201)
         summary.retry_save()
         self.assertEqual(summary.current_summary["summary_save_status"], "SAVED")

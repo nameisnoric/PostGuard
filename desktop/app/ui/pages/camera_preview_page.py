@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QMessageBox
 )
 
@@ -79,18 +80,23 @@ class CameraPreviewPage(QWidget):
         # -------------------------
 
         layout = QVBoxLayout(self)
+        self.setProperty("page", True)
+        layout.setContentsMargins(72, 28, 72, 36)
+        layout.setSpacing(10)
 
         # -------------------------
         # Title
         # -------------------------
 
         self.title_label = QLabel(
-            "Camera Preview"
+            "Check your camera"
         )
+        self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Check that your camera is positioned correctly."
+            "Step 2 of 3  ·  Keep your face and shoulders visible before continuing."
         )
+        self.description_label.setProperty("role", "muted")
 
         # -------------------------
         # Camera Information
@@ -99,6 +105,7 @@ class CameraPreviewPage(QWidget):
         self.camera_info_label = QLabel(
             "No camera selected."
         )
+        self.camera_info_label.setProperty("role", "muted")
 
         # -------------------------
         # Preview
@@ -114,18 +121,15 @@ class CameraPreviewPage(QWidget):
 
         self.preview_label.setMinimumSize(
             640,
-            480
+            360
+        )
+        self.preview_label.setMaximumSize(960, 540)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Ignored,
         )
 
-        self.preview_label.setStyleSheet(
-            """
-            QLabel {
-                background-color: #111111;
-                border: 1px solid #444444;
-                border-radius: 8px;
-            }
-            """
-        )
+        self.preview_label.setProperty("preview", True)
 
         # -------------------------
         # Buttons
@@ -138,8 +142,9 @@ class CameraPreviewPage(QWidget):
         )
 
         self.continue_button = QPushButton(
-            "Continue to Personal Baseline"
+            "Continue to Baseline"
         )
+        self.continue_button.setProperty("variant", "primary")
 
         self.continue_button.setEnabled(
             False
@@ -181,10 +186,11 @@ class CameraPreviewPage(QWidget):
             self.neck_tilt_label
         )
         
-        layout.addWidget(
-            self.preview_label,
-            1
-        )
+        preview_row = QHBoxLayout()
+        preview_row.addStretch()
+        preview_row.addWidget(self.preview_label, 1)
+        preview_row.addStretch()
+        layout.addLayout(preview_row, 1)
 
         layout.addLayout(
             button_layout

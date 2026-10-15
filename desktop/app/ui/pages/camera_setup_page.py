@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
+    QFrame,
     QLabel,
     QPushButton,
     QListWidget,
@@ -22,30 +24,37 @@ class CameraSetupPage(QWidget):
         # เก็บข้อมูล camera ที่ได้จาก Backend
         self.saved_cameras = []
         self.detected_cameras = []
+        self.current_source = None
         
         # -------------------------
         # Layout
         # -------------------------
 
         layout = QVBoxLayout(self)
+        self.setProperty("page", True)
+        layout.setContentsMargins(140, 36, 140, 48)
+        layout.setSpacing(12)
 
         # -------------------------
         # Title
         # -------------------------
 
         self.title_label = QLabel(
-            "Camera Setup"
+            "Set up your camera"
         )
+        self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Select a camera for PostGuard monitoring."
+            "Step 1 of 3  ·  Select a camera, then check its preview."
         )
+        self.description_label.setProperty("role", "muted")
 
         # -------------------------
         # Camera List
         # -------------------------
 
         self.camera_list = QListWidget()
+        self.camera_list.setMinimumHeight(220)
 
         # -------------------------
         # Buttons
@@ -56,7 +65,7 @@ class CameraSetupPage(QWidget):
         )
 
         self.continue_button = QPushButton(
-            "Continue"
+            "Check Camera"
         )
         
         self.scan_button = QPushButton(
@@ -79,21 +88,28 @@ class CameraSetupPage(QWidget):
             self.description_label
         )
 
-        layout.addWidget(
-            self.camera_list
+        card = QFrame()
+        card.setProperty("card", True)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(22, 20, 22, 20)
+        card_layout.setSpacing(12)
+        card_layout.addWidget(QLabel("Available cameras"))
+        card_layout.addWidget(self.camera_list)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.scan_button)
+        button_layout.addWidget(self.refresh_button)
+        button_layout.addStretch()
+        self.continue_button.setProperty("variant", "primary")
+        button_layout.addWidget(self.continue_button)
+        card_layout.addLayout(button_layout)
+        layout.addWidget(card)
+        help_label = QLabel(
+            "Camera permission is required. Scan again if your webcam is not listed."
         )
-
-        layout.addWidget(
-            self.scan_button
-        )
-        
-        layout.addWidget(
-            self.refresh_button
-        )
-
-        layout.addWidget(
-            self.continue_button
-        )
+        help_label.setProperty("role", "muted")
+        help_label.setWordWrap(True)
+        layout.addWidget(help_label)
+        layout.addStretch()
 
         # -------------------------
         # Events
@@ -149,6 +165,7 @@ class CameraSetupPage(QWidget):
             return
 
         self.saved_cameras = response.json()
+        self.current_source = "saved"
 
         self.camera_list.clear()
 
@@ -316,6 +333,10 @@ class CameraSetupPage(QWidget):
                     "Saved camera selected.\n\n"
                     f"Camera: {camera_name}"
                 )
+            )
+
+            self.camera_selected.emit(
+                selected_camera
             )
 
     # --------------------------------

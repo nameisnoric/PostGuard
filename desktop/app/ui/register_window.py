@@ -1,15 +1,19 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
-    QMessageBox
+    QMessageBox,
+    QFrame,
+    QHBoxLayout,
 )
 
 import requests
 
 from app.services.api_client import APIClient
+from app.ui.theme import APP_QSS, set_centered_window
 
 
 class RegisterWindow(QWidget):
@@ -21,10 +25,9 @@ class RegisterWindow(QWidget):
             "PostGuard - Register"
         )
 
-        self.resize(
-            400,
-            500
-        )
+        set_centered_window(self, 900, 680, 720, 600)
+        self.setObjectName("authWindow")
+        self.setStyleSheet(APP_QSS)
 
         # -------------------------
         # Title
@@ -33,6 +36,12 @@ class RegisterWindow(QWidget):
         self.title_label = QLabel(
             "Create PostGuard Account"
         )
+        self.title_label.setProperty("role", "title")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        subtitle = QLabel("Create an account with your KU email")
+        subtitle.setProperty("role", "muted")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # -------------------------
         # Full Name
@@ -85,6 +94,7 @@ class RegisterWindow(QWidget):
         self.register_button = QPushButton(
             "Send OTP"
         )
+        self.register_button.setProperty("variant", "primary")
 
         self.back_button = QPushButton(
             "Back to Login"
@@ -94,35 +104,32 @@ class RegisterWindow(QWidget):
         # Layout
         # -------------------------
 
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(
-            self.title_label
-        )
-
-        layout.addWidget(
-            self.full_name_input
-        )
-
-        layout.addWidget(
-            self.username_input
-        )
-
-        layout.addWidget(
-            self.email_input
-        )
-
-        layout.addWidget(
-            self.password_input
-        )
-
-        layout.addWidget(
-            self.register_button
-        )
-
-        layout.addWidget(
-            self.back_button
-        )
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(32, 32, 32, 32)
+        outer.addStretch()
+        card = QFrame()
+        card.setProperty("card", True)
+        card.setMaximumWidth(500)
+        card.setMinimumWidth(420)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(42, 36, 42, 36)
+        layout.setSpacing(11)
+        layout.addWidget(self.title_label)
+        layout.addWidget(subtitle)
+        layout.addSpacing(10)
+        for label, field in (
+            ("Full name", self.full_name_input),
+            ("Username", self.username_input),
+            ("KU Email", self.email_input),
+            ("Password", self.password_input),
+        ):
+            layout.addWidget(QLabel(label))
+            layout.addWidget(field)
+        layout.addSpacing(6)
+        layout.addWidget(self.register_button)
+        layout.addWidget(self.back_button)
+        outer.addWidget(card, alignment=Qt.AlignmentFlag.AlignCenter)
+        outer.addStretch()
 
         # -------------------------
         # Events

@@ -27,16 +27,21 @@ class SessionSummaryPage(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.setProperty("page", True)
 
         self.current_session_id = None
         self.current_summary = None
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 20)
+        layout.setSpacing(12)
 
         self.title_label = QLabel("Session Summary")
+        self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
             "Completed monitoring session report"
         )
+        self.description_label.setProperty("role", "muted")
 
         # Session information
         info_group = QGroupBox("Session Information")
@@ -89,8 +94,8 @@ class SessionSummaryPage(QWidget):
             detection_layout.addWidget(widget)
 
         # Database save status
-        save_group = QGroupBox("Summary Database Status")
-        save_layout = QVBoxLayout(save_group)
+        self.save_group = QGroupBox("Summary Save Problem")
+        save_layout = QVBoxLayout(self.save_group)
 
         self.save_status_label = QLabel(
             "ยังไม่มีข้อมูลการบันทึก"
@@ -163,6 +168,7 @@ class SessionSummaryPage(QWidget):
             "ระยะเวลา Alert ไม่ใช่ระยะเวลาท่าทางเสี่ยงทั้งหมด"
         )
         self.note_label.setWordWrap(True)
+        self.note_label.setProperty("role", "muted")
 
         self.back_button = QPushButton(
             "Back to Dashboard"
@@ -175,7 +181,7 @@ class SessionSummaryPage(QWidget):
         layout.addWidget(self.description_label)
         layout.addWidget(info_group)
         layout.addWidget(detection_group)
-        layout.addWidget(save_group)
+        layout.addWidget(self.save_group)
         layout.addWidget(alert_group)
         layout.addWidget(self.note_label)
         layout.addStretch()
@@ -281,12 +287,14 @@ class SessionSummaryPage(QWidget):
         if status == "LOADED":
             self.save_status_label.setText("Loaded saved report from database")
             self.retry_button.setEnabled(False)
+            self.save_group.hide()
 
         elif status == "SAVED":
             self.save_status_label.setText(
                 "บันทึก Session Summary ลงฐานข้อมูลสำเร็จ"
             )
             self.retry_button.setEnabled(False)
+            self.save_group.hide()
 
         elif status == "ALREADY_EXISTS":
             self.save_status_label.setText(
@@ -294,6 +302,7 @@ class SessionSummaryPage(QWidget):
                 "โปรดตรวจสอบข้อมูลเดิมก่อนใช้งาน"
             )
             self.retry_button.setEnabled(False)
+            self.save_group.hide()
 
         else:
             self.save_status_label.setText(
@@ -303,6 +312,7 @@ class SessionSummaryPage(QWidget):
             self.retry_button.setEnabled(
                 self.current_session_id is not None
             )
+            self.save_group.show()
 
     def retry_save(self):
         if not self.current_summary:

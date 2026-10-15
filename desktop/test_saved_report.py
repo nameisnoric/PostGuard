@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.services.api_client import APIClient
@@ -40,6 +40,9 @@ class SavedReportTests(unittest.TestCase):
         with patch("app.ui.pages.history_page.load_session_summary", return_value=self.saved) as load, patch.object(APIClient, "get_session_alerts", return_value=Mock(ok=True, json=lambda: [])), patch("app.ui.pages.history_page.QDialog.exec", return_value=0):
             page.open_saved_report()
             load.assert_called_once_with(7)
+        report_dialogs = page.findChildren(QDialog)
+        self.assertTrue(report_dialogs)
+        self.assertIn("QDialog", report_dialogs[-1].styleSheet())
         self.assertTrue(page.report_button.isEnabled())
         page.deleteLater()
 
