@@ -162,6 +162,8 @@ Risk Score History และ Blink Rate History ยังไม่เชื่�
 - `desktop/app/ui/pages/alert_history_dialog.py` — session alert viewer with loading, error and empty states
 - `desktop/app/ui/pages/profile_page.py` — Figma-aligned profile form, private photo management and persistent username/full-name edits
 - `desktop/app/ui/account_recovery_window.py` — restricted 14-day account recovery screen
+- `desktop/app/ui/pages/settings_page.py` — persisted notification, sound, volume and reminder settings
+- `desktop/app/services/alert_sound.py` — local WAV playback and reminder cooldown control
 
 บัญชีที่ส่งคำขอลบจะเปลี่ยนเป็น `PENDING_DELETION` ทันที และ API ปกติจะถูกปิดกั้น
 ผู้ใช้ login ได้เฉพาะหน้ากู้คืนภายใน 14 วัน Backend ตรวจบัญชีครบกำหนดตอนเริ่มระบบและทุก 6 ชั่วโมง

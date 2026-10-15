@@ -6,3 +6,4 @@ from app.models.session import PostureSession
 from app.models.alert_event import AlertEvent
 from app.models.session_summary import SessionSummary
 from app.models.register_otp import RegistrationOTP
+from app.models.user_settings import UserSettings

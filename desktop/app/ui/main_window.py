@@ -26,6 +26,7 @@ from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.profile_page import ProfilePage
+from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import APP_QSS, polish, set_centered_window
 
 from app.services.api_client import APIClient
@@ -81,8 +82,7 @@ class MainWindow(QMainWindow):
         self.account_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         account_menu = QMenu(self.account_button)
         self.profile_action = account_menu.addAction("Profile")
-        self.settings_action = account_menu.addAction("Settings (coming soon)")
-        self.settings_action.setEnabled(False)
+        self.settings_action = account_menu.addAction("Settings")
         account_menu.addSeparator()
         self.logout_action = account_menu.addAction("Log out")
         self.account_button.setMenu(account_menu)
@@ -138,6 +138,7 @@ class MainWindow(QMainWindow):
         )
 
         self.profile_page = ProfilePage(self.user_data)
+        self.settings_page = SettingsPage(self.monitoring_page.sound_player)
         self._update_account_avatar()
 
         # ========================================
@@ -174,6 +175,7 @@ class MainWindow(QMainWindow):
         )
 
         self.pages.addWidget(self.profile_page)
+        self.pages.addWidget(self.settings_page)
 
         main_layout.addWidget(self.pages, 1)
 
@@ -190,9 +192,13 @@ class MainWindow(QMainWindow):
         )
 
         self.profile_action.triggered.connect(self.show_profile)
+        self.settings_action.triggered.connect(self.show_settings)
         self.logout_action.triggered.connect(self.logout)
         self.profile_page.profile_updated.connect(self.update_profile)
         self.profile_page.account_deletion_requested.connect(self.delete_account)
+        self.settings_page.settings_updated.connect(
+            self.monitoring_page.apply_notification_settings
+        )
         self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================
@@ -236,6 +242,7 @@ class MainWindow(QMainWindow):
         self.global_pause_button.clicked.connect(self.monitoring_page.handle_pause_resume)
         self.global_stop_button.clicked.connect(self.monitoring_page.handle_stop)
         self.update_monitoring_controls()
+        self.settings_page.load_settings()
 
         # Session Summary -> Dashboard
         self.session_summary_page.back_requested.connect(
@@ -283,7 +290,7 @@ class MainWindow(QMainWindow):
             button.setProperty("navActive", button is active)
             polish(button)
         self.account_button.setProperty(
-            "accountActive", current is self.profile_page
+            "accountActive", current in (self.profile_page, self.settings_page)
         )
         polish(self.account_button)
 
@@ -341,6 +348,11 @@ class MainWindow(QMainWindow):
         self.camera_preview_page.stop_preview()
         self.profile_page.reset_form()
         self.pages.setCurrentWidget(self.profile_page)
+
+    def show_settings(self):
+        self.camera_preview_page.stop_preview()
+        self.settings_page.load_settings()
+        self.pages.setCurrentWidget(self.settings_page)
 
     def update_profile(self, updated: dict) -> None:
         self.user_data.update(updated)

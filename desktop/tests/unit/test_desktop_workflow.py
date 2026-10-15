@@ -48,6 +48,15 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.stack.enter_context(patch.object(APIClient, "create_personal_baseline", return_value=response(self.baseline, 201)))
         self.stack.enter_context(patch.object(APIClient, "get", return_value=response(self.baseline)))
         self.stack.enter_context(patch.object(APIClient, "get_session_alerts", return_value=response([])))
+        self.user_settings = {
+            "notifications_enabled": True,
+            "sound_enabled": True,
+            "sound_volume": 70,
+            "reminder_interval_minutes": 5,
+        }
+        self.stack.enter_context(patch.object(
+            APIClient, "get_settings", return_value=response(self.user_settings)
+        ))
         self.update_profile = self.stack.enter_context(patch.object(
             APIClient,
             "update_profile",
@@ -134,6 +143,15 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(self.window.user_data["full_name"], "New Name")
         self.assertEqual(self.window.user_data["username"], "newname")
         self.assertEqual(self.window.account_button.text(), "NN")
+
+    def test_settings_menu_loads_persisted_alert_preferences(self):
+        self.window.settings_action.trigger()
+        self.assertIs(self.window.pages.currentWidget(), self.window.settings_page)
+        self.assertEqual(self.window.settings_page.volume_slider.value(), 70)
+        self.assertEqual(
+            self.window.monitoring_page.sound_player.settings,
+            self.user_settings,
+        )
 
     def test_account_deletion_logs_out_after_backend_confirmation(self):
         TokenStore.set_token("test-token")

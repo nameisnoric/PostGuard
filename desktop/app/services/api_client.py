@@ -65,6 +65,15 @@ class APIClient:
         )
 
     @staticmethod
+    def put(endpoint: str, data: dict | None = None):
+        return requests.put(
+            f"{API_BASE_URL}{endpoint}",
+            json=data,
+            headers=APIClient._get_headers(),
+            timeout=10,
+        )
+
+    @staticmethod
     def delete(endpoint: str):
         return requests.delete(
             f"{API_BASE_URL}{endpoint}",
@@ -94,6 +103,22 @@ class APIClient:
     @staticmethod
     def cancel_account_deletion():
         return APIClient.delete("/users/me/deletion-request")
+
+    @staticmethod
+    def get_settings():
+        return APIClient.get("/users/me/settings")
+
+    @staticmethod
+    def update_settings(settings: dict):
+        allowed_fields = {
+            "notifications_enabled",
+            "sound_enabled",
+            "sound_volume",
+            "reminder_interval_minutes",
+        }
+        if set(settings) != allowed_fields:
+            raise ValueError("Invalid settings payload.")
+        return APIClient.put("/users/me/settings", settings)
 
     @staticmethod
     def upload_avatar(path: str):

@@ -11,7 +11,6 @@ import requests
 from PySide6.QtCore import QLocale, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QDoubleSpinBox,
     QFrame,
@@ -30,6 +29,7 @@ from app.services.detection_service import DetectionService
 from app.services.api_client import APIClient
 from app.services.risk_engine import assess_posture
 from app.services.experimental_alert_service import ExperimentalAlertService
+from app.services.alert_sound import AlertSoundPlayer
 from app.services.posture_duration_tracker import (
     PostureDurationTracker,
     classify_neck_side_bending,
@@ -61,6 +61,7 @@ class MonitoringPage(QWidget):
         self.neck_samples = []
         self.posture_tracker = PostureDurationTracker()
         self.alert_service = ExperimentalAlertService()
+        self.sound_player = AlertSoundPlayer()
         self._alert_force_close = False
 
         self.timer = QTimer(self)
@@ -429,6 +430,11 @@ class MonitoringPage(QWidget):
         self.risk_label.setText("Risk Score: N/A (PARTIAL - missing factors)")
         if self.session_id is None:
             self.alert_label.setText("Experimental Alert: Waiting")
+        if self.alert_service.active_event_id is None:
+            self.sound_player.notify(False)
+
+    def apply_notification_settings(self, settings: dict) -> None:
+        self.sound_player.apply_settings(settings)
 
     def update_partial_risk(self, result: dict) -> None:
         """Use existing neck_tilt only. Never change teammate's detector math."""
@@ -490,7 +496,6 @@ class MonitoringPage(QWidget):
                 "Experimental Alert: Neck side-bending held >= 60 s. "
                 "Please adjust your posture. Event saved to PostgreSQL."
             )
-            QApplication.beep()
         elif action == "ended":
             self.alert_label.setText("Experimental Alert: Cleared (event ended)")
         elif self.alert_service.last_error:
@@ -504,6 +509,10 @@ class MonitoringPage(QWidget):
             self.alert_label.setText("Experimental Alert: Detection unavailable / disabled")
         elif self.alert_service.active_event_id is None:
             self.alert_label.setText("Experimental Alert: Monitoring continuous bending")
+        self.sound_player.notify(
+            self.alert_service.active_event_id is not None,
+            new_alert=action == "created",
+        )
 
     def update_baseline_comparison(self, result: dict) -> None:
         if self.baseline_data is None:

@@ -79,7 +79,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Username and full name editing | Implemented | Final end-to-end persistence test with Supabase |
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Missing | Add consent model, API and desktop flow |
-| Settings | Missing | Add persisted user settings and Settings page |
+| Settings | Implemented | Final live sound and persistence acceptance test |
 | Dashboard and history | Partial | Complete TOR report fields when source data is available |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
 | Image/video privacy | Implemented by design | Add explicit user-facing notice and acceptance test |
@@ -88,9 +88,8 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 ## Implementation order for the current desktop phase
 
 1. Implement Privacy Notice and stored consent management.
-2. Implement persisted Settings.
-3. Finish report/history UX using currently available session data.
-4. Package and test the Windows application.
+2. Finish report/history UX using currently available session data.
+3. Package and test the Windows application.
 
 Detection-related requirements remain part of the TOR and must be completed
 later, but they are outside the current desktop-system phase.
