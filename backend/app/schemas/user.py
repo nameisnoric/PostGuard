@@ -42,6 +42,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     username: str
     full_name: str | None = None
+    avatar_path: str | None = None
 
     model_config = {
         "from_attributes": True
@@ -140,4 +141,4 @@ class RegistrationOTPVerify(BaseModel):
         if not otp.isdigit() or len(otp) != 6:
             raise ValueError("OTP must be exactly 6 digits")
         return otp
-    
+

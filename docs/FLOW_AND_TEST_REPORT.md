@@ -92,11 +92,11 @@ flowchart TD
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m unittest test_session_summaries test_session_recovery -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests/unit -p "test_*.py" -v
 # คำสั่งถัดไปเชื่อม DB ที่ตั้งใน .env, ใช้ข้อมูลชั่วคราวแล้ว rollback
-.\.venv\Scripts\python.exe check_summary_database.py --rollback-test
+.\.venv\Scripts\python.exe -m scripts.check_summary_database --rollback-test
 cd ..\desktop
-.\.venv\Scripts\python.exe -m unittest test_session_recovery test_desktop_workflow test_risk_engine test_posture_duration_tracker test_experimental_alert_service test_alert_history_service test_session_summary_service test_saved_report -v
+.\.venv\Scripts\python.exe -m unittest discover -s tests/unit -p "test_*.py" -v
 ```
 
 เปิดแอปจริงด้วยสอง terminal:
@@ -133,10 +133,27 @@ Reset token อยู่เฉพาะใน dialog ไม่เก็บใน
 ```powershell
 # จาก project root
 cd desktop
-.\.venv\Scripts\python.exe -m unittest test_password_reset -v
+.\.venv\Scripts\python.exe -m unittest tests.unit.test_password_reset -v
 cd ..\backend
 # ใช้ฐานข้อมูลที่กำหนดใน .env และ rollback ข้อมูลทดสอบ
-.\.venv\Scripts\python.exe check_password_reset.py --rollback-test
+.\.venv\Scripts\python.exe -m scripts.check_password_reset --rollback-test
 ```
 
 การทดสอบด้วยอีเมลจริงยังต้องทำผ่านหน้า Forgot Password ด้วยบัญชีของผู้ใช้เอง
+
+## Dashboard
+
+- แสดงสถานะ Session ปัจจุบันและปุ่ม Start/Return to Monitoring, View History
+- โหลดข้อมูลจริงจาก `GET /sessions` หลัง Login, เมื่อกลับ Dashboard และเมื่อกด Refresh
+- โหลดผ่าน Qt thread pool เพื่อไม่บล็อก timer ตรวจจับระหว่างรอ Dashboard API
+- สรุปจำนวน COMPLETED, เวลาตรวจจับรวม (total_duration - paused_duration เฉพาะ COMPLETED ที่มีเวลาถูกต้อง), และจำนวน INTERRUPTED
+- ตารางแสดง 5 Session ล่าสุด; Session ที่ยังทำงาน/ขาดข้อมูลแสดงเวลาตรวจจับ N/A
+- หาก API ล้มเหลวแสดงข้อมูลไม่พร้อมและให้ Refresh ไม่แทนด้วยศูนย์
+- Posture insights เป็น placeholder Coming soon; Full Risk Score/Blink Rate เป็น N/A ไม่มีคะแนนสมมติ
+- `docs/assets/dashboard-preview.png` เป็นภาพตัวอย่างที่ใช้ข้อมูลจำลองสำหรับตรวจ layout เท่านั้น ไม่ใช่ข้อมูลในบัญชีผู้ใช้
+- Desktop tests รวม 71 tests ผ่าน รวม Dashboard 6 tests: การรวมเวลา, ข้อมูลไม่ครบ, ไม่มีข้อมูล/API error, ปุ่มและสถานะ, asynchronous refresh และจำกัดรายการล่าสุด
+
+```powershell
+cd desktop
+.\.venv\Scripts\python.exe -m unittest tests.unit.test_dashboard -v
+```

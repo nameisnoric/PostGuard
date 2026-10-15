@@ -1,5 +1,7 @@
 import requests
 
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -10,6 +12,8 @@ from PySide6.QtWidgets import (
     QFrame,
     QStackedWidget,
     QMessageBox,
+    QMenu,
+    QToolButton,
 )
 
 from app.core.token_store import TokenStore
@@ -21,6 +25,7 @@ from app.ui.pages.baseline_page import BaselinePage
 from app.ui.pages.monitoring_page import MonitoringPage
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.ui.pages.history_page import HistoryPage
+from app.ui.pages.profile_page import ProfilePage
 from app.ui.theme import APP_QSS, polish, set_centered_window
 
 from app.services.api_client import APIClient
@@ -69,8 +74,19 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(self.dashboard_button)
         navigation_layout.addWidget(self.history_button)
 
-        self.logout_button = QPushButton("Log out")
-        navigation_layout.addWidget(self.logout_button)
+        self.account_button = QToolButton()
+        self.account_button.setText(self._account_initials())
+        self.account_button.setProperty("account", True)
+        self.account_button.setProperty("accountActive", False)
+        self.account_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        account_menu = QMenu(self.account_button)
+        self.profile_action = account_menu.addAction("Profile")
+        self.settings_action = account_menu.addAction("Settings (coming soon)")
+        self.settings_action.setEnabled(False)
+        account_menu.addSeparator()
+        self.logout_action = account_menu.addAction("Log out")
+        self.account_button.setMenu(account_menu)
+        navigation_layout.addWidget(self.account_button)
         main_layout.addWidget(navigation)
 
         self.session_bar = QFrame()
@@ -121,6 +137,9 @@ class MainWindow(QMainWindow):
             HistoryPage()
         )
 
+        self.profile_page = ProfilePage(self.user_data)
+        self._update_account_avatar()
+
         # ========================================
         # 4. Register Pages
         # ========================================
@@ -154,6 +173,8 @@ class MainWindow(QMainWindow):
             self.history_page
         )
 
+        self.pages.addWidget(self.profile_page)
+
         main_layout.addWidget(self.pages, 1)
 
         self.dashboard_button.clicked.connect(
@@ -168,9 +189,9 @@ class MainWindow(QMainWindow):
             self.show_history
         )
 
-        self.logout_button.clicked.connect(
-            self.logout
-        )
+        self.profile_action.triggered.connect(self.show_profile)
+        self.logout_action.triggered.connect(self.logout)
+        self.profile_page.profile_updated.connect(self.update_profile)
         self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================
@@ -235,6 +256,11 @@ class MainWindow(QMainWindow):
         button.setProperty("navActive", False)
         return button
 
+    def _account_initials(self) -> str:
+        name = self.user_data.get("full_name") or self.user_data.get("username") or "U"
+        words = str(name).split()
+        return "".join(word[0].upper() for word in words[:2]) or "U"
+
     def _sync_navigation(self, _index: int = 0) -> None:
         current = self.pages.currentWidget()
         monitor_pages = {
@@ -255,6 +281,10 @@ class MainWindow(QMainWindow):
         ):
             button.setProperty("navActive", button is active)
             polish(button)
+        self.account_button.setProperty(
+            "accountActive", current is self.profile_page
+        )
+        polish(self.account_button)
 
     # ============================================
     # Dashboard
@@ -305,6 +335,25 @@ class MainWindow(QMainWindow):
 
         # Load saved sessions from PostgreSQL
         self.history_page.load_sessions()
+
+    def show_profile(self):
+        self.camera_preview_page.stop_preview()
+        self.profile_page.reset_form()
+        self.pages.setCurrentWidget(self.profile_page)
+
+    def update_profile(self, updated: dict) -> None:
+        self.user_data.update(updated)
+        self._update_account_avatar()
+
+    def _update_account_avatar(self) -> None:
+        pixmap = self.profile_page.avatar_label.pixmap()
+        if pixmap is not None and not pixmap.isNull():
+            self.account_button.setText("")
+            self.account_button.setIcon(QIcon(pixmap))
+            self.account_button.setIconSize(QSize(32, 32))
+            return
+        self.account_button.setIcon(QIcon())
+        self.account_button.setText(self._account_initials())
 
     # ============================================
     # Logout

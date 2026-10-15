@@ -5,7 +5,10 @@ from io import StringIO
 
 import requests
 from PySide6.QtWidgets import QApplication, QMessageBox
-import test_desktop_workflow as fixtures
+try:
+    from . import test_desktop_workflow as fixtures
+except ImportError:
+    import test_desktop_workflow as fixtures
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import find_unclosed_sessions, interrupt_previous_session
 from app.services.alert_history_service import summarize_alerts

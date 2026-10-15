@@ -164,6 +164,36 @@ QLabel[preview="true"] {
     border: 1px solid #e2e8f0;
     border-radius: 12px;
 }
+QLabel#profileAvatar {
+    color: #1e40af;
+    background: #dbeafe;
+    border: 1px solid #bfdbfe;
+    border-radius: 48px;
+    font-size: 24px;
+    font-weight: 700;
+}
+QFrame#divider { color: #e2e8f0; background: #e2e8f0; max-height: 1px; }
+QToolButton[account="true"] {
+    min-width: 42px;
+    min-height: 42px;
+    color: #1e40af;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 21px;
+    font-weight: 700;
+}
+QToolButton[account="true"]:hover { background: #dbeafe; }
+QToolButton[accountActive="true"] { border: 2px solid #2563eb; }
+QMenu {
+    color: #0f172a;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px;
+}
+QMenu::item { padding: 9px 28px 9px 12px; border-radius: 6px; }
+QMenu::item:selected { color: #1e40af; background: #eff6ff; }
+QMenu::item:disabled { color: #94a3b8; }
 """
 
 

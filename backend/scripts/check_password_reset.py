@@ -1,6 +1,7 @@
 r"""Opt-in API test on configured PostgreSQL; rollback all rows, mock email delivery.
 
-Run from backend: .\.venv\Scripts\python.exe check_password_reset.py --rollback-test
+Run from backend:
+.\.venv\Scripts\python.exe -m scripts.check_password_reset --rollback-test
 Uses real password hashing/JWT. Never prints passwords, OTPs, tokens or DB URLs.
 Database ID sequences may advance even though test rows are rolled back.
 """

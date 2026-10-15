@@ -115,6 +115,16 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertGreater(self.window.maximumWidth(), self.window.width())
         self.assertGreater(self.window.maximumHeight(), self.window.height())
 
+    def test_profile_menu_opens_profile_and_updates_account_initials(self):
+        self.window.profile_action.trigger()
+        self.assertIs(self.window.pages.currentWidget(), self.window.profile_page)
+        self.window.profile_page.first_name_input.setText("New")
+        self.window.profile_page.last_name_input.setText("Name")
+        self.window.profile_page.display_name_input.setText("New Name")
+        self.window.profile_page.save_changes()
+        self.assertEqual(self.window.user_data["full_name"], "New Name")
+        self.assertEqual(self.window.account_button.text(), "NN")
+
     def test_preview_calibrate_save_monitor_pause_stop_summary(self):
         self.window.show_monitor()
         self.window.show_camera_preview(self.camera)

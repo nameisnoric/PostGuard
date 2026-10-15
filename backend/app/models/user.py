@@ -39,6 +39,11 @@ class User(Base):
         nullable = True
     )
 
+    avatar_path: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -51,4 +56,4 @@ class User(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
-    
+

@@ -4,7 +4,10 @@ import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import test_session_summaries as fixtures
+try:
+    from . import test_session_summaries as fixtures
+except ImportError:
+    import test_session_summaries as fixtures
 from app.models.session import PostureSession
 from app.models.alert_event import AlertEvent
 from app.routers.sessions import router as sessions_router

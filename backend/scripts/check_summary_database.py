@@ -1,4 +1,7 @@
-"""Opt-in live DB check: python check_summary_database.py --rollback-test.
+"""Opt-in live DB check.
+
+Run from backend:
+.\.venv\Scripts\python.exe -m scripts.check_summary_database --rollback-test
 
 Uses the configured database, creates unique test rows inside an outer transaction,
 and rolls them back even when an assertion fails. Does not create or migrate tables.

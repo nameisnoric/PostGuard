@@ -64,6 +64,33 @@ class APIClient:
         return APIClient.get("/auth/me")
 
     @staticmethod
+    def upload_avatar(path: str):
+        suffix = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+        content_type = "image/png" if suffix == "png" else "image/jpeg"
+        with open(path, "rb") as avatar_file:
+            content = avatar_file.read()
+        headers = APIClient._get_headers()
+        headers["Content-Type"] = content_type
+        return requests.put(
+            f"{API_BASE_URL}/users/me/avatar",
+            data=content,
+            headers=headers,
+            timeout=20,
+        )
+
+    @staticmethod
+    def get_avatar():
+        return APIClient.get("/users/me/avatar")
+
+    @staticmethod
+    def delete_avatar():
+        return requests.delete(
+            f"{API_BASE_URL}/users/me/avatar",
+            headers=APIClient._get_headers(),
+            timeout=15,
+        )
+
+    @staticmethod
     def request_register_otp(email: str, username: str, password: str, full_name: str):
         return APIClient.post(
             "/auth/register/request-otp",
