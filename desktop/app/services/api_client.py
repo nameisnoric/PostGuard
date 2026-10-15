@@ -217,6 +217,10 @@ class APIClient:
         return APIClient.get(f"/sessions/{session_id}")
 
     @staticmethod
+    def get_session_summaries():
+        return APIClient.get("/summaries")
+
+    @staticmethod
     def create_alert_event(session_id: int, event_type: str, risk_level: str):
         return APIClient.post(
             f"/sessions/{session_id}/alerts",

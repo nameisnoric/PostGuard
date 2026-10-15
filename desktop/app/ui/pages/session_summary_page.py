@@ -15,7 +15,12 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.api_client import APIClient
-from app.services.alert_history_service import summarize_alerts
+from app.services.alert_history_service import (
+    duration_text,
+    event_type_label,
+    local_datetime,
+    summarize_alerts,
+)
 from app.services.session_summary_service import (
     save_session_summary,
 )
@@ -54,6 +59,8 @@ class SessionSummaryPage(QWidget):
         self.start_label = QLabel("Started: --")
         self.end_label = QLabel("Ended: --")
         self.duration_label = QLabel("Duration: --")
+        self.paused_duration_label = QLabel("Paused Duration: --")
+        self.pause_count_label = QLabel("Pause Count: --")
 
         for widget in (
             self.session_label,
@@ -63,6 +70,8 @@ class SessionSummaryPage(QWidget):
             self.start_label,
             self.end_label,
             self.duration_label,
+            self.paused_duration_label,
+            self.pause_count_label,
         ):
             info_layout.addWidget(widget)
 
@@ -93,13 +102,30 @@ class SessionSummaryPage(QWidget):
         ):
             detection_layout.addWidget(widget)
 
+        report_group = QGroupBox("Stored Report Metrics")
+        report_layout = QVBoxLayout(report_group)
+        self.average_risk_label = QLabel("Average Risk Score: N/A")
+        self.maximum_risk_label = QLabel("Maximum Risk Score: N/A")
+        self.blink_rate_label = QLabel("Blink Rate: N/A")
+        self.report_alert_count_label = QLabel("Stored Alert Count: --")
+        self.frequent_event_label = QLabel("Most Frequent Alert: N/A")
+        self.risk_breakdown_label = QLabel("Risk Breakdown: --")
+        self.risk_breakdown_label.setWordWrap(True)
+        for widget in (
+            self.average_risk_label,
+            self.maximum_risk_label,
+            self.blink_rate_label,
+            self.report_alert_count_label,
+            self.frequent_event_label,
+            self.risk_breakdown_label,
+        ):
+            report_layout.addWidget(widget)
+
         # Database save status
         self.save_group = QGroupBox("Summary Save Problem")
         save_layout = QVBoxLayout(self.save_group)
 
-        self.save_status_label = QLabel(
-            "ยังไม่มีข้อมูลการบันทึก"
-        )
+        self.save_status_label = QLabel("No report save status is available.")
         self.save_status_label.setWordWrap(True)
 
         self.retry_button = QPushButton(
@@ -163,9 +189,8 @@ class SessionSummaryPage(QWidget):
         alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Risk Score และ Blink Rate ยังไม่พร้อมใช้งาน "
-            "จึงไม่สร้างค่า 0 แทนข้อมูลที่ไม่มี "
-            "ระยะเวลา Alert ไม่ใช่ระยะเวลาท่าทางเสี่ยงทั้งหมด"
+            "Risk score and blink rate remain N/A until their complete calculations "
+            "are connected. Alert duration is the time an alert record remained open."
         )
         self.note_label.setWordWrap(True)
         self.note_label.setProperty("role", "muted")
@@ -181,6 +206,7 @@ class SessionSummaryPage(QWidget):
         layout.addWidget(self.description_label)
         layout.addWidget(info_group)
         layout.addWidget(detection_group)
+        layout.addWidget(report_group)
         layout.addWidget(self.save_group)
         layout.addWidget(alert_group)
         layout.addWidget(self.note_label)
@@ -191,7 +217,7 @@ class SessionSummaryPage(QWidget):
     def format_angle(value):
         if value is None:
             return "N/A"
-        return f"{float(value):+.2f}°"
+        return f"{float(value):+.2f}\N{DEGREE SIGN}"
 
     def set_saved_report(self, session: dict, saved: dict) -> None:
         """Display database measurements without recalculating detection."""
@@ -203,6 +229,8 @@ class SessionSummaryPage(QWidget):
             "started_at": session.get("started_at", "N/A"),
             "ended_at": session.get("ended_at", "N/A"),
             "duration_seconds": session.get("total_duration"),
+            "paused_duration": session.get("paused_duration"),
+            "pause_count": session.get("pause_count", 0),
             "summary_save_status": "LOADED",
         }
         self.set_summary(report)
@@ -212,6 +240,8 @@ class SessionSummaryPage(QWidget):
     def set_summary(self, summary: dict) -> None:
         self.current_summary = summary.copy()
         self.current_session_id = summary.get("session_id")
+        saved_metrics = summary.get("saved_summary")
+        report_metrics = saved_metrics if isinstance(saved_metrics, dict) else summary
 
         self.session_label.setText(
             f"Session ID: {self.current_session_id}"
@@ -230,19 +260,21 @@ class SessionSummaryPage(QWidget):
         )
         self.start_label.setText(
             "Started: "
-            + str(summary.get("started_at", "--"))
+            + local_datetime(summary.get("started_at"))
         )
         self.end_label.setText(
             "Ended: "
-            + str(summary.get("ended_at", "--"))
+            + local_datetime(summary.get("ended_at"))
         )
 
         seconds = summary.get("duration_seconds")
-        if seconds is None:
-            self.duration_label.setText("Duration: N/A")
-        else:
-            minutes, remaining = divmod(int(seconds), 60)
-            self.duration_label.setText(f"Duration: {minutes:02d}:{remaining:02d}")
+        self.duration_label.setText(f"Total Duration: {duration_text(seconds)}")
+        self.paused_duration_label.setText(
+            f"Paused Duration: {duration_text(summary.get('paused_duration'))}"
+        )
+        self.pause_count_label.setText(
+            f"Pause Count: {summary.get('pause_count', 0)}"
+        )
 
         for label, title, key in (
             (self.count_label, "Detection Cycles", "detection_count"),
@@ -276,8 +308,56 @@ class SessionSummaryPage(QWidget):
             )
         )
 
+        self.average_risk_label.setText(
+            "Average Risk Score: "
+            + self._number_or_na(report_metrics.get("average_risk_score"))
+        )
+        self.maximum_risk_label.setText(
+            "Maximum Risk Score: "
+            + self._number_or_na(report_metrics.get("maximum_risk_score"))
+        )
+        self.blink_rate_label.setText(
+            "Blink Rate: " + self._number_or_na(report_metrics.get("blink_rate"))
+        )
+        alert_count = report_metrics.get("total_alert_count")
+        self.report_alert_count_label.setText(
+            f"Stored Alert Count: {alert_count if alert_count is not None else 'N/A'}"
+        )
+        frequent = report_metrics.get("most_frequent_alert_event")
+        self.frequent_event_label.setText(
+            f"Most Frequent Alert: {event_type_label(frequent)}"
+        )
+        self.risk_breakdown_label.setText(
+            "Risk Breakdown: " + self._risk_breakdown(report_metrics)
+        )
+
         self.update_save_status()
         self.refresh_alerts()
+
+    @staticmethod
+    def _number_or_na(value):
+        if value is None:
+            return "N/A"
+        try:
+            return f"{float(value):.2f}"
+        except (TypeError, ValueError):
+            return "N/A"
+
+    @staticmethod
+    def _risk_breakdown(summary):
+        parts = []
+        for level in ("low", "medium", "high"):
+            count = summary.get(f"{level}_risk_alert_count")
+            seconds = summary.get(f"{level}_risk_duration")
+            if count is None and seconds is None:
+                parts.append(f"{level.title()} N/A")
+            else:
+                count_text = count if count is not None else "N/A"
+                parts.append(
+                    f"{level.title()} {count_text} alert(s), "
+                    f"{duration_text(seconds)} open time"
+                )
+        return " | ".join(parts)
 
     def update_save_status(self):
         summary = self.current_summary or {}
@@ -285,35 +365,23 @@ class SessionSummaryPage(QWidget):
         error = summary.get("summary_save_error")
 
         if status == "LOADED":
-            self.save_status_label.setText("Loaded saved report from database")
+            self.save_status_label.setText("Loaded saved report from database.")
             self.retry_button.setEnabled(False)
             self.save_group.hide()
-
         elif status == "SAVED":
-            self.save_status_label.setText(
-                "บันทึก Session Summary ลงฐานข้อมูลสำเร็จ"
-            )
+            self.save_status_label.setText("Session report saved successfully.")
             self.retry_button.setEnabled(False)
             self.save_group.hide()
-
         elif status == "ALREADY_EXISTS":
-            self.save_status_label.setText(
-                "Session นี้มี Summary อยู่แล้วในฐานข้อมูล "
-                "โปรดตรวจสอบข้อมูลเดิมก่อนใช้งาน"
-            )
+            self.save_status_label.setText("A saved report already exists for this session.")
             self.retry_button.setEnabled(False)
             self.save_group.hide()
-
         else:
             self.save_status_label.setText(
-                "ยังบันทึก Summary ไม่สำเร็จ\n"
-                + str(error or "Unknown error")
+                "The session report has not been saved.\n" + str(error or "Unknown error")
             )
-            self.retry_button.setEnabled(
-                self.current_session_id is not None
-            )
+            self.retry_button.setEnabled(self.current_session_id is not None)
             self.save_group.show()
-
     def retry_save(self):
         if not self.current_summary:
             return
@@ -410,26 +478,17 @@ class SessionSummaryPage(QWidget):
         dialog.exec()
 
     def go_back(self):
-        status = (
-            (self.current_summary or {}).get(
-                "summary_save_status"
-            )
-        )
-
+        status = (self.current_summary or {}).get("summary_save_status")
         if status not in ("SAVED", "ALREADY_EXISTS", "LOADED"):
             answer = QMessageBox.question(
                 self,
-                "Unsaved Summary",
-                "Summary ยังไม่ได้บันทึกสำเร็จ\n"
-                "หากออกจากหน้านี้ อาจไม่สามารถ "
-                "Retry ข้อมูลเดิมได้\n\n"
-                "ต้องการออกหรือไม่?",
-                QMessageBox.StandardButton.Yes
-                | QMessageBox.StandardButton.No,
+                "Unsaved Report",
+                "This session report has not been saved successfully. "
+                "If you leave now, you may not be able to retry with the same data.\n\n"
+                "Leave this report?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
-
             if answer != QMessageBox.StandardButton.Yes:
                 return
-
         self.back_requested.emit()

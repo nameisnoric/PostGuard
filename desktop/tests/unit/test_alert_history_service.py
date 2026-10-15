@@ -1,5 +1,10 @@
 import unittest
-from app.services.alert_history_service import summarize_alerts, validate_session_id
+from app.services.alert_history_service import (
+    duration_text,
+    event_type_label,
+    summarize_alerts,
+    validate_session_id,
+)
 
 
 class AlertHistoryServiceTests(unittest.TestCase):
@@ -36,6 +41,11 @@ class AlertHistoryServiceTests(unittest.TestCase):
         for invalid in (0, -1, True, "10"):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 validate_session_id(invalid)
+
+    def test_display_formatters_do_not_invent_missing_values(self):
+        self.assertEqual(duration_text(3661), "01:01:01")
+        self.assertEqual(duration_text(None), "N/A")
+        self.assertEqual(event_type_label("NECK_LATERAL_TILT"), "Neck Lateral Tilt")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
 
 from app.services.api_client import APIClient
 from app.services.alert_history_service import (
-    local_datetime, summarize_alerts, validate_session_id,
+    duration_text, event_type_label, local_datetime, summarize_alerts,
+    validate_session_id,
 )
 from app.ui.theme import APP_QSS
 
@@ -33,8 +34,8 @@ class AlertHistoryDialog(QDialog):
         self.layout().addWidget(title)
 
         self.description = QLabel(
-            "Experimental posture alerts. The duration column is alert-open time, "
-            "NOT the full time spent in a posture. MEDIUM is a provisional API label."
+            "Alert events saved for each monitoring session. Duration shows how long "
+            "an alert record remained open."
         )
         self.description.setWordWrap(True)
         self.layout().addWidget(self.description)
@@ -67,8 +68,8 @@ class AlertHistoryDialog(QDialog):
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels([
-            "Event ID", "Event Type", "API Risk Level", "Started (local)",
-            "Ended (local)", "Alert Duration (s)", "Status",
+            "Event", "Type", "Risk", "Started (local)",
+            "Ended (local)", "Open duration", "Status",
         ])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -162,7 +163,8 @@ class AlertHistoryDialog(QDialog):
             f"Total: {stats['total_alerts']} | Closed: {stats['closed_alerts']} | "
             f"Active: {stats['active_alerts']} | "
             f"Incomplete: {stats['incomplete_alerts']} | "
-            f"Sum of closed alert-open durations: {stats['closed_alert_seconds']} s"
+            "Closed alert-open time: "
+            f"{duration_text(stats['closed_alert_seconds'])}"
         )
         self.empty_label.setVisible(not alerts)
         self.table.setVisible(bool(alerts))
@@ -171,11 +173,11 @@ class AlertHistoryDialog(QDialog):
             ended = alert.get("ended_at")
             values = [
                 alert.get("event_id", "--"),
-                alert.get("event_type", "--"),
-                alert.get("risk_level", "--"),
+                event_type_label(alert.get("event_type")),
+                str(alert.get("risk_level", "--")).title(),
                 local_datetime(alert.get("started_at")),
                 local_datetime(ended),
-                alert.get("duration", "--") if ended else "--",
+                duration_text(alert.get("duration")) if ended else "--",
                 "INCOMPLETE" if alert.get("incomplete") else "CLOSED" if ended else "ACTIVE",
             ]
             for column, value in enumerate(values):

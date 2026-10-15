@@ -16,8 +16,36 @@ class SavedReportTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
-        self.session = dict(session_id=7, status="COMPLETED", camera_id=1, baseline_id=2, total_duration=120)
-        self.saved = dict(session_id=7, detection_count=12, pose_detected_count=10, face_detected_count=9, average_shoulder=-1.5, average_neck=None)
+        self.session = dict(
+            session_id=7,
+            status="COMPLETED",
+            camera_id=1,
+            baseline_id=2,
+            total_duration=120,
+            paused_duration=20,
+            pause_count=1,
+            started_at="2026-10-15T04:48:28Z",
+            ended_at="2026-10-15T04:50:28Z",
+        )
+        self.saved = dict(
+            session_id=7,
+            detection_count=12,
+            pose_detected_count=10,
+            face_detected_count=9,
+            average_shoulder=-1.5,
+            average_neck=None,
+            average_risk_score=None,
+            maximum_risk_score=None,
+            blink_rate=None,
+            total_alert_count=2,
+            most_frequent_alert_event="NECK_LATERAL_TILT",
+            low_risk_alert_count=0,
+            medium_risk_alert_count=2,
+            high_risk_alert_count=0,
+            low_risk_duration=0,
+            medium_risk_duration=30,
+            high_risk_duration=0,
+        )
 
     def test_saved_report_uses_persisted_values_and_disables_save(self):
         with patch.object(APIClient, "get_session_alerts", return_value=Mock(ok=True, json=lambda: [])), patch.object(APIClient, "post") as post:
@@ -26,6 +54,10 @@ class SavedReportTests(unittest.TestCase):
             self.assertEqual(page.count_label.text(), "Detection Cycles: 12")
             self.assertIn("-1.50", page.shoulder_label.text())
             self.assertEqual(page.neck_label.text(), "Average Neck: N/A")
+            self.assertEqual(page.duration_label.text(), "Total Duration: 00:02:00")
+            self.assertEqual(page.paused_duration_label.text(), "Paused Duration: 00:00:20")
+            self.assertIn("Neck Lateral Tilt", page.frequent_event_label.text())
+            self.assertEqual(page.average_risk_label.text(), "Average Risk Score: N/A")
             self.assertFalse(page.retry_button.isEnabled())
             self.assertIn("Loaded", page.save_status_label.text())
             post.assert_not_called()
@@ -58,6 +90,36 @@ class SavedReportTests(unittest.TestCase):
             page.load_sessions()
         self.assertEqual(page.table.rowCount(), 0)
         self.assertFalse(page.report_button.isEnabled())
+        page.deleteLater()
+
+    def test_history_filters_and_marks_report_availability(self):
+        interrupted = dict(
+            session_id=8,
+            status="INTERRUPTED",
+            camera_id=2,
+            baseline_id=3,
+            total_duration=None,
+        )
+        sessions_response = Mock(ok=True, json=lambda: [self.session, interrupted])
+        reports_response = Mock(ok=True, json=lambda: [self.saved])
+        with patch.object(
+            APIClient,
+            "get_sessions",
+            return_value=sessions_response,
+        ), patch.object(
+            APIClient,
+            "get_session_summaries",
+            return_value=reports_response,
+        ):
+            page = HistoryPage()
+            page.load_sessions()
+
+        self.assertEqual(page.total_value.text(), "2")
+        self.assertEqual(page.reports_value.text(), "1")
+        self.assertEqual(page.table.item(0, 5).text(), "Saved")
+        page.status_filter.setCurrentIndex(page.status_filter.findData("INTERRUPTED"))
+        self.assertEqual(page.table.rowCount(), 1)
+        self.assertEqual(page.table.item(0, 0).text(), "#8")
         page.deleteLater()
 
 

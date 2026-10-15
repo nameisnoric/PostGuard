@@ -121,7 +121,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(monitor.size().height(), 405)
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
-            "Alert Events",
+            "All Alert Events",
         )
         self.assertFalse(hasattr(self.window, "alert_history_button"))
 

@@ -56,7 +56,8 @@ class AlertHistoryDialogTests(unittest.TestCase):
         dialog = self.make_dialog(alerts)
         self.assertEqual(dialog.table.rowCount(), 1)
         self.assertFalse(dialog.table.isHidden())
-        self.assertEqual(dialog.table.item(0, 1).text(), "NECK_LATERAL_TILT")
+        self.assertEqual(dialog.table.item(0, 1).text(), "Neck Lateral Tilt")
+        self.assertEqual(dialog.table.item(0, 5).text(), "00:01:00")
 
 
 if __name__ == "__main__":

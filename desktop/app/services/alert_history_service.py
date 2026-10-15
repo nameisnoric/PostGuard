@@ -64,6 +64,25 @@ def local_datetime(value):
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if dt.tzinfo is None:
             return value  # Do not invent a timezone for naive timestamps.
-        return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        return dt.astimezone().strftime("%d/%m/%Y %H:%M:%S")
     except (ValueError, TypeError, AttributeError):
         return str(value)
+
+
+def duration_text(seconds):
+    """Format a known duration as HH:MM:SS without inventing missing data."""
+    if seconds is None:
+        return "N/A"
+    if type(seconds) not in (int, float) or seconds < 0:
+        return "N/A"
+    total = int(seconds)
+    hours, remainder = divmod(total, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def event_type_label(value):
+    """Turn API enum text into a readable label while preserving unknown values."""
+    if not isinstance(value, str) or not value:
+        return "N/A"
+    return value.replace("_", " ").title()
