@@ -122,7 +122,7 @@ def login_user(
         "token_type":"bearer"
     }
 
-def get_current_user(
+def get_authenticated_user(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         db: Session = Depends(get_db)
 ):
@@ -147,6 +147,17 @@ def get_current_user(
 
     return user
 
+
+def get_current_user(
+    authenticated_user: User = Depends(get_authenticated_user),
+):
+    if authenticated_user.account_status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is pending deletion. Recover the account to continue.",
+        )
+    return authenticated_user
+
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -154,7 +165,7 @@ def get_current_user(
     )
 
 def get_me(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_authenticated_user)
 ):
     return current_user
 

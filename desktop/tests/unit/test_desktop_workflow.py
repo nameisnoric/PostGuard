@@ -48,6 +48,15 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.stack.enter_context(patch.object(APIClient, "create_personal_baseline", return_value=response(self.baseline, 201)))
         self.stack.enter_context(patch.object(APIClient, "get", return_value=response(self.baseline)))
         self.stack.enter_context(patch.object(APIClient, "get_session_alerts", return_value=response([])))
+        self.update_profile = self.stack.enter_context(patch.object(
+            APIClient,
+            "update_profile",
+            return_value=response({
+                "username": "newname",
+                "full_name": "New Name",
+                "avatar_path": None,
+            }),
+        ))
         self.start = self.stack.enter_context(patch.object(APIClient, "start_session", return_value=response({"session_id": 3, "status": "RUNNING"}, 201)))
         self.end = self.stack.enter_context(patch.object(APIClient, "end_session", return_value=response({"session_id": 3, "status": "COMPLETED", "total_duration": 100})))
         self.save = self.stack.enter_context(patch.object(APIClient, "post", return_value=response({"session_id": 3}, 201)))
@@ -120,10 +129,26 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertIs(self.window.pages.currentWidget(), self.window.profile_page)
         self.window.profile_page.first_name_input.setText("New")
         self.window.profile_page.last_name_input.setText("Name")
-        self.window.profile_page.display_name_input.setText("New Name")
+        self.window.profile_page.username_input.setText("newname")
         self.window.profile_page.save_changes()
         self.assertEqual(self.window.user_data["full_name"], "New Name")
+        self.assertEqual(self.window.user_data["username"], "newname")
         self.assertEqual(self.window.account_button.text(), "NN")
+
+    def test_account_deletion_logs_out_after_backend_confirmation(self):
+        TokenStore.set_token("test-token")
+        deletion = response({
+            "account_status": "PENDING_DELETION",
+            "deletion_scheduled_for": "2026-10-29T12:00:00+00:00",
+        })
+        with patch.object(
+            APIClient, "request_account_deletion", return_value=deletion
+        ) as request_deletion, patch("app.ui.login_window.LoginWindow") as login:
+            self.window.delete_account()
+
+        request_deletion.assert_called_once_with()
+        self.assertIsNone(TokenStore.get_token())
+        login.return_value.show.assert_called_once_with()
 
     def test_preview_calibrate_save_monitor_pause_stop_summary(self):
         self.window.show_monitor()

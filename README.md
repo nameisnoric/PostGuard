@@ -56,3 +56,5 @@ cd desktop
 See [docs/UI_IMPLEMENTATION_GUIDE.md](docs/UI_IMPLEMENTATION_GUIDE.md),
 [docs/FLOW_AND_TEST_REPORT.md](docs/FLOW_AND_TEST_REPORT.md) and
 [docs/PRIVATE_AVATAR_SETUP.md](docs/PRIVATE_AVATAR_SETUP.md) for details.
+The current acceptance scope and implementation gaps are tracked in
+[docs/TOR_DESKTOP_REQUIREMENTS.md](docs/TOR_DESKTOP_REQUIREMENTS.md).

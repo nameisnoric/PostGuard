@@ -56,12 +56,44 @@ class APIClient:
         )
 
     @staticmethod
+    def patch(endpoint: str, data: dict | None = None):
+        return requests.patch(
+            f"{API_BASE_URL}{endpoint}",
+            json=data,
+            headers=APIClient._get_headers(),
+            timeout=10,
+        )
+
+    @staticmethod
+    def delete(endpoint: str):
+        return requests.delete(
+            f"{API_BASE_URL}{endpoint}",
+            headers=APIClient._get_headers(),
+            timeout=15,
+        )
+
+    @staticmethod
     def login(email: str, password: str):
         return APIClient.post("/auth/login", {"email": email, "password": password})
 
     @staticmethod
     def get_current_user():
         return APIClient.get("/auth/me")
+
+    @staticmethod
+    def update_profile(username: str, full_name: str):
+        return APIClient.patch(
+            "/users/me",
+            {"username": username, "full_name": full_name},
+        )
+
+    @staticmethod
+    def request_account_deletion():
+        return APIClient.post("/users/me/deletion-request")
+
+    @staticmethod
+    def cancel_account_deletion():
+        return APIClient.delete("/users/me/deletion-request")
 
     @staticmethod
     def upload_avatar(path: str):
@@ -84,11 +116,7 @@ class APIClient:
 
     @staticmethod
     def delete_avatar():
-        return requests.delete(
-            f"{API_BASE_URL}/users/me/avatar",
-            headers=APIClient._get_headers(),
-            timeout=15,
-        )
+        return APIClient.delete("/users/me/avatar")
 
     @staticmethod
     def request_register_otp(email: str, username: str, password: str, full_name: str):

@@ -86,6 +86,29 @@ class SessionRecoveryTests(unittest.TestCase):
         self.assertNotIn("secret-password", output.getvalue())
         login.deleteLater()
 
+    def test_pending_deletion_login_opens_only_account_recovery(self):
+        login = LoginWindow()
+        login.email_input.setText("test@ku.th")
+        login.password_input.setText("secret-password")
+        pending_user = {
+            "id": 1,
+            "account_status": "PENDING_DELETION",
+            "deletion_scheduled_for": "2026-10-29T12:00:00+00:00",
+        }
+        with patch.object(
+            APIClient, "login", return_value=response({"access_token": "token"})
+        ), patch.object(
+            APIClient, "get_current_user", return_value=response(pending_user)
+        ), patch(
+            "app.ui.account_recovery_window.AccountRecoveryWindow"
+        ) as recovery, patch("app.ui.login_window.MainWindow") as main_window:
+            login.handle_login()
+
+        recovery.assert_called_once_with(pending_user)
+        recovery.return_value.show.assert_called_once_with()
+        main_window.assert_not_called()
+        login.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()

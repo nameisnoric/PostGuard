@@ -6,7 +6,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog
 
-from app.ui.pages.profile_page import ProfilePage, ProfileSaveConfirmationDialog
+from app.services.api_client import APIClient
+from app.ui.pages.profile_page import (
+    AccountDeletionConfirmationDialog,
+    ProfilePage,
+    ProfileSaveConfirmationDialog,
+)
 
 
 class ProfilePageTests(unittest.TestCase):
@@ -24,24 +29,34 @@ class ProfilePageTests(unittest.TestCase):
     def test_existing_user_data_populates_figma_fields(self):
         self.assertEqual(self.page.first_name_input.text(), "Jordan")
         self.assertEqual(self.page.last_name_input.text(), "Lee")
-        self.assertEqual(self.page.display_name_input.text(), "jlee")
+        self.assertEqual(self.page.username_input.text(), "jlee")
         self.assertEqual(self.page.avatar_label.text(), "JL")
 
-    def test_save_updates_session_state_and_emits_profile(self):
+    def test_save_persists_profile_and_emits_backend_values(self):
         updated = Mock()
         self.page.profile_updated.connect(updated)
         self.page.first_name_input.setText("Jane")
         self.page.last_name_input.setText("Doe")
-        self.page.display_name_input.setText("Jane D")
-
-        self.page.save_changes()
-
-        updated.assert_called_once_with({
+        self.page.username_input.setText("janed")
+        reply = Mock(ok=True, json=lambda: {
+            "username": "janed",
             "full_name": "Jane Doe",
-            "display_name": "Jane D",
             "avatar_path": None,
         })
-        self.assertIn("app session", self.page.status_label.text())
+
+        with patch(
+            "app.ui.pages.profile_page.APIClient.update_profile",
+            return_value=reply,
+        ) as update_profile:
+            self.page.save_changes()
+
+        update_profile.assert_called_once_with("janed", "Jane Doe")
+        updated.assert_called_once_with({
+            "username": "janed",
+            "full_name": "Jane Doe",
+            "avatar_path": None,
+        })
+        self.assertEqual(self.page.status_label.text(), "Profile information saved.")
 
     def test_keep_editing_does_not_apply_changes(self):
         self.page.first_name_input.setText("Temporary")
@@ -56,13 +71,47 @@ class ProfilePageTests(unittest.TestCase):
 
     def test_confirming_from_save_button_applies_changes(self):
         self.page.first_name_input.setText("Jane")
+        reply = Mock(ok=True, json=lambda: {
+            "username": "jlee",
+            "full_name": "Jane Lee",
+            "avatar_path": None,
+        })
         with patch.object(
             ProfileSaveConfirmationDialog,
             "exec",
             return_value=QDialog.DialogCode.Accepted,
+        ), patch(
+            "app.ui.pages.profile_page.APIClient.update_profile",
+            return_value=reply,
         ):
             self.page.save_button.click()
         self.assertEqual(self.page.user_data["full_name"], "Jane Lee")
+
+    def test_duplicate_username_error_does_not_change_profile(self):
+        self.page.username_input.setText("already-used")
+        reply = Mock(
+            ok=False,
+            status_code=409,
+            json=lambda: {"detail": "Username is already in use."},
+        )
+
+        with patch(
+            "app.ui.pages.profile_page.APIClient.update_profile",
+            return_value=reply,
+        ):
+            self.page.save_changes()
+
+        self.assertEqual(self.page.user_data["username"], "jlee")
+        self.assertEqual(self.page.status_label.text(), "Username is already in use.")
+
+    def test_api_client_sends_profile_update_to_authenticated_endpoint(self):
+        with patch.object(APIClient, "patch") as send:
+            APIClient.update_profile("janed", "Jane Doe")
+
+        send.assert_called_once_with(
+            "/users/me",
+            {"username": "janed", "full_name": "Jane Doe"},
+        )
 
     def test_required_fields_are_validated(self):
         self.page.first_name_input.clear()
@@ -92,6 +141,19 @@ class ProfilePageTests(unittest.TestCase):
         self.assertIsNone(self.page.user_data["avatar_path"])
         self.assertEqual(self.page.avatar_label.text(), "JL")
         updated.assert_called_once_with({"avatar_path": None})
+
+    def test_account_deletion_requires_confirmation_before_signal(self):
+        requested = Mock()
+        self.page.account_deletion_requested.connect(requested)
+        with patch.object(
+            AccountDeletionConfirmationDialog,
+            "exec",
+            side_effect=(QDialog.DialogCode.Rejected, QDialog.DialogCode.Accepted),
+        ):
+            self.page.delete_account_button.click()
+            requested.assert_not_called()
+            self.page.delete_account_button.click()
+            requested.assert_called_once_with()
 
 
 if __name__ == "__main__":

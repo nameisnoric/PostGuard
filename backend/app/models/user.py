@@ -44,6 +44,23 @@ class User(Base):
         nullable=True,
     )
 
+    account_status: Mapped[str] = mapped_column(
+        String(32),
+        default="ACTIVE",
+        nullable=False,
+        index=True,
+    )
+
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    deletion_scheduled_for: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

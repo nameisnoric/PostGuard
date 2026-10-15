@@ -192,6 +192,7 @@ class MainWindow(QMainWindow):
         self.profile_action.triggered.connect(self.show_profile)
         self.logout_action.triggered.connect(self.logout)
         self.profile_page.profile_updated.connect(self.update_profile)
+        self.profile_page.account_deletion_requested.connect(self.delete_account)
         self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================
@@ -344,6 +345,55 @@ class MainWindow(QMainWindow):
     def update_profile(self, updated: dict) -> None:
         self.user_data.update(updated)
         self._update_account_avatar()
+
+    def delete_account(self) -> None:
+        """Finish local work, request deletion, then return to login."""
+        if not self._finish_before_exit():
+            self.profile_page.status_label.setText(
+                "Finish and save the current monitoring session before deleting the account."
+            )
+            return
+
+        self.profile_page.delete_account_button.setEnabled(False)
+        self.profile_page.status_label.setText("Requesting account deletion...")
+        try:
+            response = APIClient.request_account_deletion()
+        except requests.RequestException:
+            self.profile_page.delete_account_button.setEnabled(True)
+            self.profile_page.status_label.setText(
+                "Cannot request account deletion. Check your connection."
+            )
+            return
+        if not response.ok:
+            self.profile_page.delete_account_button.setEnabled(True)
+            try:
+                detail = response.json().get(
+                    "detail", "Account deletion could not be requested."
+                )
+            except (ValueError, AttributeError):
+                detail = "Account deletion could not be requested."
+            self.profile_page.status_label.setText(str(detail))
+            return
+
+        try:
+            scheduled_for = response.json().get("deletion_scheduled_for")
+        except (ValueError, AttributeError):
+            scheduled_for = None
+        QMessageBox.information(
+            self,
+            "Account deletion requested",
+            "Your account is disabled and scheduled for permanent deletion in 14 days. "
+            "Sign in again before the deadline to recover it."
+            + (f"\n\nDeletion deadline: {scheduled_for}" if scheduled_for else ""),
+        )
+        TokenStore.clear_token()
+        self._exit_ready = True
+        self.hide()
+        from app.ui.login_window import LoginWindow
+
+        self.login_window = LoginWindow()
+        self.login_window.show()
+        self.close()
 
     def _update_account_avatar(self) -> None:
         pixmap = self.profile_page.avatar_label.pixmap()

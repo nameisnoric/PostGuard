@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, field_validator
 import re
 
@@ -43,10 +45,38 @@ class UserResponse(BaseModel):
     username: str
     full_name: str | None = None
     avatar_path: str | None = None
+    account_status: str = "ACTIVE"
+    deletion_requested_at: datetime | None = None
+    deletion_scheduled_for: datetime | None = None
 
     model_config = {
         "from_attributes": True
     }
+
+
+class UserProfileUpdate(BaseModel):
+    username: str
+    full_name: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, username: str) -> str:
+        username = username.strip()
+        if not username:
+            raise ValueError("Username is required")
+        if len(username) > 100:
+            raise ValueError("Username must not exceed 100 characters")
+        return username
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, full_name: str) -> str:
+        full_name = full_name.strip()
+        if not full_name:
+            raise ValueError("Full name is required")
+        if len(full_name) > 150:
+            raise ValueError("Full name must not exceed 150 characters")
+        return full_name
 
 class UserLogin(BaseModel):
     email: EmailStr

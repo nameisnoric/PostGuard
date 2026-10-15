@@ -143,6 +143,14 @@ class LoginWindow(QWidget):
 
         user_data = me_response.json()
 
+        if user_data.get("account_status") == "PENDING_DELETION":
+            from app.ui.account_recovery_window import AccountRecoveryWindow
+
+            self.recovery_window = AccountRecoveryWindow(user_data)
+            self.recovery_window.show()
+            self.close()
+            return
+
         self.main_window = MainWindow(
             user_data
         )

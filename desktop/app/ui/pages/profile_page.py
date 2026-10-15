@@ -63,8 +63,47 @@ class ProfileSaveConfirmationDialog(QDialog):
         layout.addLayout(buttons)
 
 
+class AccountDeletionConfirmationDialog(QDialog):
+    """Explain the recovery period before an account deletion request."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("PostGuard - Delete Account")
+        self.setModal(True)
+        self.setFixedWidth(520)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 26, 28, 24)
+        layout.setSpacing(16)
+
+        heading = QLabel("Request account deletion?")
+        heading.setProperty("role", "title")
+        message = QLabel(
+            "Your account will be disabled immediately and scheduled for permanent "
+            "deletion in 14 days. During that period, sign in again to recover it. "
+            "After the deadline, your account, monitoring records and private profile "
+            "photo will be permanently removed."
+        )
+        message.setWordWrap(True)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        cancel = QPushButton("Keep account")
+        cancel.clicked.connect(self.reject)
+        confirm = QPushButton("Request deletion")
+        confirm.setProperty("variant", "danger")
+        confirm.clicked.connect(self.accept)
+        buttons.addWidget(cancel)
+        buttons.addWidget(confirm)
+
+        layout.addWidget(heading)
+        layout.addWidget(message)
+        layout.addLayout(buttons)
+
+
 class ProfilePage(QWidget):
     profile_updated = Signal(dict)
+    account_deletion_requested = Signal()
 
     def __init__(self, user_data: dict):
         super().__init__()
@@ -145,13 +184,13 @@ class ProfilePage(QWidget):
         fields.setVerticalSpacing(8)
         self.first_name_input = QLineEdit()
         self.last_name_input = QLineEdit()
-        self.display_name_input = QLineEdit()
+        self.username_input = QLineEdit()
         fields.addWidget(QLabel("First Name"), 0, 0)
         fields.addWidget(QLabel("Last Name"), 0, 1)
         fields.addWidget(self.first_name_input, 1, 0)
         fields.addWidget(self.last_name_input, 1, 1)
-        fields.addWidget(QLabel("Display Name"), 2, 0, 1, 2)
-        fields.addWidget(self.display_name_input, 3, 0, 1, 2)
+        fields.addWidget(QLabel("Username"), 2, 0, 1, 2)
+        fields.addWidget(self.username_input, 3, 0, 1, 2)
         fields.setColumnStretch(0, 1)
         fields.setColumnStretch(1, 1)
         card_layout.addLayout(fields)
@@ -169,12 +208,40 @@ class ProfilePage(QWidget):
         actions.addStretch()
         card_layout.addLayout(actions)
 
+        danger_divider = QFrame()
+        danger_divider.setFrameShape(QFrame.Shape.HLine)
+        danger_divider.setObjectName("divider")
+        card_layout.addWidget(danger_divider)
+
+        danger_title = QLabel("Delete account")
+        danger_title.setProperty("role", "heading")
+        danger_message = QLabel(
+            "Disable this account now and permanently delete it after a 14-day "
+            "recovery period."
+        )
+        danger_message.setProperty("role", "muted")
+        danger_message.setWordWrap(True)
+        self.delete_account_button = QPushButton("Delete Account")
+        self.delete_account_button.setProperty("variant", "danger")
+        self.delete_account_button.clicked.connect(self.confirm_account_deletion)
+        danger_actions = QHBoxLayout()
+        danger_actions.addWidget(self.delete_account_button)
+        danger_actions.addStretch()
+        card_layout.addWidget(danger_title)
+        card_layout.addWidget(danger_message)
+        card_layout.addLayout(danger_actions)
+
         card_row.addWidget(card, 1)
         card_row.addStretch()
         layout.addLayout(card_row)
         layout.addStretch()
 
         self.reset_form()
+
+    def confirm_account_deletion(self) -> None:
+        dialog = AccountDeletionConfirmationDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.account_deletion_requested.emit()
 
     @staticmethod
     def _split_name(full_name: str) -> tuple[str, str]:
@@ -296,9 +363,7 @@ class ProfilePage(QWidget):
         first, last = self._split_name(self.user_data.get("full_name"))
         self.first_name_input.setText(first)
         self.last_name_input.setText(last)
-        self.display_name_input.setText(
-            self.user_data.get("display_name") or self.user_data.get("username") or ""
-        )
+        self.username_input.setText(self.user_data.get("username") or "")
         self.selected_photo_path = None
         self.status_label.clear()
         if self.user_data.get("avatar_path"):
@@ -311,20 +376,17 @@ class ProfilePage(QWidget):
         """Validate and ask for confirmation before applying profile changes."""
         first = self.first_name_input.text().strip()
         last = self.last_name_input.text().strip()
-        display_name = self.display_name_input.text().strip()
-        if not first or not display_name:
-            self.status_label.setText("First Name and Display Name are required.")
+        username = self.username_input.text().strip()
+        if not first or not username:
+            self.status_label.setText("First Name and Username are required.")
             return
 
         full_name = " ".join(part for part in (first, last) if part)
         changes = []
         if full_name != str(self.user_data.get("full_name") or ""):
-            changes.append("Your first and last name will be updated for this app session.")
-        current_display_name = (
-            self.user_data.get("display_name") or self.user_data.get("username") or ""
-        )
-        if display_name != str(current_display_name):
-            changes.append("Your display name will be updated for this app session.")
+            changes.append("Your first and last name will be saved to your account.")
+        if username != str(self.user_data.get("username") or ""):
+            changes.append("Your username will be saved to your account.")
         if self.selected_photo_path:
             changes.append("Your new profile photo will be uploaded to private storage.")
 
@@ -339,49 +401,140 @@ class ProfilePage(QWidget):
     def save_changes(self) -> None:
         first = self.first_name_input.text().strip()
         last = self.last_name_input.text().strip()
-        display_name = self.display_name_input.text().strip()
-        if not first or not display_name:
-            self.status_label.setText("First Name and Display Name are required.")
+        username = self.username_input.text().strip()
+        if not first or not username:
+            self.status_label.setText("First Name and Username are required.")
             return
+
+        full_name = " ".join(part for part in (first, last) if part)
+        profile_changed = (
+            username != str(self.user_data.get("username") or "")
+            or full_name != str(self.user_data.get("full_name") or "")
+        )
+        if not profile_changed and not self.selected_photo_path:
+            self.status_label.setText("No profile changes to save.")
+            return
+
         avatar_path = self.user_data.get("avatar_path")
+        profile_saved = False
         photo_uploaded = False
-        if self.selected_photo_path:
-            self.save_button.setEnabled(False)
-            self.status_label.setText("Uploading private profile photo...")
-            QApplication.processEvents()
-            try:
-                response = APIClient.upload_avatar(self.selected_photo_path)
-                if not response.ok:
-                    try:
-                        detail = response.json().get("detail", "Avatar upload failed.")
-                    except (ValueError, AttributeError):
-                        detail = "Avatar upload failed."
-                    self.status_label.setText(str(detail))
+        self.save_button.setEnabled(False)
+        QApplication.processEvents()
+        try:
+            if profile_changed:
+                self.status_label.setText("Saving profile information...")
+                QApplication.processEvents()
+                try:
+                    response = APIClient.update_profile(username, full_name)
+                except requests.RequestException:
+                    self.status_label.setText(
+                        "Cannot save profile information. Check your connection."
+                    )
                     return
-                payload = response.json()
+                if not response.ok:
+                    self.status_label.setText(self._response_detail(
+                        response, "Profile information could not be saved."
+                    ))
+                    return
+                try:
+                    payload = response.json()
+                except (ValueError, AttributeError):
+                    self.status_label.setText("Profile update returned an invalid response.")
+                    return
+                saved_username = payload.get("username")
+                saved_full_name = payload.get("full_name")
+                if not isinstance(saved_username, str) or not isinstance(saved_full_name, str):
+                    self.status_label.setText("Profile update returned an invalid response.")
+                    return
+                username = saved_username
+                full_name = saved_full_name
+                avatar_path = payload.get("avatar_path", avatar_path)
+                self.user_data.update({
+                    "username": username,
+                    "full_name": full_name,
+                    "avatar_path": avatar_path,
+                })
+                profile_saved = True
+
+            if self.selected_photo_path:
+                self.status_label.setText("Uploading private profile photo...")
+                QApplication.processEvents()
+                try:
+                    response = APIClient.upload_avatar(self.selected_photo_path)
+                except (OSError, ValueError, requests.RequestException):
+                    if profile_saved:
+                        self.profile_updated.emit(self._current_profile_update())
+                        self.status_label.setText(
+                            "Profile information was saved, but the photo could not be uploaded."
+                        )
+                    else:
+                        self.status_label.setText(
+                            "Cannot upload the profile photo. Check your connection."
+                        )
+                    return
+                if not response.ok:
+                    detail = self._response_detail(response, "Avatar upload failed.")
+                    if profile_saved:
+                        self.profile_updated.emit(self._current_profile_update())
+                        self.status_label.setText(
+                            "Profile information was saved, but the photo could not be uploaded. "
+                            + detail
+                        )
+                    else:
+                        self.status_label.setText(detail)
+                    return
+                try:
+                    payload = response.json()
+                except (ValueError, AttributeError):
+                    self._show_photo_failure(
+                        "Avatar upload returned an invalid response.", profile_saved
+                    )
+                    return
                 avatar_path = payload.get("avatar_path")
                 if not isinstance(avatar_path, str) or not avatar_path:
-                    self.status_label.setText("Avatar upload returned an invalid response.")
+                    self._show_photo_failure(
+                        "Avatar upload returned an invalid response.", profile_saved
+                    )
                     return
                 photo_uploaded = True
-            except (OSError, ValueError, requests.RequestException):
-                self.status_label.setText(
-                    "Cannot upload the profile photo. Check your connection."
-                )
-                return
-            finally:
-                self.save_button.setEnabled(True)
+        finally:
+            self.save_button.setEnabled(True)
 
         updated = {
-            "full_name": " ".join(part for part in (first, last) if part),
-            "display_name": display_name,
+            "username": username,
+            "full_name": full_name,
             "avatar_path": avatar_path,
         }
         self.user_data.update(updated)
         self.selected_photo_path = None
-        self.status_label.setText(
-            "Profile photo saved privately. Name changes are kept for this app session."
-            if photo_uploaded else
-            "Name changes are kept for this app session."
-        )
+        if profile_saved and photo_uploaded:
+            self.status_label.setText("Profile information and photo saved.")
+        elif photo_uploaded:
+            self.status_label.setText("Profile photo saved privately.")
+        else:
+            self.status_label.setText("Profile information saved.")
         self.profile_updated.emit(updated)
+
+    def _current_profile_update(self) -> dict:
+        return {
+            "username": self.user_data.get("username"),
+            "full_name": self.user_data.get("full_name"),
+            "avatar_path": self.user_data.get("avatar_path"),
+        }
+
+    def _show_photo_failure(self, detail: str, profile_saved: bool) -> None:
+        if profile_saved:
+            self.profile_updated.emit(self._current_profile_update())
+            self.status_label.setText(
+                "Profile information was saved, but the photo upload failed. " + detail
+            )
+        else:
+            self.status_label.setText(detail)
+
+    @staticmethod
+    def _response_detail(response, fallback: str) -> str:
+        try:
+            detail = response.json().get("detail", fallback)
+        except (ValueError, AttributeError):
+            detail = fallback
+        return str(detail)

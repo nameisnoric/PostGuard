@@ -1,15 +1,19 @@
 """Authenticated user profile endpoints."""
 
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from PIL import Image, ImageOps, UnidentifiedImageError
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.user import User
-from app.routers.auth import get_current_user
+from app.routers.auth import get_authenticated_user, get_current_user
+from app.schemas.user import UserProfileUpdate, UserResponse
 from app.services.avatar_storage import (
     AvatarStorageError, SupabaseAvatarStorage, get_avatar_storage,
 )
@@ -20,6 +24,90 @@ MAX_AVATAR_BYTES = 5 * 1024 * 1024
 MAX_AVATAR_PIXELS = 25_000_000
 AVATAR_SIZE = (400, 400)
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
+ACCOUNT_DELETION_DELAY = timedelta(days=14)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+@router.post("/deletion-request", response_model=UserResponse)
+def request_account_deletion(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Place an active account in the required 14-day recovery period."""
+    requested_at = utc_now()
+    current_user.account_status = "PENDING_DELETION"
+    current_user.deletion_requested_at = requested_at
+    current_user.deletion_scheduled_for = requested_at + ACCOUNT_DELETION_DELAY
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.delete("/deletion-request", response_model=UserResponse)
+def cancel_account_deletion(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    """Recover an account while its 14-day recovery period is still open."""
+    if current_user.account_status != "PENDING_DELETION":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Account does not have a pending deletion request.",
+        )
+    deadline = current_user.deletion_scheduled_for
+    if deadline is None or as_utc(deadline) <= utc_now():
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="The account recovery period has ended.",
+        )
+    current_user.account_status = "ACTIVE"
+    current_user.deletion_requested_at = None
+    current_user.deletion_scheduled_for = None
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("", response_model=UserResponse, status_code=status.HTTP_200_OK)
+def update_profile(
+    profile: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist the signed-in user's username and full name."""
+    username_owner = db.scalar(
+        select(User).where(
+            User.username == profile.username,
+            User.id != current_user.id,
+        )
+    )
+    if username_owner:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username is already in use.",
+        )
+
+    current_user.username = profile.username
+    current_user.full_name = profile.full_name
+    try:
+        db.commit()
+        db.refresh(current_user)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username is already in use.",
+        ) from exc
+    return current_user
 
 
 def normalize_avatar(content: bytes) -> bytes:

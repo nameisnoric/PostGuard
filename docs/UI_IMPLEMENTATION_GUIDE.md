@@ -160,7 +160,17 @@ Risk Score History และ Blink Rate History ยังไม่เชื่�
 - `desktop/app/ui/pages/camera_preview_page.py` — ตรวจภาพก่อนสร้าง baseline
 - `desktop/app/ui/pages/baseline_page.py` — calibration และบันทึก baseline
 - `desktop/app/ui/pages/alert_history_dialog.py` — session alert viewer with loading, error and empty states
-- `desktop/app/ui/pages/profile_page.py` — Figma-aligned profile form, local photo preview and session-only edits
+- `desktop/app/ui/pages/profile_page.py` — Figma-aligned profile form, private photo management and persistent username/full-name edits
+- `desktop/app/ui/account_recovery_window.py` — restricted 14-day account recovery screen
+
+บัญชีที่ส่งคำขอลบจะเปลี่ยนเป็น `PENDING_DELETION` ทันที และ API ปกติจะถูกปิดกั้น
+ผู้ใช้ login ได้เฉพาะหน้ากู้คืนภายใน 14 วัน Backend ตรวจบัญชีครบกำหนดตอนเริ่มระบบและทุก 6 ชั่วโมง
+จากนั้นลบข้อมูลที่อ้างอิงผ่าน foreign-key cascade และรูปใน private storage คำสั่งต่อไปนี้ใช้ตรวจหรือสั่ง cleanup เพิ่มเติมด้วยตนเองได้:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m scripts.purge_deleted_accounts
+```
 - `desktop/app/ui/login_window.py` — login card and authentication entry point
 - `desktop/app/ui/register_window.py` — account registration card and OTP handoff
 - `desktop/app/ui/password_reset_dialog.py` — three-step password reset dialog
