@@ -1,5 +1,7 @@
 """Keep camera preview containers aligned with the actual frame aspect ratio."""
 
+from PySide6.QtWidgets import QSizePolicy
+
 
 def fitted_preview_size(frame_width, frame_height, max_width, max_height):
     """Return the largest frame-sized rectangle inside the given bounds."""
@@ -23,4 +25,9 @@ def fit_preview_label(label, frame_width, frame_height, max_width, max_height):
     )
     if label.width() != width or label.height() != height:
         label.setFixedSize(width, height)
+    label.setSizePolicy(
+        QSizePolicy.Policy.Fixed,
+        QSizePolicy.Policy.Fixed,
+    )
+    label.updateGeometry()
     return width, height

@@ -9,7 +9,6 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QSizePolicy
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtTest import QTest
@@ -109,12 +108,12 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.show_monitoring_page(self.camera, 2)
         self.assertEqual(self.window.monitoring_page.session_id, 3)
 
-    def test_saved_camera_selection_opens_preview(self):
+    def test_detected_camera_selection_opens_preview(self):
         setup = self.window.camera_setup_page
-        setup.saved_cameras = [self.camera]
-        setup.current_source = "saved"
+        setup.detected_cameras = [self.camera]
         setup.camera_list.clear()
         setup.camera_list.addItem("Test (640x360)")
+        setup.camera_list.setEnabled(True)
         setup.camera_list.setCurrentRow(0)
 
         setup.handle_continue()
@@ -143,17 +142,20 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(calibration.maximumWidth(), 820)
         self.assertEqual(monitor.size().width(), 720)
         self.assertEqual(monitor.size().height(), 405)
-        preview_item = self.window.camera_preview_page.layout().itemAt(6)
-        preview_label_item = preview_item.layout().itemAt(1)
-        self.assertEqual(
-            preview_label_item.alignment(),
-            Qt.AlignmentFlag.AlignCenter,
-        )
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
             "All Alert Events",
         )
         self.assertFalse(hasattr(self.window, "alert_history_button"))
+
+    def test_camera_preview_is_horizontally_centered_after_frame_resize(self):
+        self.window.show_camera_preview(self.camera)
+        self.window.camera_preview_page.update_frame()
+        self.app.processEvents()
+
+        page = self.window.camera_preview_page
+        preview_center = page.preview_label.mapTo(page, page.preview_label.rect().center()).x()
+        self.assertLessEqual(abs(preview_center - page.rect().center().x()), 2)
 
     def test_main_window_uses_centered_resizable_desktop_size(self):
         self.assertEqual(self.window.width(), 1280)

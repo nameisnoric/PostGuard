@@ -1,417 +1,144 @@
-from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QFrame,
-    QLabel,
-    QPushButton,
-    QListWidget,
-    QMessageBox
-)
+"""Select a physical camera before preview and camera preparation."""
+
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-import requests
-
-from app.services.api_client import APIClient
 from app.services.camera_service import CameraService
+
 
 class CameraSetupPage(QWidget):
     camera_selected = Signal(dict)
 
     def __init__(self):
         super().__init__()
-
-        # เก็บข้อมูล camera ที่ได้จาก Backend
-        self.saved_cameras = []
+        self.setProperty("page", True)
         self.detected_cameras = []
-        self.current_source = None
-        
-        # -------------------------
-        # Layout
-        # -------------------------
 
         layout = QVBoxLayout(self)
-        self.setProperty("page", True)
         layout.setContentsMargins(140, 36, 140, 48)
         layout.setSpacing(12)
 
-        # -------------------------
-        # Title
-        # -------------------------
-
-        self.title_label = QLabel(
-            "Set up your camera"
+        title = QLabel("Set up your camera")
+        title.setProperty("role", "title")
+        description = QLabel(
+            "Step 1 of 4  ·  Scan this device and select the camera you want to use."
         )
-        self.title_label.setProperty("role", "title")
-
-        self.description_label = QLabel(
-            "Step 1 of 4  ·  Select a camera, then check its preview."
-        )
-        self.description_label.setProperty("role", "muted")
-
-        # -------------------------
-        # Camera List
-        # -------------------------
-
-        self.camera_list = QListWidget()
-        self.camera_list.setMinimumHeight(220)
-
-        # -------------------------
-        # Buttons
-        # -------------------------
-
-        self.refresh_button = QPushButton(
-            "Refresh Cameras"
-        )
-
-        self.continue_button = QPushButton(
-            "Check Camera"
-        )
-        
-        self.scan_button = QPushButton(
-            "Scan Webcam"
-        )
-
-        # ยังไม่ให้กด Continue
-        # จนกว่าจะเลือก camera
-        self.continue_button.setEnabled(False)
-
-        # -------------------------
-        # Add Widgets
-        # -------------------------
-
-        layout.addWidget(
-            self.title_label
-        )
-
-        layout.addWidget(
-            self.description_label
-        )
+        description.setProperty("role", "muted")
+        layout.addWidget(title)
+        layout.addWidget(description)
 
         card = QFrame()
         card.setProperty("card", True)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(22, 20, 22, 20)
         card_layout.setSpacing(12)
-        card_layout.addWidget(QLabel("Available cameras"))
-        card_layout.addWidget(self.camera_list)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(self.scan_button)
-        button_layout.addWidget(self.refresh_button)
-        button_layout.addStretch()
-        self.continue_button.setProperty("variant", "primary")
-        button_layout.addWidget(self.continue_button)
-        card_layout.addLayout(button_layout)
-        layout.addWidget(card)
-        help_label = QLabel(
-            "Camera permission is required. Scan again if your webcam is not listed."
+
+        heading = QLabel("Cameras connected to this device")
+        heading.setProperty("role", "heading")
+        self.status_label = QLabel(
+            "Select Scan Cameras to look for an available webcam."
         )
-        help_label.setProperty("role", "muted")
-        help_label.setWordWrap(True)
-        layout.addWidget(help_label)
+        self.status_label.setProperty("role", "muted")
+        self.status_label.setWordWrap(True)
+        card_layout.addWidget(heading)
+        card_layout.addWidget(self.status_label)
+
+        self.camera_list = QListWidget()
+        self.camera_list.setMinimumHeight(220)
+        self.camera_list.setEnabled(False)
+        card_layout.addWidget(self.camera_list)
+
+        actions = QHBoxLayout()
+        self.scan_button = QPushButton("Scan Cameras")
+        self.continue_button = QPushButton("Check Camera")
+        self.continue_button.setProperty("variant", "primary")
+        self.continue_button.setEnabled(False)
+        actions.addWidget(self.scan_button)
+        actions.addStretch()
+        actions.addWidget(self.continue_button)
+        card_layout.addLayout(actions)
+        layout.addWidget(card)
+
+        privacy = QLabel(
+            "Camera access stays on this device. Scanning checks which camera can "
+            "provide a frame; it does not save or upload an image."
+        )
+        privacy.setProperty("role", "muted")
+        privacy.setWordWrap(True)
+        layout.addWidget(privacy)
         layout.addStretch()
 
-        # -------------------------
-        # Events
-        # -------------------------
+        self.scan_button.clicked.connect(self.scan_webcams)
+        self.camera_list.itemSelectionChanged.connect(self.handle_selection)
+        self.camera_list.itemDoubleClicked.connect(self.handle_continue)
+        self.continue_button.clicked.connect(self.handle_continue)
 
-        self.refresh_button.clicked.connect(
-            self.load_cameras
-        )
-
-        self.camera_list.itemSelectionChanged.connect(
-            self.handle_selection
-        )
-
-        self.continue_button.clicked.connect(
-            self.handle_continue
-        )
-        
-        self.scan_button.clicked.connect(
-            self.scan_webcams
-        )
-
-        # # โหลด camera ครั้งแรก
-        # self.load_cameras()
-
-    def load_cameras(self):
-        try:
-            response = APIClient.get_cameras()
-
-        except requests.RequestException:
-            QMessageBox.critical(
-                self,
-                "PostGuard",
-                "Cannot connect to the PostGuard server."
-            )
-            return
-
-        print(
-            "CAMERAS STATUS:",
-            response.status_code
-        )
-
-        print(
-            "CAMERAS RESPONSE:",
-            response.text
-        )
-
-        if not response.ok:
-            QMessageBox.warning(
-                self,
-                "PostGuard",
-                "Unable to load cameras."
-            )
-            return
-
-        self.saved_cameras = response.json()
-        self.current_source = "saved"
-
-        self.camera_list.clear()
-
-        if not self.saved_cameras:
-            self.camera_list.addItem(
-                "No cameras found."
-            )
-
-            self.continue_button.setEnabled(
-                False
-            )
-
-            return
-
-        for camera in self.saved_cameras:
-            camera_name = camera.get(
-                "camera_name",
-                "Unknown Camera"
-            )
-
-            width = camera.get(
-                "resolution_width"
-            )
-
-            height = camera.get(
-                "resolution_height"
-            )
-
-            if width and height:
-                display_text = (
-                    f"{camera_name} "
-                    f"({width}x{height})"
-                )
-
-            else:
-                display_text = camera_name
-
-            self.camera_list.addItem(
-                display_text
-            )
-            
-            self.camera_list.setCurrentRow(0)
-            self.continue_button.setEnabled(True)
-
-    def handle_selection(self):
-
-        selected_row = self.camera_list.currentRow()
-
-        print(
-            "SELECTED ROW:",
-            selected_row
-        )
-
-        if self.current_source == "detected":
-            camera_count = len(
-                self.detected_cameras
-            )
-
-        elif self.current_source == "saved":
-            camera_count = len(
-                self.saved_cameras
-            )
-
-        else:
-            camera_count = 0
-
-        print(
-            "CURRENT SOURCE:",
-            self.current_source
-        )
-
-        print(
-            "CAMERA COUNT:",
-            camera_count
-        )
-
-        if 0 <= selected_row < camera_count:
-            self.continue_button.setEnabled(True)
-
-        else:
-            self.continue_button.setEnabled(False)
-
-    def handle_continue(self):
-
-        selected_row = self.camera_list.currentRow()
-
-        print(
-            "CONTINUE SELECTED ROW:",
-            selected_row
-        )
-
-        print(
-            "CURRENT SOURCE:",
-            self.current_source
-        )
-
-    # --------------------------------
-    # ยังไม่ได้เลือก Camera
-    # --------------------------------
-
-        if selected_row < 0:
-            QMessageBox.warning(
-                self,
-                "PostGuard",
-                "Please select a camera."
-            )
-            return
-
-    # --------------------------------
-    # Physical Webcam จาก OpenCV
-    # --------------------------------
-
-        if self.current_source == "detected":
-
-            if selected_row >= len(
-                self.detected_cameras
-            ):
-                return
-
-            selected_camera = (
-                self.detected_cameras[
-                    selected_row
-                ]
-            )
-
-            print(
-                "SELECTED WEBCAM:",
-                selected_camera
-            )
-
-            self.camera_selected.emit(
-                selected_camera
-            )
-    # --------------------------------
-    # Camera ที่บันทึกใน Database
-    # --------------------------------
-
-        elif self.current_source == "saved":
-
-            if selected_row >= len(
-                self.saved_cameras
-            ):
-                return
-
-            selected_camera = (
-                self.saved_cameras[
-                    selected_row
-                ]
-            )
-
-            print(
-                "SELECTED SAVED CAMERA:",
-                selected_camera
-            )
-
-            camera_name = selected_camera.get(
-                "camera_name",
-                "Unknown Camera"
-            )
-
-            QMessageBox.information(
-                self,
-                "PostGuard",
-                (
-                    "Saved camera selected.\n\n"
-                    f"Camera: {camera_name}"
-                )
-            )
-
-            self.camera_selected.emit(
-                selected_camera
-            )
-
-    # --------------------------------
-    # ไม่มี Source
-    # --------------------------------
-
-        else:
-
-            QMessageBox.warning(
-                self,
-                "PostGuard",
-                "Please scan or load cameras first."
-            )
-        
     def scan_webcams(self):
-
         self.scan_button.setEnabled(False)
-
-        self.scan_button.setText(
-            "Scanning..."
-        )
+        self.scan_button.setText("Scanning...")
+        self.continue_button.setEnabled(False)
+        self.camera_list.clear()
+        self.camera_list.setEnabled(False)
+        self.status_label.setText("Checking cameras connected to this device...")
+        QApplication.processEvents()
 
         try:
             cameras = CameraService.scan_cameras()
-
+        except (OSError, RuntimeError, ValueError) as error:
+            self.detected_cameras = []
+            self.status_label.setText("Camera scan failed. Check camera permission.")
+            QMessageBox.warning(self, "Camera Scan", str(error))
+            return
         finally:
             self.scan_button.setEnabled(True)
-
-            self.scan_button.setText(
-                "Scan Webcams"
-            )
+            self.scan_button.setText("Scan Again")
 
         self.detected_cameras = cameras
-        self.current_source = "detected"
-
-        self.camera_list.clear()
-
         if not cameras:
-            self.camera_list.addItem(
-                "No webcam detected."
+            self.status_label.setText(
+                "No available camera was found. Check Windows camera permission "
+                "and make sure another application is not using the camera."
             )
-
-            self.continue_button.setEnabled(
-                False
-            )
-
             return
 
-        for camera in self.detected_cameras:
-
-            camera_name = camera.get(
-                "camera_name",
-                "Unknown Camera"
-            )
-
-            width = camera.get(
-                "resolution_width"
-            )
-
-            height = camera.get(
-                "resolution_height"
-            )
-
-            device_index = camera.get(
-                "device_index"
-            )
-
-            display_text = (
-                f"{camera_name} "
-                f"[Device {device_index}] "
-                f"({width}x{height})"
-            )
-
+        for camera in cameras:
+            name = camera.get("camera_name", "Unknown Camera")
+            device_index = camera.get("device_index", "--")
+            width = camera.get("resolution_width", "--")
+            height = camera.get("resolution_height", "--")
             self.camera_list.addItem(
-                display_text
+                f"{name}  ·  Device {device_index}  ·  {width}×{height}"
             )
-            self.camera_list.setCurrentRow(0)
-            self.continue_button.setEnabled(True)
+
+        count = len(cameras)
+        noun = "camera" if count == 1 else "cameras"
+        self.status_label.setText(
+            f"Found {count} available {noun}. Select one to check its preview."
+        )
+        self.camera_list.setEnabled(True)
+        self.camera_list.setCurrentRow(0)
+
+    def handle_selection(self):
+        row = self.camera_list.currentRow()
+        self.continue_button.setEnabled(0 <= row < len(self.detected_cameras))
+
+    def handle_continue(self, *_args):
+        row = self.camera_list.currentRow()
+        if not 0 <= row < len(self.detected_cameras):
+            QMessageBox.warning(
+                self,
+                "Camera Setup",
+                "Scan and select an available camera first.",
+            )
+            return
+        self.camera_selected.emit(self.detected_cameras[row].copy())

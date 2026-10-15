@@ -188,13 +188,9 @@ class CameraPreviewPage(QWidget):
         )
         
         preview_row = QHBoxLayout()
-        preview_row.addStretch()
-        preview_row.addWidget(
-            self.preview_label,
-            0,
-            Qt.AlignmentFlag.AlignCenter,
-        )
-        preview_row.addStretch()
+        preview_row.addStretch(1)
+        preview_row.addWidget(self.preview_label)
+        preview_row.addStretch(1)
         layout.addLayout(preview_row, 1)
 
         layout.addLayout(
