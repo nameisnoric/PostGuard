@@ -1,14 +1,16 @@
-# Virtual environment
+# Virtual environments
 .venv/
-
-# Environment variables
-.env
+venv/
+desktop/.venv/
+backend/.venv/
 
 # Python cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
 
 # IDE
 .vscode/
@@ -17,3 +19,16 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build
+build/
+dist/
+*.spec
+
+# Generated test results
+camera_card/tests/tilt_results/
+camera_card/mediapipe_detection/tests/detection_visual_results/
+camera_card/mediapipe_detection/tests/results/# Generated test results
+camera_card/tests/tilt_results/
+camera_card/mediapipe_detection/tests/detection_visual_results/
+camera_card/mediapipe_detection/tests/results/
