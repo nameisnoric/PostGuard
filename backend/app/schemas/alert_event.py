@@ -28,6 +28,7 @@ class AlertEventResponse(BaseModel):
     risk_level: str
     started_at: datetime
     ended_at: datetime | None
-    duration: int
+    duration: int | None
+    incomplete: bool = False
 
     model_config = ConfigDict(from_attributes=True)

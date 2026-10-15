@@ -15,6 +15,14 @@ router = APIRouter(
     tags=["Alert Events"]
 )
 
+
+def _alert_response(alert, session):
+    result = AlertEventResponse.model_validate(alert)
+    if session.status == "INTERRUPTED" and alert.ended_at is None:
+        result.incomplete = True
+        result.duration = None
+    return result
+
 @router.post(
     "/sessions/{session_id}/alerts",
     response_model=AlertEventResponse,
@@ -127,6 +135,10 @@ def end_alert_event(
             detail="Alert event has already ended"
         )
 
+    session = db.get(PostureSession, alert_event.session_id)
+    if session.status == "INTERRUPTED":
+        raise HTTPException(status_code=409, detail="Interrupted alert end time is unknown")
+
     now = datetime.now(timezone.utc)
 
     duration_seconds = int(
@@ -176,7 +188,7 @@ def get_session_alerts(
 
     alert_events = db.scalars(alert_statement).all()
 
-    return alert_events
+    return [_alert_response(alert, posture_session) for alert in alert_events]
 
 @router.get(
     "/alerts/{event_id}",
@@ -208,4 +220,4 @@ def get_alert_event(
             detail="Alert event not found"
         )
 
-    return alert_event
+    return _alert_response(alert_event, db.get(PostureSession, alert_event.session_id))

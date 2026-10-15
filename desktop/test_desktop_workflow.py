@@ -43,6 +43,7 @@ class DesktopWorkflowTests(unittest.TestCase):
             detector = self.stack.enter_context(patch(f"app.ui.pages.{module}.DetectionService"))
             detector.return_value.process_frame.return_value = self.result
         self.stack.enter_context(patch.object(APIClient, "get_cameras", return_value=response([])))
+        self.stack.enter_context(patch.object(APIClient, "get_sessions", return_value=response([])))
         self.stack.enter_context(patch.object(APIClient, "create_camera", return_value=response(self.camera, 201)))
         self.stack.enter_context(patch.object(APIClient, "create_personal_baseline", return_value=response(self.baseline, 201)))
         self.stack.enter_context(patch.object(APIClient, "get", return_value=response(self.baseline)))
@@ -133,7 +134,10 @@ class DesktopWorkflowTests(unittest.TestCase):
         monitor = self.window.monitoring_page
         self.window.show_dashboard()
         self.assertFalse(monitor.isVisible())
-        QTest.qWait(200)
+        for _ in range(20):
+            if monitor.detection_count:
+                break
+            QTest.qWait(50)
         self.assertGreater(monitor.detection_count, 0)
         with patch.object(APIClient, "get", return_value=response([])):
             self.window.show_history()

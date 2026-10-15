@@ -302,6 +302,33 @@ def get_sessions(
 
     return sessions
 
+
+@router.post("/{session_id}/interrupt", response_model=SessionResponse)
+def interrupt_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Explicitly abandon an unclosed session; its actual end time is unknown."""
+    posture_session = db.scalar(
+        select(PostureSession).where(
+            PostureSession.session_id == session_id,
+            PostureSession.user_id == current_user.id,
+        ).with_for_update()
+    )
+    if posture_session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if posture_session.status == "INTERRUPTED":
+        return posture_session  # Safe retry after a lost response.
+    if posture_session.status not in ("RUNNING", "PAUSED"):
+        raise HTTPException(status_code=409, detail="Only an active session can be interrupted")
+    posture_session.status = "INTERRUPTED"
+    # Do not invent ended_at, elapsed time, alert durations or detection samples.
+    # Unclosed alerts retain their unknown end and are displayed as incomplete.
+    db.commit()
+    db.refresh(posture_session)
+    return posture_session
+
 @router.get(
     "/{session_id}",
     response_model=SessionResponse,

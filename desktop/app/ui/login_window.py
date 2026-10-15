@@ -35,6 +35,8 @@ class LoginWindow(QWidget):
 
         self.login_button = QPushButton("Login")
         self.register_button = QPushButton("Create Account")
+        self.forgot_password_button = QPushButton("Forgot Password?")
+        self.forgot_password_button.clicked.connect(self.open_password_reset)
         self.login_button.clicked.connect(
             self.handle_login
         )
@@ -49,6 +51,7 @@ class LoginWindow(QWidget):
         layout.addWidget(self.password_input)
         layout.addWidget(self.login_button)
         layout.addWidget(self.register_button)
+        layout.addWidget(self.forgot_password_button)
 
         self.setLayout(layout)
 
@@ -73,9 +76,6 @@ class LoginWindow(QWidget):
                 "Cannot connect to the PostGuard server."
             )
             return
-
-        print("LOGIN STATUS:", response.status_code)
-        print("LOGIN RESPONSE:", response.text)
 
         if response.status_code != 200:
             self.show_error(
@@ -108,9 +108,6 @@ class LoginWindow(QWidget):
             )
             return
 
-        print("ME STATUS:", me_response.status_code)
-        print("ME RESPONSE:", me_response.text)
-
         if me_response.status_code != 200:
             TokenStore.clear_token()
 
@@ -127,6 +124,16 @@ class LoginWindow(QWidget):
 
         self.main_window.show()
         self.close()
+        self.main_window.check_previous_sessions()
+
+    def open_password_reset(self):
+        from app.ui.password_reset_dialog import PasswordResetDialog
+
+        dialog = PasswordResetDialog(self, email=self.email_input.text().strip())
+        if dialog.exec() == dialog.DialogCode.Accepted:
+            self.email_input.setText(dialog.email)
+            self.password_input.clear()
+            self.password_input.setFocus()
 
     def open_register(self):
         from app.ui.register_window import RegisterWindow

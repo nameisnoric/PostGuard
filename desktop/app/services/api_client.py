@@ -6,6 +6,31 @@ from app.core.token_store import TokenStore
 
 class APIClient:
     @staticmethod
+    def request_password_reset(email: str):
+        return APIClient.post("/auth/forgot-password", {"email": email})
+
+    @staticmethod
+    def verify_reset_otp(email: str, otp: str):
+        return APIClient.post("/auth/verify-reset-otp", {"email": email, "otp": otp})
+
+    @staticmethod
+    def reset_password(reset_token: str, new_password: str):
+        return APIClient.post(
+            "/auth/reset_password",
+            {"reset_token": reset_token, "new_password": new_password},
+        )
+
+    @staticmethod
+    def get_sessions():
+        return APIClient.get("/sessions")
+
+    @staticmethod
+    def interrupt_session(session_id: int):
+        if type(session_id) is not int or session_id <= 0:
+            raise ValueError("A valid session_id is required.")
+        return APIClient.post(f"/sessions/{session_id}/interrupt")
+
+    @staticmethod
     def _get_headers() -> dict:
         headers = {"Content-Type": "application/json"}
         token = TokenStore.get_token()

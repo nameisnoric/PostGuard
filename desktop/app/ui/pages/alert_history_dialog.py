@@ -127,6 +127,7 @@ class AlertHistoryDialog(QDialog):
         self.stats_label.setText(
             f"Total: {stats['total_alerts']} | Closed: {stats['closed_alerts']} | "
             f"Active: {stats['active_alerts']} | "
+            f"Incomplete: {stats['incomplete_alerts']} | "
             f"Sum of closed alert-open durations: {stats['closed_alert_seconds']} s"
         )
         self.table.setRowCount(len(alerts))
@@ -139,7 +140,7 @@ class AlertHistoryDialog(QDialog):
                 local_datetime(alert.get("started_at")),
                 local_datetime(ended),
                 alert.get("duration", "--") if ended else "--",
-                "CLOSED" if ended else "ACTIVE",
+                "INCOMPLETE" if alert.get("incomplete") else "CLOSED" if ended else "ACTIVE",
             ]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(str(value))

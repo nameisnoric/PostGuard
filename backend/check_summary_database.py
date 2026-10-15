@@ -94,6 +94,27 @@ def check():
                 assert loaded.json()["total_alert_count"] == 1
                 assert client.post(url + "/summary", json=payload).status_code == 409
                 assert len(client.get("/summaries").json()) == 1
+                # A crashed instance has no reliable end time or local samples.
+                unclosed = client.post("/sessions/start", json={"camera_id": camera_id, "baseline_id": baseline_id})
+                assert unclosed.status_code == 201
+                unclosed_id = unclosed.json()["session_id"]
+                unclosed_url = f"/sessions/{unclosed_id}"
+                unfinished_alert = client.post(unclosed_url + "/alerts", json={"event_type": "NECK_LATERAL_TILT", "risk_level": "MEDIUM"})
+                assert unfinished_alert.status_code == 201
+                recovered = client.post(unclosed_url + "/interrupt")
+                assert recovered.status_code == 200
+                assert recovered.json()["status"] == "INTERRUPTED"
+                assert recovered.json()["ended_at"] is None
+                assert recovered.json()["total_duration"] is None
+                assert client.post(unclosed_url + "/interrupt").status_code == 200
+                assert client.post(unclosed_url + "/summary", json=payload).status_code == 409
+                incomplete_alerts = client.get(unclosed_url + "/alerts").json()
+                assert incomplete_alerts[0]["incomplete"] is True
+                assert incomplete_alerts[0]["duration"] is None
+                next_session = client.post("/sessions/start", json={"camera_id": camera_id, "baseline_id": baseline_id})
+                assert next_session.status_code == 201
+                assert client.post(f"/sessions/{next_session.json()['session_id']}/interrupt").status_code == 200
+                print("PASS: interrupted recovery, unknown durations, incomplete alert and new session")
                 other = User(email=marker + "_other@ku.th", username=marker + "_other", password_hash=hash_password(password))
                 db.add(other)
                 db.flush()
@@ -104,6 +125,7 @@ def check():
                 assert client.post(url + "/summary", json=payload).status_code == 404
                 assert client.get("/summaries").json() == []
                 assert client.get(url + "/alerts").status_code == 404
+                assert client.post(unclosed_url + "/interrupt").status_code == 404
                 client.headers.pop("Authorization")
                 assert client.get("/sessions").status_code in (401, 403)
             print("PASS: PostgreSQL camera/baseline/start/alert/pause/resume/end/save/read/duplicate/ownership")

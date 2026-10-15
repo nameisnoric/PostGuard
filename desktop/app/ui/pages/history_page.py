@@ -165,7 +165,7 @@ class HistoryPage(QWidget):
     @staticmethod
     def format_duration(seconds):
         if seconds is None:
-            return "--"
+            return "N/A"
 
         try:
             total = max(0, int(seconds))
@@ -323,6 +323,12 @@ class HistoryPage(QWidget):
             ),
             f"Pause Count: {session.get('pause_count', 0)}",
         ]
+
+        if session.get("status") == "INTERRUPTED":
+            details.append(
+                "Interrupted session: actual end time and detection statistics are unavailable. "
+                "No summary was generated."
+            )
 
         self.details_label.setText(
             "\n".join(details)

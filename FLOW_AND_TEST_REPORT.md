@@ -9,7 +9,7 @@ flowchart TD
     A[เปิด Desktop] --> B[Login]
     A --> R[สมัครสมาชิก → ขอ OTP → ยืนยัน OTP]
     R --> B
-    B --> C[รับ JWT → GET /auth/me → Dashboard]
+    B --> C[รับ JWT → GET /auth/me → ตรวจ Session ค้าง → Dashboard]
     C --> D[Monitor → เลือก/สแกน Webcam]
     D --> E[Camera Preview]
     E --> F[ค้นหาหรือลงทะเบียน Camera ผ่าน API]
@@ -33,6 +33,11 @@ flowchart TD
 - Desktop ใช้ PySide6/OpenCV/MediaPipe; API เป็น FastAPI; ข้อมูลถาวรอยู่ PostgreSQL/Supabase
 - `desktop/app/core/config.py` ชี้ API ไป `http://127.0.0.1:8001`
 - Login เก็บ JWT ใน `TokenStore` ในหน่วยความจำ แล้วแนบ Authorization ใน API requests
+- หลัง Login และก่อนเปิด Monitor/Start จะตรวจ Session RUNNING/PAUSED ที่ไม่มีอยู่ในแอปรอบนี้ หากพบจะให้เลือกจบเป็น INTERRUPTED หรือยกเลิก (ไม่ตัดสินเองว่าเป็น Session เสีย เพราะอาจยังทำงานบนอีกเครื่อง)
+- Session INTERRUPTED เก็บประวัติเดิมและไม่สร้าง Summary; ไม่เติม ended_at ที่ไม่ทราบ API คืน total_duration/paused_duration เป็น null เพื่อให้แสดง N/A โดยไม่แก้ schema หรือเขียนทับตัวเลขดิบที่มีอยู่
+- Alert ที่ยังไม่ปิดใน Session INTERRUPTED แสดง INCOMPLETE, duration=null และไม่นับเป็น active/closed duration; Alert ที่ปิดแล้วคงค่าเดิม
+- Recovery endpoint `POST /sessions/{session_id}/interrupt` ตรวจเจ้าของ รองรับ Retry และไม่อนุญาตให้เปลี่ยน COMPLETED เป็น INTERRUPTED
+- หากตรวจ Session ค้างไม่สำเร็จหรือผู้ใช้ยกเลิก จะไม่เริ่ม Session ใหม่ ผู้ใช้กด Monitor เพื่อทดลองใหม่ได้
 - Baseline ต้องเห็นทั้ง Pose และ Face; เก็บ 30 ตัวอย่าง และตรวจส่วนเบี่ยงเบนมาตรฐานไหล่/คอไม่เกิน 2 องศา หากไม่พบหรือขยับมากจะเริ่มเก็บใหม่
 - Monitoring ใช้ timer 30 ms และตรวจจับทุก 5 เฟรม; อัตราจริงขึ้นกับเวลาประมวลผล
 - Threshold ทดลองเริ่มที่ 0 ซึ่งปิดการจำแนกเอียงคอ ต้องกำหนดมากกว่า 0 ก่อนทดลอง Alert
@@ -68,14 +73,16 @@ flowchart TD
 
 1. **แก้แล้ว — การเปลี่ยนหน้าจบ Session โดยไม่มี Summary:** เอาการจบ Session ออกจาก hideEvent; การเปลี่ยนหน้าคง timer/camera/samples ไว้ ปุ่ม Monitor กลับ Session เดิม ปุ่ม Stop ส่วนกลางเรียก snapshot/end/save
 2. **แก้แล้ว — ปุ่ม Pause ยังเปิดหลัง Stop:** reset สถานะและ disable ปุ่มบนหน้าและ sidebar หลังจบ Session
-3. **Login มี debug print ของ response:** `desktop/app/ui/login_window.py` พิมพ์ login response ซึ่งมี access token ควรนำออกก่อนใช้งานจริง การทดสอบครั้งนี้ไม่เรียก UI login พร้อม token จริงและไม่แสดง token ในผลทดสอบ
+3. **แก้แล้ว — Login มี debug print ของ response:** นำ log ของ Login/Me response ออก และมี test ตรวจว่าไม่พิมพ์ token/password
 4. **Pose จริงยังไม่พบ:** ยังยืนยัน calibration และ monitoring ท่าทางจริงไม่ได้ ต้องจัดกล้องให้เห็นศีรษะและไหล่ทั้งสองข้างแล้วทดสอบใหม่ การตรวจ Face ผ่านไม่เท่ากับ Pose ผ่าน
 
-แก้ข้อ 1–2 และเพิ่ม tests สำหรับ navigation, timer ขณะซ่อนหน้า, ปุ่มส่วนกลาง, Stop ขณะ Pause, Close/Logout สำเร็จและล้มเหลว รวมถึงกล้องอ่านไม่สำเร็จแล้ว Retry End โดยรักษาสถิติไว้ ข้อ 3–4 ยังเป็นข้อจำกัด ไม่ได้แก้ Camera/Detection ของทีม
+แก้ข้อ 1–3 และเพิ่ม tests สำหรับ navigation, timer ขณะซ่อนหน้า, ปุ่มส่วนกลาง, Stop ขณะ Pause, Close/Logout สำเร็จและล้มเหลว รวมถึงกล้องอ่านไม่สำเร็จแล้ว Retry End โดยรักษาสถิติไว้ ข้อ 4 ยังเป็นข้อจำกัด ไม่ได้แก้ Camera/Detection ของทีม
+
+การทดสอบล่าสุดหลังเพิ่ม Session Recovery: Backend 9 tests และ Desktop 56 tests ผ่าน รวมการยกเลิก recovery, เครือข่ายล้มเหลว, response หายแล้วตรวจ GET ซ้ำ, สิทธิ์ข้ามผู้ใช้, ไม่สร้าง Summary เทียม และ Login ไม่พิมพ์ token ทดสอบ recovery บน Supabase ผ่านด้วยข้อมูลชั่วคราวที่ rollback แล้ว ไม่มีการจบ Session ของผู้ใช้จริง
 
 ## ส่วนที่ยังไม่ได้ยืนยัน
 
-- ส่ง/รับ OTP ทางอีเมลจริง, Registration ครบวงจร และ Forgot/Reset Password
+- ส่ง/รับ OTP ทางอีเมลจริง และ Registration ครบวงจร (Password Reset UI/API ผ่านการทดสอบที่จำลองการส่งอีเมลแล้ว)
 - ลำดับ Camera Tilt Correction/Context Filter ตามแบบออกแบบ: ในเส้นทาง Desktop ที่อ่านพบการเรียก Detection โดยตรง ยังไม่ยืนยันการเชื่อมขั้นตอนเหล่านี้
 - ความแม่นยำเชิงมุมและเกณฑ์ความเสี่ยงทางคลินิก
 - เปิด GUI จริงและกดตลอด flow ตั้งแต่ Login จนถึง History ด้วยค่าจาก Webcam จริง
@@ -85,11 +92,11 @@ flowchart TD
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m unittest test_session_summaries -v
+.\.venv\Scripts\python.exe -m unittest test_session_summaries test_session_recovery -v
 # คำสั่งถัดไปเชื่อม DB ที่ตั้งใน .env, ใช้ข้อมูลชั่วคราวแล้ว rollback
 .\.venv\Scripts\python.exe check_summary_database.py --rollback-test
 cd ..\desktop
-.\.venv\Scripts\python.exe -m unittest test_desktop_workflow test_risk_engine test_posture_duration_tracker test_experimental_alert_service test_alert_history_service test_session_summary_service test_saved_report -v
+.\.venv\Scripts\python.exe -m unittest test_session_recovery test_desktop_workflow test_risk_engine test_posture_duration_tracker test_experimental_alert_service test_alert_history_service test_session_summary_service test_saved_report -v
 ```
 
 เปิดแอปจริงด้วยสอง terminal:
@@ -106,4 +113,30 @@ cd desktop
 .\.venv\Scripts\python.exe -m app.main
 ```
 
-สามารถเปลี่ยน Dashboard/History ระหว่างตรวจจับได้ กด **Stop Monitoring** บน sidebar เพื่อจบและบันทึกจากหน้าใดก็ได้ หากบันทึกไม่สำเร็จ ให้ Retry ในหน้า Summary ก่อน Logout/ปิดแอปหรือเริ่ม Session ใหม่ การกู้คืนเมื่อ process ถูกบังคับปิดหรือเครื่องดับยังไม่รองรับ
+สามารถเปลี่ยน Dashboard/History ระหว่างตรวจจับได้ กด **Stop Monitoring** บน sidebar เพื่อจบและบันทึกจากหน้าใดก็ได้ หากบันทึกไม่สำเร็จ ให้ Retry ในหน้า Summary ก่อน Logout/ปิดแอปหรือเริ่ม Session ใหม่ หาก process ถูกบังคับปิดหรือเครื่องดับ เปิดแอปและ Login อีกครั้งเพื่อเลือกจบ Session ค้างเป็น INTERRUPTED ยังไม่มี heartbeat หรือการกู้สถิติที่อยู่ในหน่วยความจำก่อนแอปดับ
+
+## Password Reset Desktop
+
+หน้า Login มีปุ่ม **Forgot Password?** เปิด dialog 3 ขั้นตอน:
+
+1. กรอกอีเมล `@ku.th` → `POST /auth/forgot-password`
+2. กรอก OTP 6 หลัก → `POST /auth/verify-reset-otp` (มี Send New OTP และ Change Email)
+3. กรอกรหัสผ่านใหม่พร้อมยืนยัน → `POST /auth/reset_password` → กลับ Login
+
+ชื่อ endpoint สุดท้ายใช้ underscore ตาม Backend เดิม ไม่ใช่ `/reset-password`
+รหัสผ่านต้องยาวอย่างน้อย 8 ตัว มีตัวใหญ่ ตัวเล็ก ตัวเลข และอักขระพิเศษ OTP มีอายุ 5 นาที และ reset token มีอายุ 10 นาทีตาม Backend
+Reset token อยู่เฉพาะใน dialog ไม่เก็บใน TokenStore และล้างพร้อมช่องรหัสผ่านเมื่อยกเลิกหรือสำเร็จ ไม่พิมพ์ข้อมูลเหล่านี้ลง log
+หากคำขอเปลี่ยนรหัสผ่านขาดการเชื่อมต่อ ระบบจะแจ้งว่าผลยังไม่ยืนยัน และให้ลอง Login ด้วยรหัสใหม่ก่อนขอ reset อีกครั้ง
+
+ทดสอบ Desktop รวม 65 tests ผ่าน (เพิ่ม Password Reset 9 tests) และทดสอบ API บน Supabase ผ่านกรณี OTP ผิด/หมดอายุ, ส่งใหม่, รหัสผ่านไม่ผ่านเงื่อนไข, เปลี่ยนรหัสผ่าน, reset token ใช้ซ้ำ, Login ด้วยรหัสเก่า/ใหม่ โดย mock การส่งอีเมลทั้งหมดและ rollback ข้อมูลทดสอบ ไม่มีการแก้รหัสผ่านบัญชีจริง
+
+```powershell
+# จาก project root
+cd desktop
+.\.venv\Scripts\python.exe -m unittest test_password_reset -v
+cd ..\backend
+# ใช้ฐานข้อมูลที่กำหนดใน .env และ rollback ข้อมูลทดสอบ
+.\.venv\Scripts\python.exe check_password_reset.py --rollback-test
+```
+
+การทดสอบด้วยอีเมลจริงยังต้องทำผ่านหน้า Forgot Password ด้วยบัญชีของผู้ใช้เอง

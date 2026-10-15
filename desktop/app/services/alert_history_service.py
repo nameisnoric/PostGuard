@@ -20,6 +20,7 @@ def summarize_alerts(alerts):
     ids = set()
     active = 0
     closed = 0
+    incomplete = 0
     closed_duration = 0
     event_types = {}
 
@@ -34,7 +35,9 @@ def summarize_alerts(alerts):
         if not isinstance(event_type, str) or not event_type:
             raise ValueError("Invalid event_type")
         event_types[event_type] = event_types.get(event_type, 0) + 1
-        if alert.get("ended_at") is None:
+        if alert.get("incomplete"):
+            incomplete += 1
+        elif alert.get("ended_at") is None:
             active += 1
         else:
             closed += 1
@@ -47,6 +50,7 @@ def summarize_alerts(alerts):
         "total_alerts": len(alerts),
         "active_alerts": active,
         "closed_alerts": closed,
+        "incomplete_alerts": incomplete,
         "closed_alert_seconds": closed_duration,
         "event_type_counts": event_types,
     }

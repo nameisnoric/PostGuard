@@ -23,6 +23,10 @@ from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.alert_history_dialog import add_alert_history_button
 
 from app.services.api_client import APIClient
+from app.services.session_recovery_service import (
+    find_unclosed_sessions,
+    interrupt_previous_session,
+)
 
 class MainWindow(QMainWindow):
 
@@ -32,6 +36,7 @@ class MainWindow(QMainWindow):
         self.user_data = user_data
         self._exit_ready = False
         self._exit_in_progress = False
+        self._recovery_in_progress = False
 
         self.setWindowTitle("PostGuard")
         self.resize(1200, 750)
@@ -286,6 +291,8 @@ class MainWindow(QMainWindow):
             return
         if self._show_unsaved_summary():
             return
+        if not self.check_previous_sessions():
+            return
 
         self.camera_preview_page.stop_preview()
 
@@ -354,6 +361,38 @@ class MainWindow(QMainWindow):
         can_control = active and not monitor.is_stopping
         self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
         self.global_stop_button.setEnabled(can_control)
+
+    def check_previous_sessions(self) -> bool:
+        if self.monitoring_page.session_id is not None:
+            return True
+        if self._recovery_in_progress:
+            return False
+        self._recovery_in_progress = True
+        try:
+            sessions = find_unclosed_sessions()
+            for session in sessions:
+                answer = QMessageBox.question(
+                    self, "Unclosed Session",
+                    f"Session {session['session_id']} is still {session['status']}.\n"
+                    "It may be running on another device.\n\n"
+                    "Mark it as interrupted so you can start a new session?\n"
+                    "Existing records will be kept. The actual end time and lost "
+                    "detection statistics cannot be recovered; no summary will be fabricated.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    self.monitoring_status_label.setText("Previous session unresolved; Monitor to retry")
+                    return False
+                interrupt_previous_session(session["session_id"])
+            self.update_monitoring_controls()
+            return True
+        except (requests.RequestException, RuntimeError, ValueError) as error:
+            self.monitoring_status_label.setText("Session check failed; Monitor to retry")
+            QMessageBox.warning(self, "Session Recovery", str(error))
+            return False
+        finally:
+            self._recovery_in_progress = False
 
     def _show_unsaved_summary(self) -> bool:
         summary = self.session_summary_page.current_summary
@@ -584,6 +623,8 @@ class MainWindow(QMainWindow):
             self.pages.setCurrentWidget(self.monitoring_page)
             return
         if self._show_unsaved_summary():
+            return
+        if not self.check_previous_sessions():
             return
 
         # Switch to Monitoring Page
