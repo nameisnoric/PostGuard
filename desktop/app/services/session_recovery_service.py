@@ -5,6 +5,18 @@ import requests
 from app.services.api_client import APIClient
 
 
+# ``ENDED`` was used by an earlier Desktop/API version. It is a terminal
+# historical state, so it is valid input but must never be recovered as active.
+KNOWN_SESSION_STATUSES = {
+    "RUNNING",
+    "PAUSED",
+    "COMPLETED",
+    "INTERRUPTED",
+    "ENDED",
+}
+ACTIVE_SESSION_STATUSES = {"RUNNING", "PAUSED"}
+
+
 def find_unclosed_sessions() -> list[dict]:
     response = APIClient.get_sessions()
     if not response.ok:
@@ -14,11 +26,11 @@ def find_unclosed_sessions() -> list[dict]:
         not isinstance(item, dict)
         or type(item.get("session_id")) is not int
         or item["session_id"] <= 0
-        or item.get("status") not in ("RUNNING", "PAUSED", "COMPLETED", "INTERRUPTED")
+        or item.get("status") not in KNOWN_SESSION_STATUSES
         for item in sessions
     ):
         raise ValueError("Invalid session list")
-    return [item for item in sessions if item["status"] in ("RUNNING", "PAUSED")]
+    return [item for item in sessions if item["status"] in ACTIVE_SESSION_STATUSES]
 
 
 def interrupt_previous_session(session_id: int) -> None:

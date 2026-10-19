@@ -95,7 +95,7 @@ class HistoryPage(QWidget):
         self.search_input.textChanged.connect(self._apply_filters)
         self.status_filter = QComboBox()
         self.status_filter.addItem("All statuses", "")
-        for status in ("COMPLETED", "RUNNING", "PAUSED", "INTERRUPTED"):
+        for status in ("COMPLETED", "RUNNING", "PAUSED", "INTERRUPTED", "ENDED"):
             self.status_filter.addItem(status.title(), status)
         self.status_filter.currentIndexChanged.connect(self._apply_filters)
         controls.addWidget(self.search_input, 1)

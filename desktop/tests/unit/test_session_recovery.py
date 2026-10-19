@@ -66,6 +66,21 @@ class SessionRecoveryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     find_unclosed_sessions()
 
+    def test_legacy_ended_session_is_valid_but_not_recovered(self):
+        sessions = [
+            {"session_id": 7, "status": "ENDED"},
+            {"session_id": 9, "status": "RUNNING"},
+        ]
+        with patch.object(
+            APIClient,
+            "get_sessions",
+            return_value=response(sessions),
+        ):
+            self.assertEqual(
+                find_unclosed_sessions(),
+                [{"session_id": 9, "status": "RUNNING"}],
+            )
+
     def test_incomplete_alert_not_counted_as_active_or_closed(self):
         stats = summarize_alerts([{"event_id": 1, "event_type": "NECK_LATERAL_TILT", "ended_at": None, "duration": None, "incomplete": True}])
         self.assertEqual(stats["incomplete_alerts"], 1)
