@@ -198,16 +198,6 @@ class RegisterWindow(QWidget):
             )
             return
 
-        print(
-            "REGISTER OTP STATUS:",
-            response.status_code
-        )
-
-        print(
-            "REGISTER OTP RESPONSE:",
-            response.text
-        )
-
         if response.status_code != 200:
             try:
                 error_data = response.json()

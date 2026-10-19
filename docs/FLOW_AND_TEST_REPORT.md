@@ -1,5 +1,15 @@
 # PostGuard: flow และผลทดสอบ
 
+## Live email delivery check — 19 October 2026
+
+- Resend accepted one Registration OTP email and one Password Reset OTP email
+  addressed to the configured KU test mailbox; both responses contained message IDs.
+- Delivery helpers now use the requested email address instead of a hard-coded
+  recipient, and Registration OTP debug output was removed.
+- Backend 32 tests and Desktop 117 tests passed after the change.
+- The mailbox owner confirmed receipt of both messages on 20 October 2026.
+  One manual OTP flow through the Desktop UI remains as the final UI acceptance check.
+
 ## Personal Baseline verification — 16 October 2026
 
 - Backend unit/integration tests: 30 passed.

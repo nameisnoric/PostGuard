@@ -490,22 +490,6 @@ def verify_registration_otp(
 
     # 4. ตรวจว่า OTP หมดอายุหรือยัง
     now = datetime.now(timezone.utc)
-    if registration:
-        print("email:", registration.email)
-        print("attempt_count:", registration.attempt_count)
-        print("used_at:", registration.used_at)
-        print("expires_at:", registration.expires_at)
-        print("expires_at tz:", registration.expires_at.tzinfo)
-
-        print("now:", now)
-        print("now tz:", now.tzinfo)
-        print("OTP entered:", request.otp)
-
-    if registration:
-        print(
-            "OTP valid:",
-            verify_otp(request.otp, registration.otp_hash)
-    )
 
     if registration.expires_at < now:
         raise HTTPException(
@@ -558,9 +542,6 @@ def verify_registration_otp(
     # 9. บันทึกทั้งสองอย่างพร้อมกัน
     db.commit()
     db.refresh(new_user)
-
-    print("=== REGISTRATION OTP DEBUG ===")
-    print("registration:", registration)
 
     return new_user
     

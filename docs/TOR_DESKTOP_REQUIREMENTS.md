@@ -64,6 +64,8 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 - Backend API: FastAPI.
 - Authentication: JWT and Argon2 password hashes.
 - Password reset delivery: Resend.
+- Production sender identity: `PostGuard <no-reply@postguardapp.xyz>` after
+  `postguardapp.xyz` is verified in Resend.
 - Persistence: PostgreSQL hosted through Supabase.
 - Camera processing remains on the user's device; only calculated results and
   required records are sent to the backend.
@@ -73,7 +75,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | TOR area | Status | Remaining work |
 | --- | --- | --- |
 | Register, login and logout | Implemented | Keep the current `@ku.th` email/password flow |
-| Password reset with OTP | Implemented | Final live-email acceptance test |
+| Password reset with OTP | Implemented; live delivery confirmed on 20 October 2026 | Complete one manual OTP flow through the Desktop UI |
 | Email and password validation | Implemented | Frozen for the current phase; no changes requested |
 | Profile photo | Implemented | Final end-to-end persistence test |
 | Username and full name editing | Implemented | Final end-to-end persistence test with Supabase |
