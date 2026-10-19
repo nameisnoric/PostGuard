@@ -169,20 +169,23 @@ The camera workflow has four UI steps before monitoring starts:
 2. `Camera Preview` confirms that the face, shoulders and image are visible.
 3. `Camera Preparation` detects a standard 85.60 x 53.98 mm reference card,
    validates ten consecutive frames and calculates the numeric camera scale.
-4. `Personal Baseline` captures the user's neutral posture and saves it with
-   the camera-reference snapshot.
+4. `Personal Baseline` collects at least 60 valid frames over at least 15
+   seconds, checks the stability of four measurements and asks the user to
+   confirm the candidate before saving it with the camera-reference snapshot.
 
 The preparation processor lives in
 `desktop/app/services/camera_setup/reference_card.py`. It returns frame size,
 card size in pixels, X/Y/average scale, roll, perspective and capture time.
 The UI deliberately drops the frame, contour and card box before calling the
-backend. `POST /personal-baselines` stores only those numeric values alongside
-the posture baseline. `POST /sessions` rejects an old or incomplete baseline
-with HTTP 409 so a Session cannot start without camera preparation.
+backend. `POST /personal-baselines` stores only numeric camera values, the four
+baseline medians, their standard deviations, sample count, duration, valid
+ratio and confirmation state. `POST /sessions/start` rejects an old,
+unconfirmed or incomplete baseline with HTTP 409.
 
-The reference-card logic was adapted from `feature/camera` commit `04211ba`.
-The branch itself was not merged, and its posture-detection models remain out
-of the current desktop scope.
+The reference-card and Personal Baseline logic were adapted from
+`feature/camera` commit `04211ba`. The branch itself was not merged; the source
+modules were copied into the existing Desktop integration and connected to its
+current Detection service.
 
 หน้า Session Summary ซ่อนรายละเอียดฐานข้อมูลเมื่อบันทึกสำเร็จ เพราะเป็นรายละเอียด
 ภายในระบบ แต่ยังเก็บ save status ไว้ใน state และจะแสดง `Summary Save Problem` พร้อม

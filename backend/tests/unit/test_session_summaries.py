@@ -51,6 +51,15 @@ class SessionSummaryTests(unittest.TestCase):
             camera_horizontal_perspective=0.0,
             camera_vertical_perspective=0.0,
             camera_calibrated_at=datetime.now(timezone.utc),
+            baseline_status="SUCCESS",
+            confirmation_status="CONFIRMED",
+            baseline_sample_count=60,
+            baseline_duration_seconds=15.0,
+            baseline_valid_ratio=1.0,
+            shoulder_angle=-1.25,
+            lateral_tilt_baseline=2.75,
+            neck_flexion_baseline=1.5,
+            ipd_baseline=70.0,
         ))
         self.db.flush()
         self.db.add(PostureSession(session_id=1, user_id=1, camera_id=1, baseline_id=1, status="COMPLETED"))

@@ -12,11 +12,35 @@ from app.schemas.session import SessionResponse, SessionStart
 from app.models.alert_event import AlertEvent
 
 from datetime import timezone, datetime
+import math
 
 router = APIRouter(
     prefix="/sessions",
     tags=["Sessions"]
 )
+
+
+def _has_complete_personal_baseline(baseline: PersonalBaseline) -> bool:
+    """Only a confirmed, finite four-feature baseline may start a session."""
+    measurements = (
+        baseline.shoulder_angle,
+        baseline.lateral_tilt_baseline,
+        baseline.neck_flexion_baseline,
+        baseline.ipd_baseline,
+    )
+    return (
+        baseline.baseline_status == "SUCCESS"
+        and baseline.confirmation_status == "CONFIRMED"
+        and baseline.baseline_sample_count is not None
+        and baseline.baseline_sample_count >= 2
+        and baseline.baseline_valid_ratio is not None
+        and 0.0 <= baseline.baseline_valid_ratio <= 1.0
+        and all(
+            type(value) in (int, float) and math.isfinite(value)
+            for value in measurements
+        )
+        and baseline.ipd_baseline > 0
+    )
 
 @router.post(
     "/start",
@@ -67,6 +91,15 @@ def start_session(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Camera preparation is required before starting a session",
+        )
+
+    if not _has_complete_personal_baseline(baseline):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "A technically valid and user-confirmed personal baseline "
+                "is required before starting a session"
+            ),
         )
 
     # 4. ตรวจสอบว่า User ไม่มี Session ที่กำลังทำงานอยู่

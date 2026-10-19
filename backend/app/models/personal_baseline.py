@@ -47,6 +47,16 @@ class PersonalBaseline(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    baseline_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    confirmation_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    baseline_sample_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    baseline_duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    baseline_valid_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shoulder_tilt_sd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    neck_lateral_tilt_sd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    neck_flexion_sd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    eye_distance_sd: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     neck_flexion_baseline: Mapped[float | None] = mapped_column(
         Float,
         nullable=True

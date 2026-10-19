@@ -1,5 +1,14 @@
 # PostGuard: flow และผลทดสอบ
 
+## Personal Baseline verification — 16 October 2026
+
+- Backend unit/integration tests: 30 passed.
+- Desktop unit tests: 116 passed, including the four-feature Detection Contract,
+  collector confirmation state and full Preview-to-Summary workflow.
+- Supabase migration is at `b8e7c4d2a190`; all nine Personal Baseline validation
+  columns were confirmed present.
+- The separate hardware camera test still requires a locally accessible webcam.
+
 วันที่ตรวจ: 15 ตุลาคม 2026 — working tree บน `feature/desktop` ยังไม่ commit
 
 ## Flow ที่ใช้งานอยู่
@@ -13,8 +22,9 @@ flowchart TD
     C --> D[Monitor → เลือก/สแกน Webcam]
     D --> E[Camera Preview]
     E --> F[ค้นหาหรือลงทะเบียน Camera ผ่าน API]
-    F --> G[Personal Baseline: เก็บ 30 ตัวอย่างที่นิ่ง]
-    G --> H[Save Baseline → ได้ baseline_id]
+    F --> G[Personal Baseline: เก็บอย่างน้อย 60 ตัวอย่างและ 15 วินาที]
+    G --> CFM[ผู้ใช้ยืนยัน Candidate Baseline]
+    CFM --> H[Save Baseline → ได้ baseline_id]
     H --> I[Start Monitoring → Session RUNNING]
     I --> N[Dashboard / History: ตรวจจับต่อ]
     N --> I
@@ -38,7 +48,7 @@ flowchart TD
 - Alert ที่ยังไม่ปิดใน Session INTERRUPTED แสดง INCOMPLETE, duration=null และไม่นับเป็น active/closed duration; Alert ที่ปิดแล้วคงค่าเดิม
 - Recovery endpoint `POST /sessions/{session_id}/interrupt` ตรวจเจ้าของ รองรับ Retry และไม่อนุญาตให้เปลี่ยน COMPLETED เป็น INTERRUPTED
 - หากตรวจ Session ค้างไม่สำเร็จหรือผู้ใช้ยกเลิก จะไม่เริ่ม Session ใหม่ ผู้ใช้กด Monitor เพื่อทดลองใหม่ได้
-- Baseline ต้องเห็นทั้ง Pose และ Face; เก็บ 30 ตัวอย่าง และตรวจส่วนเบี่ยงเบนมาตรฐานไหล่/คอไม่เกิน 2 องศา หากไม่พบหรือขยับมากจะเริ่มเก็บใหม่
+- Baseline ต้องเห็นทั้ง Pose และ Face และมีค่า shoulder tilt, neck lateral tilt, neck flexion และ eye-distance proxy ครบ เก็บอย่างน้อย 60 ตัวอย่างภายในเวลาอย่างน้อย 15 วินาที ตรวจ valid ratio และความนิ่ง ก่อนให้ผู้ใช้ยืนยัน Candidate Baseline
 - Monitoring ใช้ timer 30 ms และตรวจจับทุก 5 เฟรม; อัตราจริงขึ้นกับเวลาประมวลผล
 - Threshold ทดลองเริ่มที่ 0 ซึ่งปิดการจำแนกเอียงคอ ต้องกำหนดมากกว่า 0 ก่อนทดลอง Alert
 - Threshold นี้ยังไม่ใช่เกณฑ์ทางคลินิกที่ผ่าน validation; Full Risk Score ยังไม่พร้อม แสดง N/A และส่ง NULL
@@ -61,7 +71,7 @@ flowchart TD
 | Session/Alert | Start → สร้าง Alert → Pause → Resume → End | ผ่าน; Alert ถูกปิด |
 | Summary | Save → GET → list → POST ซ้ำ | ผ่าน; ค่าตรง และ duplicate ได้ 409 |
 | Ownership | Login อีกบัญชีแล้วอ่าน/เขียนรายงานและอ่าน Alert | ถูกปฏิเสธ 404; รายการ Summary ว่าง |
-| Desktop flow | PySide6 offscreen, กล้อง/ผล Detection/API จำลอง | Preview → Baseline 30 samples → Save → Monitoring → Pause/Resume → Stop → Summary ผ่าน |
+| Desktop flow | PySide6 offscreen, กล้อง/ผล Detection/API จำลอง | Preview → Baseline validation → User confirmation → Save → Monitoring → Pause/Resume → Stop → Summary ผ่าน |
 | Error/Retry | จำลอง End ล้มเหลว และ Summary API ล้มเหลว | เก็บสถิติเพื่อ Retry ได้ |
 | History | UI tests จำลอง API | เปิด Saved Report, ไม่มีรายงาน, API ล้มเหลว ผ่าน |
 | Webcam จริง | เปิด device 0, ประมวลผล 10 เฟรมด้วย DetectionService จริง | Face 10/10, Pose 0/10; ปิดกล้องแล้ว ไม่บันทึกภาพ |

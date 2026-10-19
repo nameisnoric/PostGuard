@@ -110,7 +110,16 @@ attached to the Personal Baseline: frame dimensions, X/Y/average scale, card
 roll, horizontal/vertical perspective and capture time. Camera frames, card
 images, contours and transform matrices are not persisted or uploaded.
 
+The Personal Baseline collector was adapted from the same `feature/camera`
+commit. It accepts only Detection Contract 1.0 frames with valid shoulder tilt,
+neck lateral tilt, neck flexion and eye-distance proxy values. Collection needs
+at least 60 valid samples, 15 seconds of coverage, a valid-frame ratio of at
+least 70 percent and stable measurements. Passing those checks creates a
+candidate only; the user must explicitly confirm the candidate before it can be
+saved or used by a Session.
+
 The Session API accepts a new session only when its Personal Baseline contains
-the camera scale and preparation timestamp. Existing baseline records remain
-readable because the new database columns are nullable, but they must be
-recreated through Camera Preparation before starting another session.
+the camera preparation values, all four finite posture measurements and the
+`SUCCESS` / `CONFIRMED` validation state. Existing baseline records remain
+readable because the added database columns are nullable, but incomplete older
+records cannot start another session.
