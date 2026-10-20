@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from app.services.alert_sound import AlertSoundPlayer, DEFAULT_SETTINGS
 from app.services.api_client import APIClient
+from app.ui.theme import polish
 
 
 class SettingsPage(QWidget):
@@ -28,6 +30,7 @@ class SettingsPage(QWidget):
         super().__init__()
         self.sound_player = sound_player
         self.current_settings = DEFAULT_SETTINGS.copy()
+        self.has_privacy_consent = None
         self.setProperty("page", True)
 
         page_layout = QVBoxLayout(self)
@@ -144,12 +147,11 @@ class SettingsPage(QWidget):
         privacy_actions = QHBoxLayout()
         self.review_privacy_button = QPushButton("อ่านประกาศความเป็นส่วนตัว")
         self.review_privacy_button.clicked.connect(self.review_privacy_notice)
-        self.withdraw_privacy_button = QPushButton("ถอนความยินยอม")
-        self.withdraw_privacy_button.setProperty("variant", "danger")
-        self.withdraw_privacy_button.clicked.connect(self.withdraw_privacy_consent)
+        self.consent_action_button = QPushButton("ให้ Consent")
+        self.consent_action_button.clicked.connect(self.handle_privacy_consent_action)
         privacy_actions.addWidget(self.review_privacy_button)
         privacy_actions.addStretch()
-        privacy_actions.addWidget(self.withdraw_privacy_button)
+        privacy_actions.addWidget(self.consent_action_button)
 
         privacy_layout.addWidget(privacy_heading)
         privacy_layout.addWidget(privacy_note)
@@ -160,7 +162,7 @@ class SettingsPage(QWidget):
         layout.addLayout(privacy_row)
         layout.addStretch()
         self._populate(DEFAULT_SETTINGS)
-        self.withdraw_privacy_button.setEnabled(False)
+        self._set_privacy_consent_action(None)
 
     def load_settings(self) -> None:
         self.status_label.setText('กำลังโหลดการตั้งค่า...')
@@ -242,11 +244,11 @@ class SettingsPage(QWidget):
             self.privacy_status_label.setText(
                 "Consent status: Cannot load. Check your connection."
             )
-            self.withdraw_privacy_button.setEnabled(False)
+            self._set_privacy_consent_action(None)
             return
         if not response.ok:
             self.privacy_status_label.setText("Consent status: Could not be loaded.")
-            self.withdraw_privacy_button.setEnabled(False)
+            self._set_privacy_consent_action(None)
             return
         try:
             payload = response.json()
@@ -256,11 +258,11 @@ class SettingsPage(QWidget):
             payload.get("has_current_consent")
         ) is not bool:
             self.privacy_status_label.setText("Consent status: Invalid response.")
-            self.withdraw_privacy_button.setEnabled(False)
+            self._set_privacy_consent_action(None)
             return
 
         accepted = payload["has_current_consent"]
-        self.withdraw_privacy_button.setEnabled(accepted)
+        self._set_privacy_consent_action(accepted)
         if accepted:
             accepted_at = payload.get("accepted_at") or "recorded"
             self.privacy_status_label.setText(
@@ -278,6 +280,22 @@ class SettingsPage(QWidget):
 
         PrivacyNoticeDialog(self, require_acceptance=False).exec()
 
+    def handle_privacy_consent_action(self) -> None:
+        if self.has_privacy_consent is True:
+            self.withdraw_privacy_consent()
+        elif self.has_privacy_consent is False:
+            self.give_privacy_consent()
+
+    def give_privacy_consent(self) -> None:
+        from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
+
+        dialog = PrivacyNoticeDialog(self, require_acceptance=True)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._set_privacy_consent_action(True)
+        self.privacy_status_label.setText('Consent status: Accepted')
+        self.privacy_consent_changed.emit(True)
+
     def withdraw_privacy_consent(self) -> None:
         answer = QMessageBox.question(
             self,
@@ -289,20 +307,20 @@ class SettingsPage(QWidget):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self.withdraw_privacy_button.setEnabled(False)
+        self.consent_action_button.setEnabled(False)
         try:
             response = APIClient.withdraw_privacy_consent()
         except requests.RequestException:
             self.privacy_status_label.setText(
                 "Consent could not be withdrawn. Check your connection."
             )
-            self.withdraw_privacy_button.setEnabled(True)
+            self.consent_action_button.setEnabled(True)
             return
         if not response.ok:
             self.privacy_status_label.setText(
                 self._response_error(response, "Consent could not be withdrawn.")
             )
-            self.withdraw_privacy_button.setEnabled(True)
+            self.consent_action_button.setEnabled(True)
             return
         try:
             payload = response.json()
@@ -310,10 +328,22 @@ class SettingsPage(QWidget):
             payload = None
         if not isinstance(payload, dict) or payload.get("has_current_consent") is not False:
             self.privacy_status_label.setText("Consent withdrawal was not confirmed.")
-            self.withdraw_privacy_button.setEnabled(True)
+            self.consent_action_button.setEnabled(True)
             return
         self.privacy_status_label.setText('สถานะความยินยอม: ถอนแล้ว')
+        self._set_privacy_consent_action(False)
         self.privacy_consent_changed.emit(False)
+
+    def _set_privacy_consent_action(self, accepted: bool | None) -> None:
+        self.has_privacy_consent = accepted
+        self.consent_action_button.setEnabled(accepted is not None)
+        if accepted is True:
+            self.consent_action_button.setText("ยกเลิก Consent")
+            self.consent_action_button.setProperty("variant", "danger")
+        else:
+            self.consent_action_button.setText("ให้ Consent")
+            self.consent_action_button.setProperty("variant", "primary")
+        polish(self.consent_action_button)
 
     def _populate(self, settings: dict) -> None:
         self.notifications_enabled.setChecked(settings["notifications_enabled"])

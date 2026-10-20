@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.services.api_client import APIClient
 from app.ui.pages.settings_page import SettingsPage
@@ -92,7 +92,8 @@ class SettingsPageTests(unittest.TestCase):
         ):
             self.page.load_privacy_consent()
 
-        self.assertTrue(self.page.withdraw_privacy_button.isEnabled())
+        self.assertTrue(self.page.consent_action_button.isEnabled())
+        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
         changed = Mock()
         self.page.privacy_consent_changed.connect(changed)
         withdrawn = {**accepted, "has_current_consent": False, "withdrawn_at": "now"}
@@ -112,6 +113,40 @@ class SettingsPageTests(unittest.TestCase):
         withdraw.assert_called_once_with()
         changed.assert_called_once_with(False)
         self.assertIn("ถอนแล้ว", self.page.privacy_status_label.text())
+        self.assertTrue(self.page.consent_action_button.isEnabled())
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+
+    def test_missing_privacy_consent_offers_consent_action(self):
+        missing = {
+            "notice_version": "2026-10-20",
+            "accepted_version": None,
+            "accepted_at": None,
+            "withdrawn_at": None,
+            "has_current_consent": False,
+        }
+        with patch.object(
+            APIClient, "get_privacy_consent", return_value=response(missing)
+        ):
+            self.page.load_privacy_consent()
+
+        self.assertTrue(self.page.consent_action_button.isEnabled())
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+
+    def test_consent_action_updates_state_after_acceptance(self):
+        self.page._set_privacy_consent_action(False)
+        changed = Mock()
+        self.page.privacy_consent_changed.connect(changed)
+        dialog = Mock()
+        dialog.exec.return_value = QDialog.DialogCode.Accepted
+        with patch(
+            "app.ui.dialogs.privacy_notice_dialog.PrivacyNoticeDialog",
+            return_value=dialog,
+        ):
+            self.page.handle_privacy_consent_action()
+
+        self.assertTrue(self.page.has_privacy_consent)
+        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
+        changed.assert_called_once_with(True)
 
 
 if __name__ == "__main__":
