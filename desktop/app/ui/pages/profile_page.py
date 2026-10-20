@@ -124,7 +124,7 @@ class ProfilePage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("โปรไฟล์")
+        title = QLabel("Profile")
         title.setProperty("role", "title")
         subtitle = QLabel("จัดการรูปโปรไฟล์และข้อมูลส่วนตัวของคุณ")
         subtitle.setProperty("role", "muted")

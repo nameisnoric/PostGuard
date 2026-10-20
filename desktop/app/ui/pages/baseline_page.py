@@ -394,7 +394,7 @@ class BaselinePage(QWidget):
         self.save_button.setEnabled(False)
         
         self.monitor_button = QPushButton(
-            "เริ่มการตรวจจับ"
+            "Start Monitoring"
         )
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.setEnabled(False)

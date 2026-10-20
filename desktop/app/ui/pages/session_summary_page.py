@@ -60,7 +60,7 @@ class SessionSummaryPage(QWidget):
         scroll_area.setWidget(content)
         page_layout.addWidget(scroll_area)
 
-        self.title_label = QLabel("สรุปเซสชัน")
+        self.title_label = QLabel("Session Summary")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
             "รายงานเซสชันการตรวจจับที่เสร็จสิ้น"
@@ -68,7 +68,7 @@ class SessionSummaryPage(QWidget):
         self.description_label.setProperty("role", "muted")
 
         # Session information
-        info_group = QGroupBox("ข้อมูลเซสชัน")
+        info_group = QGroupBox("Session Information")
         info_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
@@ -99,7 +99,7 @@ class SessionSummaryPage(QWidget):
             info_layout.addWidget(widget)
 
         # Detection summary
-        detection_group = QGroupBox("สรุปผลการตรวจจับ")
+        detection_group = QGroupBox("Detection Summary")
         detection_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
@@ -212,7 +212,7 @@ class SessionSummaryPage(QWidget):
         )
 
         self.view_alerts_button = QPushButton(
-            "ดูประวัติการแจ้งเตือน"
+            "View Alert History"
         )
         self.view_alerts_button.clicked.connect(
             self.open_alert_history
@@ -235,7 +235,7 @@ class SessionSummaryPage(QWidget):
         self.note_label.setProperty("role", "muted")
 
         self.back_button = QPushButton(
-            "กลับไปแดชบอร์ด"
+            "Back to Dashboard"
         )
         self.back_button.clicked.connect(
             self.go_back
@@ -272,7 +272,7 @@ class SessionSummaryPage(QWidget):
             "summary_save_status": "LOADED",
         }
         self.set_summary(report)
-        self.title_label.setText("รายงานเซสชันที่บันทึก")
+        self.title_label.setText("Saved Session Report")
         self.back_button.setText("ปิดรายงาน")
 
     def set_summary(self, summary: dict) -> None:

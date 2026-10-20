@@ -20,7 +20,7 @@ from app.ui.theme import APP_QSS
 class AlertHistoryDialog(QDialog):
     def __init__(self, parent=None, session_id=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - ประวัติเหตุการณ์แจ้งเตือน")
+        self.setWindowTitle("PostGuard - Alert History")
         self.resize(980, 600)
         self.setMinimumSize(760, 480)
         self.setStyleSheet(APP_QSS)
@@ -29,7 +29,7 @@ class AlertHistoryDialog(QDialog):
         self.layout().setContentsMargins(24, 22, 24, 22)
         self.layout().setSpacing(14)
 
-        title = QLabel("เหตุการณ์แจ้งเตือน")
+        title = QLabel("Alert Events")
         title.setProperty("role", "title")
         self.layout().addWidget(title)
 

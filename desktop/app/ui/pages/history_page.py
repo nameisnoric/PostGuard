@@ -62,7 +62,7 @@ class HistoryPage(QWidget):
 
         header = QHBoxLayout()
         copy = QVBoxLayout()
-        self.title_label = self._label("ประวัติการตรวจจับ", "title")
+        self.title_label = self._label("Monitoring History", "title")
         self.description_label = self._label(
             "ตรวจสอบเซสชัน เหตุการณ์แจ้งเตือน และรายงานในบัญชีของคุณ",
             "muted",
@@ -70,7 +70,7 @@ class HistoryPage(QWidget):
         copy.addWidget(self.title_label)
         copy.addWidget(self.description_label)
         header.addLayout(copy, 1)
-        self.alert_history_button = QPushButton("เหตุการณ์แจ้งเตือนทั้งหมด")
+        self.alert_history_button = QPushButton("All Alert Events")
         self.alert_history_button.clicked.connect(self.open_alert_history)
         self.refresh_button = QPushButton("รีเฟรช")
         self.refresh_button.setProperty("variant", "primary")
@@ -126,7 +126,7 @@ class HistoryPage(QWidget):
         layout.addWidget(history_card, 1)
 
         details_card, details_layout = self._card()
-        details_layout.addWidget(self._label("รายละเอียดเซสชัน", "heading"))
+        details_layout.addWidget(self._label("Session Details", "heading"))
         self.details_hint = self._label(
             "เลือกเซสชันเพื่อดูรายละเอียดที่บันทึกไว้", "muted"
         )
@@ -160,10 +160,10 @@ class HistoryPage(QWidget):
         details_layout.addLayout(details_grid)
 
         actions = QHBoxLayout()
-        self.selected_alerts_button = QPushButton("ดูการแจ้งเตือนของเซสชัน")
+        self.selected_alerts_button = QPushButton("View Session Alerts")
         self.selected_alerts_button.setEnabled(False)
         self.selected_alerts_button.clicked.connect(self.open_selected_alert_history)
-        self.report_button = QPushButton("ดูรายงานที่บันทึก")
+        self.report_button = QPushButton("View Saved Report")
         self.report_button.setProperty("variant", "primary")
         self.report_button.setEnabled(False)
         self.report_button.clicked.connect(self.open_saved_report)
@@ -406,7 +406,7 @@ class HistoryPage(QWidget):
                 )
                 return
             dialog = QDialog(self)
-            dialog.setWindowTitle('PostGuard - รายงานเซสชันที่บันทึก')
+            dialog.setWindowTitle('PostGuard - Saved Session Report')
             dialog.resize(920, 760)
             dialog.setMinimumSize(760, 600)
             dialog.setStyleSheet(APP_QSS)

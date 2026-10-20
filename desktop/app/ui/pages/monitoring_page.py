@@ -87,7 +87,7 @@ class MonitoringPage(QWidget):
         layout.setSpacing(12)
         scroll.setWidget(content)
 
-        self.title_label = QLabel("การตรวจจับแบบเรียลไทม์")
+        self.title_label = QLabel("Real-time Monitoring")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
             "กล้องจะตรวจจับต่อเนื่องขณะเปิดหน้าแดชบอร์ดหรือประวัติ"
@@ -132,7 +132,7 @@ class MonitoringPage(QWidget):
         layout.addLayout(columns, 1)
 
     def _create_information_group(self) -> QGroupBox:
-        info_group = QGroupBox("ข้อมูลการตรวจจับ")
+        info_group = QGroupBox("Monitoring Information")
         info_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
@@ -164,7 +164,7 @@ class MonitoringPage(QWidget):
         self.preview_label.setProperty("preview", True)
 
     def _create_detection_group(self) -> QGroupBox:
-        detection_group = QGroupBox("ผลตรวจจับปัจจุบัน")
+        detection_group = QGroupBox("Live Detection")
         detection_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
@@ -256,11 +256,11 @@ class MonitoringPage(QWidget):
     def _create_button_layout(self) -> QHBoxLayout:
         button_layout = QHBoxLayout()
 
-        self.pause_button = QPushButton("หยุดชั่วคราว")
+        self.pause_button = QPushButton("Pause Monitoring")
         self.pause_button.setEnabled(False)
         self.pause_button.clicked.connect(self.handle_pause_resume)
 
-        self.stop_button = QPushButton("หยุดการตรวจจับ")
+        self.stop_button = QPushButton("Stop Monitoring")
         self.stop_button.setProperty("variant", "danger")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.handle_stop)
@@ -407,7 +407,7 @@ class MonitoringPage(QWidget):
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
         self.is_paused = False
-        self.pause_button.setText("หยุดชั่วคราว")
+        self.pause_button.setText("Pause Monitoring")
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
         self.timer.start()
@@ -654,7 +654,7 @@ class MonitoringPage(QWidget):
         self.preview_label.setText("ภาพการตรวจจับจะแสดงที่นี่")
         self.stop_button.setEnabled(False)
         self.pause_button.setEnabled(False)
-        self.pause_button.setText("หยุดชั่วคราว")
+        self.pause_button.setText("Pause Monitoring")
         self.is_paused = False
         self.session_started_at = None
         self.session_started_monotonic = None
@@ -866,7 +866,7 @@ class MonitoringPage(QWidget):
             "สถานะ: หยุดชั่วคราว "
             f"(จำนวนครั้ง: {remote['pause_count']})"
         )
-        self.pause_button.setText("ตรวจจับต่อ")
+        self.pause_button.setText("Resume Monitoring")
 
     def _resume_monitoring(self) -> None:
 
@@ -908,7 +908,7 @@ class MonitoringPage(QWidget):
             f"| เวลาหยุดรวม: "
             f"{remote['paused_duration']} วินาที"
         )
-        self.pause_button.setText("หยุดชั่วคราว")
+        self.pause_button.setText("Pause Monitoring")
 
         self.timer.start()
 

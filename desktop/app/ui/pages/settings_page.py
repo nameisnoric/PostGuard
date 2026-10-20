@@ -43,7 +43,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("การตั้งค่า")
+        title = QLabel("Settings")
         title.setProperty("role", "title")
         subtitle = QLabel("จัดการการแจ้งเตือนท่าทางและเสียงแจ้งเตือน")
         subtitle.setProperty("role", "muted")

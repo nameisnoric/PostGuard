@@ -110,10 +110,10 @@ class DashboardPage(QWidget):
         layout.addWidget(self.live_note)
 
         actions = QHBoxLayout()
-        self.monitor_button = QPushButton("เริ่มการตรวจจับ")
+        self.monitor_button = QPushButton("Start Monitoring")
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.clicked.connect(self.monitor_requested.emit)
-        self.history_button = QPushButton("ดูประวัติ")
+        self.history_button = QPushButton("View History")
         self.history_button.clicked.connect(self.history_requested.emit)
         self.refresh_button = QPushButton("รีเฟรช")
         self.refresh_button.clicked.connect(self.refresh)
@@ -247,7 +247,7 @@ class DashboardPage(QWidget):
         self.live_label.setText(title)
         self.live_note.setText(note)
         self.monitor_button.setText(
-            "กลับไปหน้าการตรวจจับ" if session_id is not None else "เริ่มการตรวจจับ"
+            "Return to Monitoring" if session_id is not None else "Start Monitoring"
         )
         self.monitor_button.setEnabled(not stopping)
 

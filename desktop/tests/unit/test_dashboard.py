@@ -50,7 +50,7 @@ class DashboardTests(unittest.TestCase):
         self.page.history_requested.connect(history)
         self.page.set_monitoring_state(9, paused=True)
         self.assertIn("หยุดชั่วคราว", self.page.live_label.text())
-        self.assertEqual(self.page.monitor_button.text(), "กลับไปหน้าการตรวจจับ")
+        self.assertEqual(self.page.monitor_button.text(), "Return to Monitoring")
         self.page.monitor_button.click()
         self.page.history_button.click()
         monitor.assert_called_once()

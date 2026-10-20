@@ -191,7 +191,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(monitor.size().height(), 405)
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
-            "เหตุการณ์แจ้งเตือนทั้งหมด",
+            "All Alert Events",
         )
         self.assertFalse(hasattr(self.window, "alert_history_button"))
 
@@ -328,7 +328,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(summary_page.current_summary["summary_save_status"], "SAVED")
         self.assertEqual(summary_page.current_summary["detection_count"], 2)
         self.assertTrue(summary_page.save_group.isHidden())
-        self.assertEqual(monitor.stop_button.text(), "หยุดการตรวจจับ")
+        self.assertEqual(monitor.stop_button.text(), "Stop Monitoring")
         self.assertEqual(self.save.call_args.args[1]["average_neck"], 2.0)
         baseline_payload = self.create_baseline.call_args.kwargs["measurements"]
         self.assertEqual(baseline_payload["camera_scale_avg"], 3.50)
@@ -432,7 +432,7 @@ class DesktopWorkflowTests(unittest.TestCase):
             self.window.global_pause_button.click()
         self.assertFalse(monitor.timer.isActive())
         self.assertIn("Paused", self.window.monitoring_status_label.text())
-        self.assertEqual(self.window.global_pause_button.text(), "ตรวจจับต่อ")
+        self.assertEqual(self.window.global_pause_button.text(), "Resume Monitoring")
         self.window.show_monitor()
         self.assertTrue(monitor.is_paused)
         self.window.show_dashboard()

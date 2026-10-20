@@ -20,8 +20,8 @@ APP_QSS = """
 QMainWindow, QDialog, QWidget#appRoot, QWidget#authWindow, QStackedWidget#pageStack {
     background: #f8fafc;
     color: #0f172a;
-    font-family: "Segoe UI", "Inter", sans-serif;
-    font-size: 13px;
+    font-family: "Leelawadee UI", "Noto Sans Thai", "Tahoma", "Segoe UI", sans-serif;
+    font-size: 14px;
 }
 QWidget[page="true"] { background: #f8fafc; }
 QWidget#topNavigation {
