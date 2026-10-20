@@ -72,7 +72,7 @@ class HistoryPage(QWidget):
         header.addLayout(copy, 1)
         self.alert_history_button = QPushButton("All Alert Events")
         self.alert_history_button.clicked.connect(self.open_alert_history)
-        self.refresh_button = QPushButton("รีเฟรช")
+        self.refresh_button = QPushButton("Refresh")
         self.refresh_button.setProperty("variant", "primary")
         self.refresh_button.clicked.connect(self.load_sessions)
         header.addWidget(self.alert_history_button)

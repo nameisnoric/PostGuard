@@ -205,7 +205,7 @@ class SessionSummaryPage(QWidget):
         alert_buttons = QHBoxLayout()
 
         self.refresh_alerts_button = QPushButton(
-            "รีเฟรชสรุปการแจ้งเตือน"
+            "Refresh Alert Summary"
         )
         self.refresh_alerts_button.clicked.connect(
             self.refresh_alerts

@@ -115,7 +115,7 @@ class DashboardPage(QWidget):
         self.monitor_button.clicked.connect(self.monitor_requested.emit)
         self.history_button = QPushButton("View History")
         self.history_button.clicked.connect(self.history_requested.emit)
-        self.refresh_button = QPushButton("รีเฟรช")
+        self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.refresh)
         actions.addWidget(self.monitor_button)
         actions.addWidget(self.history_button)
@@ -137,7 +137,7 @@ class DashboardPage(QWidget):
         layout.addLayout(summary_grid)
 
         self.data_status = self._label(
-            "กดรีเฟรชเพื่อโหลดกิจกรรมที่บันทึกไว้", "muted"
+            "กด Refresh เพื่อโหลดกิจกรรมที่บันทึกไว้", "muted"
         )
         layout.addWidget(self.data_status)
 

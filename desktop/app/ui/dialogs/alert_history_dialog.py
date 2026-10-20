@@ -50,7 +50,7 @@ class AlertHistoryDialog(QDialog):
         self.session_selector.setMaxVisibleItems(8)
         self.session_selector.currentIndexChanged.connect(self.load_selected_alerts)
         controls.addWidget(self.session_selector, 1)
-        self.refresh_button = QPushButton("รีเฟรช")
+        self.refresh_button = QPushButton("Refresh")
         self.refresh_button.clicked.connect(self.load_selected_alerts)
         controls.addWidget(self.refresh_button)
         self.layout().addLayout(controls)
@@ -153,7 +153,7 @@ class AlertHistoryDialog(QDialog):
         except (requests.RequestException, ValueError, RuntimeError) as exc:
             self.table.setRowCount(0)
             self.stats_label.setText('ไม่สามารถเรียกข้อมูลการแจ้งเตือนได้ (ไม่ได้หมายถึงศูนย์)')
-            self.empty_label.setText('ไม่สามารถโหลดเหตุการณ์แจ้งเตือนได้ กดรีเฟรชเพื่อลองอีกครั้ง')
+            self.empty_label.setText('ไม่สามารถโหลดเหตุการณ์แจ้งเตือนได้ กด Refresh เพื่อลองอีกครั้ง')
             self.empty_label.show()
             self.table.hide()
             QMessageBox.warning(self, 'ประวัติการแจ้งเตือน', str(exc))
