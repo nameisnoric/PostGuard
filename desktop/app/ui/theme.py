@@ -50,6 +50,14 @@ QLabel[role="infoIcon"] {
     font-size: 22px;
     font-weight: 700;
 }
+QLabel[role="warningIcon"] {
+    color: #b45309;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 24px;
+    font-size: 24px;
+    font-weight: 700;
+}
 QDialog QLabel, QFrame[card="true"] QLabel {
     color: #0f172a;
     background: transparent;
@@ -82,6 +90,11 @@ QFrame[variant="welcome"] {
     background: #eff6ff;
     border: 1px solid #dbeafe;
     border-radius: 16px;
+}
+QFrame[variant="dangerZone"] {
+    background: #fff7f7;
+    border: 1px solid #fecaca;
+    border-radius: 14px;
 }
 QFrame[variant="sessionBar"] {
     background: #ffffff;

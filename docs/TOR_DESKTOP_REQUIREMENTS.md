@@ -57,6 +57,8 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 - Provide a Dashboard with historical usage information.
 - Provide Settings stored per user, including notification enablement, sound,
   volume and reminder/break interval.
+- Show a non-blocking in-app popup when a new posture alert is created; sound
+  remains optional and follows the user's notification settings.
 
 ### Required architecture
 
@@ -81,7 +83,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Username and full name editing | Implemented | Final end-to-end persistence test with Supabase |
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Implemented | Complete final live Desktop acceptance test |
-| Settings | Implemented | Final live sound and persistence acceptance test |
+| Settings | Implemented with popup and optional sound alerts | Final live popup, sound and persistence acceptance test |
 | Dashboard, history and reports | Implemented for available data | Complete detection-derived TOR fields when their source calculations are available |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
 | Camera preparation | Implemented | Run final acceptance test with the printed 85.60 x 53.98 mm reference card |

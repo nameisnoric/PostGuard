@@ -66,7 +66,7 @@ class SettingsPage(QWidget):
         heading.setProperty("role", "heading")
         card_layout.addWidget(heading)
 
-        self.notifications_enabled = QCheckBox("เปิดการแจ้งเตือนท่าทาง")
+        self.notifications_enabled = QCheckBox("เปิด Popup แจ้งเตือนท่าทาง")
         self.notifications_enabled.toggled.connect(self._sync_enabled_state)
         self.sound_enabled = QCheckBox("เล่นเสียงเมื่อมีการแจ้งเตือนท่าทาง")
         self.sound_enabled.toggled.connect(self._sync_enabled_state)
@@ -97,8 +97,8 @@ class SettingsPage(QWidget):
         card_layout.addLayout(reminder_row)
 
         note = QLabel(
-            "Settings affect local notifications only. Alert events are still stored "
-            "in your history when the monitoring rule is triggered."
+            "Popup จะแสดงเมื่อพบเหตุการณ์ท่าทางใหม่ ส่วนเสียงจะเล่นตามระดับเสียง "
+            "และช่วงเวลาแจ้งเตือนซ้ำที่กำหนด เหตุการณ์ยังถูกบันทึกใน History"
         )
         note.setProperty("role", "muted")
         note.setWordWrap(True)

@@ -35,6 +35,7 @@ from app.services.posture_duration_tracker import (
     classify_neck_side_bending,
 )
 from app.services.session_summary_service import save_session_summary
+from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
 from app.ui.utils.preview_sizing import fit_preview_label
 
 
@@ -63,6 +64,7 @@ class MonitoringPage(QWidget):
         self.posture_tracker = PostureDurationTracker()
         self.alert_service = ExperimentalAlertService()
         self.sound_player = AlertSoundPlayer()
+        self.alert_popup = None
         self._alert_force_close = False
 
         self.timer = QTimer(self)
@@ -90,7 +92,7 @@ class MonitoringPage(QWidget):
         self.title_label = QLabel("Real-time Monitoring")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
-            "กล้องจะตรวจจับต่อเนื่องขณะเปิดหน้าแดชบอร์ดหรือประวัติ"
+            "กล้องจะตรวจจับต่อเนื่องขณะเปิดหน้า Dashboard หรือ History"
         )
         self.description_label.setProperty("role", "muted")
 
@@ -436,6 +438,12 @@ class MonitoringPage(QWidget):
 
     def apply_notification_settings(self, settings: dict) -> None:
         self.sound_player.apply_settings(settings)
+        if (
+            not self.sound_player.settings["notifications_enabled"]
+            and self.alert_popup is not None
+        ):
+            self.alert_popup.close()
+            self.alert_popup = None
 
     def update_partial_risk(self, result: dict) -> None:
         """Use existing neck_tilt only. Never change teammate's detector math."""
@@ -497,6 +505,7 @@ class MonitoringPage(QWidget):
                 "Experimental Alert: Neck side-bending held >= 60 s. "
                 "Please adjust your posture. Event saved to PostgreSQL."
             )
+            self.show_posture_alert(direction, seconds)
         elif action == "ended":
             self.alert_label.setText("Experimental Alert: Cleared (event ended)")
         elif self.alert_service.last_error:
@@ -514,6 +523,20 @@ class MonitoringPage(QWidget):
             self.alert_service.active_event_id is not None,
             new_alert=action == "created",
         )
+
+    def show_posture_alert(self, direction: int, seconds: float) -> bool:
+        """Show one non-modal popup for a newly stored alert event."""
+        if not self.sound_player.settings.get("notifications_enabled", True):
+            return False
+        if self.alert_popup is not None:
+            self.alert_popup.close()
+        self.alert_popup = PostureAlertDialog(
+            direction=direction,
+            duration_seconds=seconds,
+            parent=self.window(),
+        )
+        self.alert_popup.show_alert()
+        return True
 
     def update_baseline_comparison(self, result: dict) -> None:
         if self.baseline_data is None:
@@ -644,6 +667,9 @@ class MonitoringPage(QWidget):
 
     def _release_local_resources(self) -> None:
         self._close_capture_resources()
+        if self.alert_popup is not None:
+            self.alert_popup.close()
+            self.alert_popup = None
         self.frame_count = 0
         self.detection_label.setText('ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ')
         self.shoulder_label.setText('ความเอียงไหล่: --')

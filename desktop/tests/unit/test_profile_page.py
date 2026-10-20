@@ -32,6 +32,11 @@ class ProfilePageTests(unittest.TestCase):
         self.assertEqual(self.page.username_input.text(), "jlee")
         self.assertEqual(self.page.avatar_label.text(), "JL")
 
+    def test_delete_account_is_a_separate_visible_action_card(self):
+        self.assertEqual(self.page.danger_card.property("variant"), "dangerZone")
+        self.assertEqual(self.page.delete_account_button.text(), "Delete Account")
+        self.assertEqual(self.page.delete_account_button.property("variant"), "danger")
+
     def test_save_persists_profile_and_emits_backend_values(self):
         updated = Mock()
         self.page.profile_updated.connect(updated)
