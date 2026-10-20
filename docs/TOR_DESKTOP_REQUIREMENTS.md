@@ -80,7 +80,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Profile photo | Implemented | Final end-to-end persistence test |
 | Username and full name editing | Implemented | Final end-to-end persistence test with Supabase |
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
-| Privacy Notice and consent | Missing | Add consent model, API and desktop flow |
+| Privacy Notice and consent | Implemented | Complete final live Desktop acceptance test |
 | Settings | Implemented | Final live sound and persistence acceptance test |
 | Dashboard, history and reports | Implemented for available data | Complete detection-derived TOR fields when their source calculations are available |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
@@ -91,7 +91,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 ## Implementation order for the current desktop phase
 
 1. Run the physical reference-card acceptance test for camera preparation.
-2. Implement Privacy Notice and stored consent management.
+2. Run the Privacy Notice acceptance and withdrawal flow in the live Desktop app.
 3. Run final live acceptance tests for history, reports and account-specific data.
 4. Package and test the Windows application.
 
@@ -125,3 +125,10 @@ the camera preparation values, all four finite posture measurements and the
 `SUCCESS` / `CONFIRMED` validation state. Existing baseline records remain
 readable because the added database columns are nullable, but incomplete older
 records cannot start another session.
+
+Privacy Notice version `2026-10-20` is enforced before Camera Setup in the
+Desktop application and again by the Session API. Acceptance version,
+acceptance time and withdrawal time are stored per user. Migration
+`a91f4c2d7e30` is applied to Supabase. Withdrawing consent is blocked while a
+session is RUNNING or PAUSED and prevents future monitoring until the current
+notice is accepted again.

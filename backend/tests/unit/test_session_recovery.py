@@ -9,7 +9,9 @@ try:
 except ImportError:
     import test_session_summaries as fixtures
 from app.models.session import PostureSession
+from app.models.user import User
 from app.models.alert_event import AlertEvent
+from app.core.privacy import CURRENT_PRIVACY_NOTICE_VERSION
 from app.routers.sessions import router as sessions_router
 from app.routers.alert_events import router as alerts_router
 from app.routers.auth import get_current_user
@@ -20,6 +22,11 @@ class SessionRecoveryTests(unittest.TestCase):
         fixtures.SessionSummaryTests.setUp(self)
         self.app.include_router(sessions_router)
         self.app.include_router(alerts_router)
+        self.user = self.db.get(User, 1)
+        self.user.privacy_consent_version = CURRENT_PRIVACY_NOTICE_VERSION
+        self.user.privacy_consent_accepted_at = datetime.now(timezone.utc)
+        self.user.privacy_consent_withdrawn_at = None
+        self.app.dependency_overrides[get_current_user] = lambda: self.user
         self.session = self.db.get(PostureSession, 1)
         self.session.status = "RUNNING"
         self.db.commit()

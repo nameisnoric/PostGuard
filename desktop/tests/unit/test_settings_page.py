@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from app.services.api_client import APIClient
 from app.ui.pages.settings_page import SettingsPage
@@ -78,6 +78,40 @@ class SettingsPageTests(unittest.TestCase):
         self.page.volume_slider.setValue(55)
         self.page.test_sound()
         self.sound.play_preview.assert_called_once_with(55)
+
+    def test_privacy_status_and_withdrawal(self):
+        accepted = {
+            "notice_version": "2026-10-20",
+            "accepted_version": "2026-10-20",
+            "accepted_at": "2026-10-20T00:00:00+00:00",
+            "withdrawn_at": None,
+            "has_current_consent": True,
+        }
+        with patch.object(
+            APIClient, "get_privacy_consent", return_value=response(accepted)
+        ):
+            self.page.load_privacy_consent()
+
+        self.assertTrue(self.page.withdraw_privacy_button.isEnabled())
+        changed = Mock()
+        self.page.privacy_consent_changed.connect(changed)
+        withdrawn = {**accepted, "has_current_consent": False, "withdrawn_at": "now"}
+        with (
+            patch(
+                "PySide6.QtWidgets.QMessageBox.question",
+                return_value=QMessageBox.StandardButton.Yes,
+            ),
+            patch.object(
+                APIClient,
+                "withdraw_privacy_consent",
+                return_value=response(withdrawn),
+            ) as withdraw,
+        ):
+            self.page.withdraw_privacy_consent()
+
+        withdraw.assert_called_once_with()
+        changed.assert_called_once_with(False)
+        self.assertIn("Withdrawn", self.page.privacy_status_label.text())
 
 
 if __name__ == "__main__":

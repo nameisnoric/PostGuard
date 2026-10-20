@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
+from app.core.privacy import has_current_privacy_consent
 from app.models.camera import Camera
 from app.models.personal_baseline import PersonalBaseline
 from app.models.session import PostureSession
@@ -52,6 +53,12 @@ def start_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    if not has_current_privacy_consent(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accept the current Privacy Notice before starting monitoring",
+        )
+
     # 1. ตรวจสอบว่า Camera เป็นของ User ที่ Login อยู่
     camera_statement = select(Camera).where(
         Camera.camera_id == request.camera_id,

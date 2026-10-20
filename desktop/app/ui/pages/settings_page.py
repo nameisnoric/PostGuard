@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QVBoxLayout,
     QWidget,
+    QMessageBox,
 )
 
 from app.services.alert_sound import AlertSoundPlayer, DEFAULT_SETTINGS
@@ -21,6 +22,7 @@ from app.services.api_client import APIClient
 
 class SettingsPage(QWidget):
     settings_updated = Signal(dict)
+    privacy_consent_changed = Signal(bool)
 
     def __init__(self, sound_player: AlertSoundPlayer):
         super().__init__()
@@ -118,8 +120,47 @@ class SettingsPage(QWidget):
         row.addWidget(card, 1)
         row.addStretch()
         layout.addLayout(row)
+
+        privacy_row = QHBoxLayout()
+        privacy_row.addStretch()
+        privacy_card = QFrame()
+        privacy_card.setProperty("card", True)
+        privacy_card.setMaximumWidth(900)
+        privacy_layout = QVBoxLayout(privacy_card)
+        privacy_layout.setContentsMargins(28, 26, 28, 26)
+        privacy_layout.setSpacing(12)
+
+        privacy_heading = QLabel("Privacy and camera data")
+        privacy_heading.setProperty("role", "heading")
+        privacy_note = QLabel(
+            "Review how camera frames are processed, check your consent status, "
+            "or withdraw consent for future monitoring."
+        )
+        privacy_note.setProperty("role", "muted")
+        privacy_note.setWordWrap(True)
+        self.privacy_status_label = QLabel("Consent status: Not loaded")
+        self.privacy_status_label.setWordWrap(True)
+
+        privacy_actions = QHBoxLayout()
+        self.review_privacy_button = QPushButton("Review Privacy Notice")
+        self.review_privacy_button.clicked.connect(self.review_privacy_notice)
+        self.withdraw_privacy_button = QPushButton("Withdraw Consent")
+        self.withdraw_privacy_button.setProperty("variant", "danger")
+        self.withdraw_privacy_button.clicked.connect(self.withdraw_privacy_consent)
+        privacy_actions.addWidget(self.review_privacy_button)
+        privacy_actions.addStretch()
+        privacy_actions.addWidget(self.withdraw_privacy_button)
+
+        privacy_layout.addWidget(privacy_heading)
+        privacy_layout.addWidget(privacy_note)
+        privacy_layout.addWidget(self.privacy_status_label)
+        privacy_layout.addLayout(privacy_actions)
+        privacy_row.addWidget(privacy_card, 1)
+        privacy_row.addStretch()
+        layout.addLayout(privacy_row)
         layout.addStretch()
         self._populate(DEFAULT_SETTINGS)
+        self.withdraw_privacy_button.setEnabled(False)
 
     def load_settings(self) -> None:
         self.status_label.setText("Loading settings...")
@@ -192,6 +233,87 @@ class SettingsPage(QWidget):
             return
         self.sound_player.play_preview(self.volume_slider.value())
         self.status_label.setText("Playing alert sound.")
+
+    def load_privacy_consent(self) -> None:
+        self.privacy_status_label.setText("Consent status: Loading...")
+        try:
+            response = APIClient.get_privacy_consent()
+        except requests.RequestException:
+            self.privacy_status_label.setText(
+                "Consent status: Cannot load. Check your connection."
+            )
+            self.withdraw_privacy_button.setEnabled(False)
+            return
+        if not response.ok:
+            self.privacy_status_label.setText("Consent status: Could not be loaded.")
+            self.withdraw_privacy_button.setEnabled(False)
+            return
+        try:
+            payload = response.json()
+        except (ValueError, AttributeError):
+            payload = None
+        if not isinstance(payload, dict) or type(
+            payload.get("has_current_consent")
+        ) is not bool:
+            self.privacy_status_label.setText("Consent status: Invalid response.")
+            self.withdraw_privacy_button.setEnabled(False)
+            return
+
+        accepted = payload["has_current_consent"]
+        self.withdraw_privacy_button.setEnabled(accepted)
+        if accepted:
+            accepted_at = payload.get("accepted_at") or "recorded"
+            self.privacy_status_label.setText(
+                f"Consent status: Accepted · {accepted_at}"
+            )
+        elif payload.get("withdrawn_at"):
+            self.privacy_status_label.setText(
+                f"Consent status: Withdrawn · {payload['withdrawn_at']}"
+            )
+        else:
+            self.privacy_status_label.setText("Consent status: Not accepted")
+
+    def review_privacy_notice(self) -> None:
+        from app.ui.privacy_notice_dialog import PrivacyNoticeDialog
+
+        PrivacyNoticeDialog(self, require_acceptance=False).exec()
+
+    def withdraw_privacy_consent(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Withdraw camera consent",
+            "Withdraw consent for future camera monitoring? Existing history "
+            "will remain available.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.withdraw_privacy_button.setEnabled(False)
+        try:
+            response = APIClient.withdraw_privacy_consent()
+        except requests.RequestException:
+            self.privacy_status_label.setText(
+                "Consent could not be withdrawn. Check your connection."
+            )
+            self.withdraw_privacy_button.setEnabled(True)
+            return
+        if not response.ok:
+            self.privacy_status_label.setText(
+                self._response_error(response, "Consent could not be withdrawn.")
+            )
+            self.withdraw_privacy_button.setEnabled(True)
+            return
+        try:
+            payload = response.json()
+        except (ValueError, AttributeError):
+            payload = None
+        if not isinstance(payload, dict) or payload.get("has_current_consent") is not False:
+            self.privacy_status_label.setText("Consent withdrawal was not confirmed.")
+            self.withdraw_privacy_button.setEnabled(True)
+            return
+        self.privacy_status_label.setText("Consent status: Withdrawn")
+        self.privacy_consent_changed.emit(False)
 
     def _populate(self, settings: dict) -> None:
         self.notifications_enabled.setChecked(settings["notifications_enabled"])

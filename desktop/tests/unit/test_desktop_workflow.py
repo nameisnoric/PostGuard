@@ -113,6 +113,17 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.stack.enter_context(patch.object(
             APIClient, "get_settings", return_value=response(self.user_settings)
         ))
+        self.privacy_consent = self.stack.enter_context(patch.object(
+            APIClient,
+            "get_privacy_consent",
+            return_value=response({
+                "notice_version": "2026-10-20",
+                "accepted_version": "2026-10-20",
+                "accepted_at": "2026-10-20T00:00:00+00:00",
+                "withdrawn_at": None,
+                "has_current_consent": True,
+            }),
+        ))
         self.update_profile = self.stack.enter_context(patch.object(
             APIClient,
             "update_profile",
@@ -220,6 +231,22 @@ class DesktopWorkflowTests(unittest.TestCase):
             self.window.monitoring_page.sound_player.settings,
             self.user_settings,
         )
+
+    def test_monitor_requires_current_privacy_consent(self):
+        self.privacy_consent.return_value = response({
+            "notice_version": "2026-10-20",
+            "accepted_version": None,
+            "accepted_at": None,
+            "withdrawn_at": None,
+            "has_current_consent": False,
+        })
+        with patch(
+            "app.ui.main_window.PrivacyNoticeDialog.exec",
+            return_value=0,
+        ):
+            self.window.show_monitor()
+
+        self.assertIs(self.window.pages.currentWidget(), self.window.dashboard_page)
 
     def test_account_deletion_logs_out_after_backend_confirmation(self):
         TokenStore.set_token("test-token")

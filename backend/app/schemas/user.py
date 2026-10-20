@@ -78,6 +78,18 @@ class UserProfileUpdate(BaseModel):
             raise ValueError("Full name must not exceed 150 characters")
         return full_name
 
+
+class PrivacyConsentAccept(BaseModel):
+    notice_version: str
+
+
+class PrivacyConsentResponse(BaseModel):
+    notice_version: str
+    accepted_version: str | None = None
+    accepted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    has_current_consent: bool
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

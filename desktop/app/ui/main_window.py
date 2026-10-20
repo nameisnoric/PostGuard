@@ -29,6 +29,7 @@ from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.profile_page import ProfilePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import APP_QSS, polish, set_centered_window
+from app.ui.privacy_notice_dialog import PrivacyNoticeDialog
 
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import (
@@ -204,6 +205,9 @@ class MainWindow(QMainWindow):
         self.settings_page.settings_updated.connect(
             self.monitoring_page.apply_notification_settings
         )
+        self.settings_page.privacy_consent_changed.connect(
+            self._privacy_consent_changed
+        )
         self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================
@@ -255,6 +259,7 @@ class MainWindow(QMainWindow):
         self.global_stop_button.clicked.connect(self.monitoring_page.handle_stop)
         self.update_monitoring_controls()
         self.settings_page.load_settings()
+        self.settings_page.load_privacy_consent()
 
         # Session Summary -> Dashboard
         self.session_summary_page.back_requested.connect(
@@ -332,6 +337,8 @@ class MainWindow(QMainWindow):
             return
         if self._show_unsaved_summary():
             return
+        if not self._ensure_privacy_consent():
+            return
         if not self.check_previous_sessions():
             return
 
@@ -370,7 +377,43 @@ class MainWindow(QMainWindow):
         self.camera_preview_page.stop_preview()
         self.camera_calibration_page.stop_camera()
         self.settings_page.load_settings()
+        self.settings_page.load_privacy_consent()
         self.pages.setCurrentWidget(self.settings_page)
+
+    def _ensure_privacy_consent(self) -> bool:
+        try:
+            response = APIClient.get_privacy_consent()
+        except requests.RequestException:
+            QMessageBox.warning(
+                self,
+                "Privacy Notice",
+                "Cannot check your privacy choice. Check your connection before "
+                "opening the camera.",
+            )
+            return False
+        if not response.ok:
+            QMessageBox.warning(
+                self,
+                "Privacy Notice",
+                "Your privacy choice could not be loaded. Restart the backend and "
+                "try again.",
+            )
+            return False
+        try:
+            payload = response.json()
+        except (ValueError, AttributeError):
+            payload = None
+        if isinstance(payload, dict) and payload.get("has_current_consent") is True:
+            return True
+
+        dialog = PrivacyNoticeDialog(self, require_acceptance=True)
+        accepted = dialog.exec() == dialog.DialogCode.Accepted
+        if accepted:
+            self.settings_page.load_privacy_consent()
+        return accepted
+
+    def _privacy_consent_changed(self, accepted: bool) -> None:
+        self.user_data["has_current_privacy_consent"] = accepted
 
     def update_profile(self, updated: dict) -> None:
         self.user_data.update(updated)

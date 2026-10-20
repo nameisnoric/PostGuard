@@ -119,7 +119,7 @@ QPushButton[nav="true"] {
 }
 QPushButton[nav="true"]:hover { color: #0f172a; background: #f8fafc; }
 QPushButton[navActive="true"] { color: #0f172a; font-weight: 700; border-bottom: 2px solid #2563eb; }
-QLineEdit, QListWidget, QTableWidget, QComboBox, QDoubleSpinBox {
+QLineEdit, QListWidget, QTableWidget, QComboBox, QDoubleSpinBox, QTextBrowser {
     background: #ffffff;
     color: #0f172a;
     border: 1px solid #e2e8f0;
@@ -127,6 +127,7 @@ QLineEdit, QListWidget, QTableWidget, QComboBox, QDoubleSpinBox {
     selection-background-color: #dbeafe;
     selection-color: #1e3a8a;
 }
+QTextBrowser { padding: 12px; }
 QLineEdit, QComboBox, QDoubleSpinBox {
     min-height: 38px;
     padding: 0 10px;

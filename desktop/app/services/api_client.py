@@ -121,6 +121,23 @@ class APIClient:
         return APIClient.put("/users/me/settings", settings)
 
     @staticmethod
+    def get_privacy_consent():
+        return APIClient.get("/users/me/privacy-consent")
+
+    @staticmethod
+    def accept_privacy_consent(notice_version: str):
+        if not notice_version:
+            raise ValueError("Privacy Notice version is required.")
+        return APIClient.put(
+            "/users/me/privacy-consent",
+            {"notice_version": notice_version},
+        )
+
+    @staticmethod
+    def withdraw_privacy_consent():
+        return APIClient.delete("/users/me/privacy-consent")
+
+    @staticmethod
     def upload_avatar(path: str):
         suffix = path.rsplit(".", 1)[-1].lower() if "." in path else ""
         content_type = "image/png" if suffix == "png" else "image/jpeg"

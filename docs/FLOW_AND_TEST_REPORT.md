@@ -1,5 +1,19 @@
 # PostGuard: flow และผลทดสอบ
 
+## Privacy Notice and stored consent — 20 October 2026
+
+- The Desktop checks current consent before opening Camera Setup and shows a
+  versioned Privacy Notice when consent is missing, withdrawn or outdated.
+- Camera images and video are described as locally processed and not persisted
+  or uploaded; only required numerical baseline, session, alert and report data
+  is stored.
+- Users can review the notice and withdraw consent from Settings. Withdrawal is
+  rejected while a monitoring session remains RUNNING or PAUSED.
+- The Session API independently rejects new sessions without current consent.
+- Supabase migration `a91f4c2d7e30` stores the accepted version, acceptance time
+  and withdrawal time.
+- Backend 36 tests and Desktop 125 unit tests pass after this implementation.
+
 ## Live email delivery check — 19 October 2026
 
 - Resend accepted one Registration OTP email and one Password Reset OTP email
