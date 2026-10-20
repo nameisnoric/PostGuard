@@ -1,229 +1,165 @@
+import requests
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget,
+    QFrame,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
-    QMessageBox
+    QWidget,
 )
 
-import requests
-
 from app.services.api_client import APIClient
-from app.ui.theme import set_centered_window
+from app.ui.theme import APP_QSS, set_centered_window
 
 
 class OTPWindow(QWidget):
-
     def __init__(self, email: str):
         super().__init__()
 
         self.email = email
+        self.setWindowTitle("PostGuard - Verify Email")
+        set_centered_window(self, 760, 520, 640, 460)
+        self.setObjectName("authWindow")
+        self.setStyleSheet(APP_QSS)
 
-        self.setWindowTitle(
-            "PostGuard - Verify OTP"
+        eyebrow = QLabel("EMAIL VERIFICATION")
+        eyebrow.setProperty("role", "eyebrow")
+        eyebrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.title_label = QLabel("Verify your email")
+        self.title_label.setProperty("role", "title")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        description = QLabel(
+            "Enter the 6-digit verification code sent to"
         )
+        description.setProperty("role", "muted")
+        description.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        set_centered_window(self, 440, 360, 400, 320)
-
-        # -------------------------
-        # Title
-        # -------------------------
-
-        self.title_label = QLabel(
-            "Verify Your Email"
-        )
-
-        # แสดงว่า OTP ถูกส่งไปที่ email ไหน
-        self.email_label = QLabel(
-            f"OTP was sent to:\n{self.email}"
-        )
-
-        # -------------------------
-        # OTP Input
-        # -------------------------
+        self.email_label = QLabel(self.email)
+        self.email_label.setProperty("role", "heading")
+        self.email_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.email_label.setWordWrap(True)
 
         self.otp_input = QLineEdit()
-
-        self.otp_input.setPlaceholderText(
-            "Enter OTP"
-        )
-
+        self.otp_input.setPlaceholderText("6-digit verification code")
         self.otp_input.setMaxLength(6)
+        self.otp_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.otp_input.setClearButtonEnabled(True)
 
-        # -------------------------
-        # Buttons
-        # -------------------------
-
-        self.verify_button = QPushButton(
-            "Verify OTP"
+        helper = QLabel(
+            "The code expires in 5 minutes. Check your spam folder if it is missing."
         )
+        helper.setProperty("role", "muted")
+        helper.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        helper.setWordWrap(True)
 
-        self.back_button = QPushButton(
-            "Back"
-        )
+        self.verify_button = QPushButton("Verify Email")
+        self.verify_button.setProperty("variant", "primary")
+        self.back_button = QPushButton("Back to Registration")
 
-        # -------------------------
-        # Layout
-        # -------------------------
+        self.card = QFrame()
+        self.card.setProperty("card", True)
+        self.card.setMaximumWidth(500)
+        self.card.setMinimumWidth(420)
 
-        layout = QVBoxLayout(self)
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setContentsMargins(42, 38, 42, 38)
+        card_layout.setSpacing(13)
+        card_layout.addWidget(eyebrow)
+        card_layout.addWidget(self.title_label)
+        card_layout.addWidget(description)
+        card_layout.addWidget(self.email_label)
+        card_layout.addSpacing(8)
+        card_layout.addWidget(QLabel("Verification code"))
+        card_layout.addWidget(self.otp_input)
+        card_layout.addWidget(helper)
+        card_layout.addSpacing(6)
+        card_layout.addWidget(self.verify_button)
+        card_layout.addWidget(self.back_button)
 
-        layout.addWidget(
-            self.title_label
-        )
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(32, 32, 32, 32)
+        outer.addStretch()
+        outer.addWidget(self.card, alignment=Qt.AlignmentFlag.AlignCenter)
+        outer.addStretch()
 
-        layout.addWidget(
-            self.email_label
-        )
-
-        layout.addWidget(
-            self.otp_input
-        )
-
-        layout.addWidget(
-            self.verify_button
-        )
-
-        layout.addWidget(
-            self.back_button
-        )
-
-        # -------------------------
-        # Events
-        # -------------------------
-
-        self.verify_button.clicked.connect(
-            self.handle_verify
-        )
-
-        self.back_button.clicked.connect(
-            self.back_to_register
-        )
+        self.verify_button.clicked.connect(self.handle_verify)
+        self.back_button.clicked.connect(self.back_to_register)
+        self.otp_input.returnPressed.connect(self.handle_verify)
+        self.otp_input.setFocus()
 
     def handle_verify(self):
-        otp = (
-            self.otp_input
-            .text()
-            .strip()
-        )
-
-        # -------------------------
-        # Basic validation
-        # -------------------------
+        otp = self.otp_input.text().strip()
 
         if not otp:
-            self.show_error(
-                "Please enter the OTP."
-            )
+            self.show_error("Please enter the OTP.")
             return
 
         if len(otp) != 6:
-            self.show_error(
-                "OTP must contain 6 digits."
-            )
+            self.show_error("OTP must contain 6 digits.")
             return
 
         if not otp.isdigit():
-            self.show_error(
-                "OTP must contain numbers only."
-            )
+            self.show_error("OTP must contain numbers only.")
             return
 
-        # -------------------------
-        # Verify OTP with Backend
-        # -------------------------
+        self.verify_button.setEnabled(False)
 
         try:
-            response = (
-                APIClient.verify_register_otp(
-                    email=self.email,
-                    otp=otp
-                )
+            response = APIClient.verify_register_otp(
+                email=self.email,
+                otp=otp,
             )
-
         except requests.RequestException:
-            self.show_error(
-                "Cannot connect to the PostGuard server."
-            )
+            self.verify_button.setEnabled(True)
+            self.show_error("Cannot connect to the PostGuard server.")
             return
 
-        print(
-            "VERIFY OTP STATUS:",
-            response.status_code
-        )
-
-        print(
-            "VERIFY OTP RESPONSE:",
-            response.text
-        )
-
-        # -------------------------
-        # OTP incorrect / expired
-        # -------------------------
-
-        if response.status_code not in (200,201):
+        if response.status_code not in (200, 201):
+            self.verify_button.setEnabled(True)
             try:
                 error_data = response.json()
-
                 message = error_data.get(
                     "detail",
-                    "OTP verification failed."
+                    "OTP verification failed.",
                 )
+            except (AttributeError, ValueError):
+                message = "OTP verification failed."
 
-            except ValueError:
-                message = (
-                    "OTP verification failed."
-                )
-
-            self.show_error(
-                str(message)
-            )
-
+            self.show_error(str(message))
+            self.otp_input.selectAll()
+            self.otp_input.setFocus()
             return
-
-        # -------------------------
-        # Registration Successful
-        # -------------------------
 
         QMessageBox.information(
             self,
-            "PostGuard",
-            "Registration successful. You can now log in."
+            "Registration Complete",
+            "Your email has been verified. You can now log in.",
         )
-
         self.open_login()
 
     def open_login(self):
-        from app.ui.login_window import (
-            LoginWindow
-        )
+        from app.ui.login_window import LoginWindow
 
         self.login_window = LoginWindow()
-
         self.login_window.show()
-
         self.close()
 
     def back_to_register(self):
-        from app.ui.register_window import (
-            RegisterWindow
-        )
+        from app.ui.register_window import RegisterWindow
 
-        self.register_window = (
-            RegisterWindow()
-        )
-
+        self.register_window = RegisterWindow()
+        self.register_window.email_input.setText(self.email)
         self.register_window.show()
-
         self.close()
 
-    def show_error(
-        self,
-        message: str
-    ):
+    def show_error(self, message: str):
         QMessageBox.warning(
             self,
             "PostGuard",
-            message
+            message,
         )

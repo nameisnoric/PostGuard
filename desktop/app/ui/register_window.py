@@ -87,6 +87,14 @@ class RegisterWindow(QWidget):
             QLineEdit.EchoMode.Password
         )
 
+        self.confirm_password_input = QLineEdit()
+        self.confirm_password_input.setPlaceholderText(
+            "Confirm Password"
+        )
+        self.confirm_password_input.setEchoMode(
+            QLineEdit.EchoMode.Password
+        )
+
         # -------------------------
         # Buttons
         # -------------------------
@@ -122,6 +130,7 @@ class RegisterWindow(QWidget):
             ("Username", self.username_input),
             ("KU Email", self.email_input),
             ("Password", self.password_input),
+            ("Confirm password", self.confirm_password_input),
         ):
             layout.addWidget(QLabel(label))
             layout.addWidget(field)
@@ -167,6 +176,11 @@ class RegisterWindow(QWidget):
             .text()
         )
 
+        confirm_password = (
+            self.confirm_password_input
+            .text()
+        )
+
         # -------------------------
         # Basic validation
         # -------------------------
@@ -176,10 +190,19 @@ class RegisterWindow(QWidget):
             or not username
             or not email
             or not password
+            or not confirm_password
         ):
             self.show_error(
                 "Please fill in all fields."
             )
+            return
+
+        if password != confirm_password:
+            self.show_error(
+                "Password and confirmation do not match."
+            )
+            self.confirm_password_input.clear()
+            self.confirm_password_input.setFocus()
             return
 
         try:
@@ -216,12 +239,6 @@ class RegisterWindow(QWidget):
 
             return
 
-        QMessageBox.information(
-            self,
-            "PostGuard",
-            "OTP has been sent to your email."
-        )
-        
         from app.ui.otp_window import OTPWindow
 
         self.otp_window = OTPWindow(email)
