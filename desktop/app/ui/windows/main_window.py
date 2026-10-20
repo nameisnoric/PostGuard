@@ -201,7 +201,7 @@ class MainWindow(QMainWindow):
         self.settings_action.triggered.connect(self.show_settings)
         self.logout_action.triggered.connect(self.logout)
         self.profile_page.profile_updated.connect(self.update_profile)
-        self.profile_page.account_deletion_requested.connect(self.delete_account)
+        self.settings_page.account_deletion_requested.connect(self.delete_account)
         self.settings_page.settings_updated.connect(
             self.monitoring_page.apply_notification_settings
         )
@@ -422,30 +422,30 @@ class MainWindow(QMainWindow):
     def delete_account(self) -> None:
         """Finish local work, request deletion, then return to login."""
         if not self._finish_before_exit():
-            self.profile_page.status_label.setText(
+            self.settings_page.account_status_label.setText(
                 'โปรดจบและบันทึกเซสชันปัจจุบันก่อนลบบัญชี'
             )
             return
 
-        self.profile_page.delete_account_button.setEnabled(False)
-        self.profile_page.status_label.setText('กำลังส่งคำขอลบบัญชี...')
+        self.settings_page.delete_account_button.setEnabled(False)
+        self.settings_page.account_status_label.setText('กำลังส่งคำขอลบบัญชี...')
         try:
             response = APIClient.request_account_deletion()
         except requests.RequestException:
-            self.profile_page.delete_account_button.setEnabled(True)
-            self.profile_page.status_label.setText(
+            self.settings_page.delete_account_button.setEnabled(True)
+            self.settings_page.account_status_label.setText(
                 "Cannot request account deletion. Check your connection."
             )
             return
         if not response.ok:
-            self.profile_page.delete_account_button.setEnabled(True)
+            self.settings_page.delete_account_button.setEnabled(True)
             try:
                 detail = response.json().get(
                     "detail", "Account deletion could not be requested."
                 )
             except (ValueError, AttributeError):
                 detail = "Account deletion could not be requested."
-            self.profile_page.status_label.setText(str(detail))
+            self.settings_page.account_status_label.setText(str(detail))
             return
 
         try:

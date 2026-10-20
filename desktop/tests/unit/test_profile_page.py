@@ -8,7 +8,6 @@ from PySide6.QtWidgets import QApplication, QDialog
 
 from app.services.api_client import APIClient
 from app.ui.pages.profile_page import (
-    AccountDeletionConfirmationDialog,
     ProfilePage,
     ProfileSaveConfirmationDialog,
 )
@@ -31,11 +30,6 @@ class ProfilePageTests(unittest.TestCase):
         self.assertEqual(self.page.last_name_input.text(), "Lee")
         self.assertEqual(self.page.username_input.text(), "jlee")
         self.assertEqual(self.page.avatar_label.text(), "JL")
-
-    def test_delete_account_is_a_separate_visible_action_card(self):
-        self.assertEqual(self.page.danger_card.property("variant"), "dangerZone")
-        self.assertEqual(self.page.delete_account_button.text(), "Delete Account")
-        self.assertEqual(self.page.delete_account_button.property("variant"), "danger")
 
     def test_save_persists_profile_and_emits_backend_values(self):
         updated = Mock()
@@ -146,20 +140,6 @@ class ProfilePageTests(unittest.TestCase):
         self.assertIsNone(self.page.user_data["avatar_path"])
         self.assertEqual(self.page.avatar_label.text(), "JL")
         updated.assert_called_once_with({"avatar_path": None})
-
-    def test_account_deletion_requires_confirmation_before_signal(self):
-        requested = Mock()
-        self.page.account_deletion_requested.connect(requested)
-        with patch.object(
-            AccountDeletionConfirmationDialog,
-            "exec",
-            side_effect=(QDialog.DialogCode.Rejected, QDialog.DialogCode.Accepted),
-        ):
-            self.page.delete_account_button.click()
-            requested.assert_not_called()
-            self.page.delete_account_button.click()
-            requested.assert_called_once_with()
-
 
 if __name__ == "__main__":
     unittest.main()

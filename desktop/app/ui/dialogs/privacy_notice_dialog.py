@@ -36,7 +36,7 @@ account in the PostGuard database.</p>
 <p>You can decline now and continue using account pages without camera access.
 You can review this notice or withdraw consent later in Settings. Withdrawal
 blocks future camera monitoring but does not delete existing history. You can
-request account deletion from Profile.</p>
+request account deletion from Settings.</p>
 """
 
 

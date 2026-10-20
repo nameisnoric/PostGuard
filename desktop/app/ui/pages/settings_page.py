@@ -19,12 +19,14 @@ from PySide6.QtWidgets import (
 
 from app.services.alert_sound import AlertSoundPlayer, DEFAULT_SETTINGS
 from app.services.api_client import APIClient
+from app.ui.dialogs.account_deletion_dialog import AccountDeletionConfirmationDialog
 from app.ui.theme import polish
 
 
 class SettingsPage(QWidget):
     settings_updated = Signal(dict)
     privacy_consent_changed = Signal(bool)
+    account_deletion_requested = Signal()
 
     def __init__(self, sound_player: AlertSoundPlayer):
         super().__init__()
@@ -160,9 +162,48 @@ class SettingsPage(QWidget):
         privacy_row.addWidget(privacy_card, 1)
         privacy_row.addStretch()
         layout.addLayout(privacy_row)
+
+        account_row = QHBoxLayout()
+        account_row.addStretch()
+        self.danger_card = QFrame()
+        self.danger_card.setProperty("card", True)
+        self.danger_card.setProperty("variant", "dangerZone")
+        self.danger_card.setMaximumWidth(900)
+        danger_layout = QVBoxLayout(self.danger_card)
+        danger_layout.setContentsMargins(28, 22, 28, 22)
+        danger_layout.setSpacing(10)
+        danger_title = QLabel("Delete Account")
+        danger_title.setProperty("role", "heading")
+        danger_message = QLabel(
+            "ปิดใช้งานบัญชีทันทีและลบข้อมูลถาวรหลังระยะเวลากู้คืน 14 วัน "
+            "คุณสามารถเข้าสู่ระบบเพื่อกู้คืนบัญชีได้ก่อนครบกำหนด"
+        )
+        danger_message.setProperty("role", "muted")
+        danger_message.setWordWrap(True)
+        self.account_status_label = QLabel("")
+        self.account_status_label.setProperty("role", "muted")
+        self.account_status_label.setWordWrap(True)
+        self.delete_account_button = QPushButton("Delete Account")
+        self.delete_account_button.setProperty("variant", "danger")
+        self.delete_account_button.clicked.connect(self.confirm_account_deletion)
+        danger_actions = QHBoxLayout()
+        danger_actions.addWidget(self.delete_account_button)
+        danger_actions.addStretch()
+        danger_layout.addWidget(danger_title)
+        danger_layout.addWidget(danger_message)
+        danger_layout.addWidget(self.account_status_label)
+        danger_layout.addLayout(danger_actions)
+        account_row.addWidget(self.danger_card, 1)
+        account_row.addStretch()
+        layout.addLayout(account_row)
         layout.addStretch()
         self._populate(DEFAULT_SETTINGS)
         self._set_privacy_consent_action(None)
+
+    def confirm_account_deletion(self) -> None:
+        dialog = AccountDeletionConfirmationDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.account_deletion_requested.emit()
 
     def load_settings(self) -> None:
         self.status_label.setText('กำลังโหลดการตั้งค่า...')

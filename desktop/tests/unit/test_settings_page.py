@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.services.api_client import APIClient
+from app.ui.dialogs.account_deletion_dialog import AccountDeletionConfirmationDialog
 from app.ui.pages.settings_page import SettingsPage
 
 
@@ -78,6 +79,21 @@ class SettingsPageTests(unittest.TestCase):
         self.page.volume_slider.setValue(55)
         self.page.test_sound()
         self.sound.play_preview.assert_called_once_with(55)
+
+    def test_account_deletion_is_confirmed_from_settings(self):
+        self.assertEqual(self.page.danger_card.property("variant"), "dangerZone")
+        self.assertEqual(self.page.delete_account_button.text(), "Delete Account")
+        requested = Mock()
+        self.page.account_deletion_requested.connect(requested)
+        with patch.object(
+            AccountDeletionConfirmationDialog,
+            "exec",
+            side_effect=(QDialog.DialogCode.Rejected, QDialog.DialogCode.Accepted),
+        ):
+            self.page.delete_account_button.click()
+            requested.assert_not_called()
+            self.page.delete_account_button.click()
+            requested.assert_called_once_with()
 
     def test_privacy_status_and_withdrawal(self):
         accepted = {

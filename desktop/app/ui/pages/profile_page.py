@@ -63,47 +63,8 @@ class ProfileSaveConfirmationDialog(QDialog):
         layout.addLayout(buttons)
 
 
-class AccountDeletionConfirmationDialog(QDialog):
-    """Explain the recovery period before an account deletion request."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle('PostGuard - ลบบัญชี')
-        self.setModal(True)
-        self.setFixedWidth(520)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 26, 28, 24)
-        layout.setSpacing(16)
-
-        heading = QLabel("ยืนยันคำขอลบบัญชี?")
-        heading.setProperty("role", "title")
-        message = QLabel(
-            "Your account will be disabled immediately and scheduled for permanent "
-            "deletion in 14 days. During that period, sign in again to recover it. "
-            "After the deadline, your account, monitoring records and private profile "
-            "photo will be permanently removed."
-        )
-        message.setWordWrap(True)
-
-        buttons = QHBoxLayout()
-        buttons.addStretch()
-        cancel = QPushButton("เก็บบัญชีไว้")
-        cancel.clicked.connect(self.reject)
-        confirm = QPushButton("ส่งคำขอลบบัญชี")
-        confirm.setProperty("variant", "danger")
-        confirm.clicked.connect(self.accept)
-        buttons.addWidget(cancel)
-        buttons.addWidget(confirm)
-
-        layout.addWidget(heading)
-        layout.addWidget(message)
-        layout.addLayout(buttons)
-
-
 class ProfilePage(QWidget):
     profile_updated = Signal(dict)
-    account_deletion_requested = Signal()
 
     def __init__(self, user_data: dict):
         super().__init__()
@@ -212,43 +173,9 @@ class ProfilePage(QWidget):
         card_row.addStretch()
         layout.addLayout(card_row)
 
-        danger_row = QHBoxLayout()
-        danger_row.addStretch()
-        self.danger_card = QFrame()
-        self.danger_card.setProperty("card", True)
-        self.danger_card.setProperty("variant", "dangerZone")
-        self.danger_card.setMaximumWidth(1048)
-        danger_layout = QVBoxLayout(self.danger_card)
-        danger_layout.setContentsMargins(24, 20, 24, 20)
-        danger_layout.setSpacing(10)
-        danger_title = QLabel("Delete Account")
-        danger_title.setProperty("role", "heading")
-        danger_message = QLabel(
-            "ปิดใช้งานบัญชีทันทีและลบข้อมูลถาวรหลังระยะเวลากู้คืน 14 วัน "
-            "ผู้ใช้สามารถเข้าสู่ระบบเพื่อกู้คืนบัญชีได้ก่อนครบกำหนด"
-        )
-        danger_message.setProperty("role", "muted")
-        danger_message.setWordWrap(True)
-        self.delete_account_button = QPushButton("Delete Account")
-        self.delete_account_button.setProperty("variant", "danger")
-        self.delete_account_button.clicked.connect(self.confirm_account_deletion)
-        danger_actions = QHBoxLayout()
-        danger_actions.addWidget(self.delete_account_button)
-        danger_actions.addStretch()
-        danger_layout.addWidget(danger_title)
-        danger_layout.addWidget(danger_message)
-        danger_layout.addLayout(danger_actions)
-        danger_row.addWidget(self.danger_card, 1)
-        danger_row.addStretch()
-        layout.addLayout(danger_row)
         layout.addStretch()
 
         self.reset_form()
-
-    def confirm_account_deletion(self) -> None:
-        dialog = AccountDeletionConfirmationDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.account_deletion_requested.emit()
 
     @staticmethod
     def _split_name(full_name: str) -> tuple[str, str]:
