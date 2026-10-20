@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from app.services.api_client import APIClient
-from app.ui.pages.alert_history_dialog import AlertHistoryDialog
+from app.ui.dialogs.alert_history_dialog import AlertHistoryDialog
 
 
 def response(data, status=200):

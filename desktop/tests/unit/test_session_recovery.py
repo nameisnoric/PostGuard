@@ -12,7 +12,7 @@ except ImportError:
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import find_unclosed_sessions, interrupt_previous_session
 from app.services.alert_history_service import summarize_alerts
-from app.ui.login_window import LoginWindow
+from app.ui.windows.login_window import LoginWindow
 
 response = fixtures.response
 
@@ -94,7 +94,7 @@ class SessionRecoveryTests(unittest.TestCase):
         login_response = response({"access_token": "secret-token"})
         login_response.text = "secret-token"
         output = StringIO()
-        with patch.object(APIClient, "login", return_value=login_response), patch.object(APIClient, "get_current_user", return_value=response({"id": 1})), patch("app.ui.login_window.MainWindow") as window, redirect_stdout(output):
+        with patch.object(APIClient, "login", return_value=login_response), patch.object(APIClient, "get_current_user", return_value=response({"id": 1})), patch("app.ui.windows.login_window.MainWindow") as window, redirect_stdout(output):
             login.handle_login()
             window.return_value.check_previous_sessions.assert_called_once()
         self.assertNotIn("secret-token", output.getvalue())
@@ -115,8 +115,8 @@ class SessionRecoveryTests(unittest.TestCase):
         ), patch.object(
             APIClient, "get_current_user", return_value=response(pending_user)
         ), patch(
-            "app.ui.account_recovery_window.AccountRecoveryWindow"
-        ) as recovery, patch("app.ui.login_window.MainWindow") as main_window:
+            "app.ui.windows.account_recovery_window.AccountRecoveryWindow"
+        ) as recovery, patch("app.ui.windows.login_window.MainWindow") as main_window:
             login.handle_login()
 
         recovery.assert_called_once_with(pending_user)

@@ -274,7 +274,7 @@ class SettingsPage(QWidget):
             self.privacy_status_label.setText("Consent status: Not accepted")
 
     def review_privacy_notice(self) -> None:
-        from app.ui.privacy_notice_dialog import PrivacyNoticeDialog
+        from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
 
         PrivacyNoticeDialog(self, require_acceptance=False).exec()
 

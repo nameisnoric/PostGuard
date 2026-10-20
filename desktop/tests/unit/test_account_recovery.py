@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.core.token_store import TokenStore
 from app.services.api_client import APIClient
-from app.ui.account_recovery_window import AccountRecoveryWindow
+from app.ui.windows.account_recovery_window import AccountRecoveryWindow
 
 
 def response(data, status=200):
@@ -44,7 +44,7 @@ class AccountRecoveryWindowTests(unittest.TestCase):
         with patch.object(
             APIClient, "cancel_account_deletion", return_value=response(active)
         ) as recover, patch(
-            "app.ui.main_window.MainWindow"
+            "app.ui.windows.main_window.MainWindow"
         ) as main_window, patch("PySide6.QtWidgets.QMessageBox.information"):
             self.window.recover_account()
 
@@ -65,7 +65,7 @@ class AccountRecoveryWindowTests(unittest.TestCase):
 
     def test_back_to_login_clears_token(self):
         TokenStore.set_token("token")
-        with patch("app.ui.login_window.LoginWindow") as login:
+        with patch("app.ui.windows.login_window.LoginWindow") as login:
             self.window.back_to_login()
         self.assertIsNone(TokenStore.get_token())
         login.return_value.show.assert_called_once_with()

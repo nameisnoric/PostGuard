@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication, QDialog
 
 from app.services.api_client import APIClient
-from app.ui.privacy_notice_dialog import (
+from app.ui.dialogs.privacy_notice_dialog import (
     PRIVACY_NOTICE_VERSION,
     PrivacyNoticeDialog,
 )

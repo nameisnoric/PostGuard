@@ -194,7 +194,7 @@ current Detection service.
 ## ไฟล์สำคัญ
 
 - `desktop/app/ui/theme.py` — design tokens, QSS และ dynamic repolish
-- `desktop/app/ui/main_window.py` — top navigation, session bar และ page orchestration
+- `desktop/app/ui/windows/main_window.py` — top navigation, session bar และ page orchestration
 - `desktop/app/ui/pages/dashboard_page.py` — real dashboard data และ empty/error states
 - `desktop/app/ui/pages/monitoring_page.py` — camera/detection layout และ session controls
 - `desktop/app/ui/pages/camera_setup_page.py` — เลือกหรือ scan กล้อง
@@ -204,7 +204,7 @@ current Detection service.
 - `desktop/app/ui/pages/baseline_page.py` — calibration และบันทึก baseline
 - `desktop/app/ui/pages/alert_history_dialog.py` — session alert viewer with loading, error and empty states
 - `desktop/app/ui/pages/profile_page.py` — Figma-aligned profile form, private photo management and persistent username/full-name edits
-- `desktop/app/ui/account_recovery_window.py` — restricted 14-day account recovery screen
+- `desktop/app/ui/windows/account_recovery_window.py` — restricted 14-day account recovery screen
 - `desktop/app/ui/pages/settings_page.py` — persisted notification, sound, volume and reminder settings
 - `desktop/app/services/alert_sound.py` — local WAV playback and reminder cooldown control
 
@@ -216,9 +216,9 @@ current Detection service.
 cd backend
 .\.venv\Scripts\python.exe -m scripts.purge_deleted_accounts
 ```
-- `desktop/app/ui/login_window.py` — login card and authentication entry point
-- `desktop/app/ui/register_window.py` — account registration card and OTP handoff
-- `desktop/app/ui/password_reset_dialog.py` — three-step password reset dialog
+- `desktop/app/ui/windows/login_window.py` — login card and authentication entry point
+- `desktop/app/ui/windows/register_window.py` — account registration card and OTP handoff
+- `desktop/app/ui/dialogs/password_reset_dialog.py` — three-step password reset dialog
 - `desktop/app/services/api_client.py` — REST client
 - `backend/app/routers/` — API endpoints
 - `backend/app/models/` — SQLAlchemy models

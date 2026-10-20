@@ -1,6 +1,6 @@
 import unittest
 
-from app.ui.preview_sizing import fitted_preview_size
+from app.ui.utils.preview_sizing import fitted_preview_size
 
 
 class PreviewSizingTests(unittest.TestCase):

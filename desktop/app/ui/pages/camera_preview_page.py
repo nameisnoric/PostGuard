@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
-from app.ui.preview_sizing import fit_preview_label
+from app.ui.utils.preview_sizing import fit_preview_label
 
 
 class CameraPreviewPage(QWidget):

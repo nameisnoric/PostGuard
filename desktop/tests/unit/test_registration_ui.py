@@ -7,8 +7,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from app.services.api_client import APIClient
-from app.ui.otp_window import OTPWindow
-from app.ui.register_window import RegisterWindow
+from app.ui.windows.otp_window import OTPWindow
+from app.ui.windows.register_window import RegisterWindow
 
 
 def response(data, status=200):
@@ -63,7 +63,7 @@ class RegistrationUITests(unittest.TestCase):
                 "request_register_otp",
                 return_value=response({"message": "sent"}),
             ) as request_otp,
-            patch("app.ui.otp_window.OTPWindow", return_value=otp_window),
+            patch("app.ui.windows.otp_window.OTPWindow", return_value=otp_window),
         ):
             self.window.handle_register()
 

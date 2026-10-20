@@ -27,7 +27,7 @@ from app.services.alert_history_service import (
 from app.services.session_summary_service import (
     save_session_summary,
 )
-from app.ui.pages.alert_history_dialog import AlertHistoryDialog
+from app.ui.dialogs.alert_history_dialog import AlertHistoryDialog
 
 
 class SessionSummaryPage(QWidget):

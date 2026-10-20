@@ -35,7 +35,7 @@ from app.services.posture_duration_tracker import (
     classify_neck_side_bending,
 )
 from app.services.session_summary_service import save_session_summary
-from app.ui.preview_sizing import fit_preview_label
+from app.ui.utils.preview_sizing import fit_preview_label
 
 
 class MonitoringPage(QWidget):

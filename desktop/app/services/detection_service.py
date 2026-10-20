@@ -1,30 +1,18 @@
-import sys
 import math
 import time
 from pathlib import Path
 
-# หา Project Root ของ PostGuard
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-BACKEND_DIR = PROJECT_ROOT / "backend"
-
-# ให้ Desktop สามารถ import โมดูลใน backend ได้
-if str(BACKEND_DIR) not in sys.path:
-    # Both applications use an ``app`` package. Appending keeps Desktop's
-    # package authoritative while still making camera_card importable.
-    sys.path.append(str(BACKEND_DIR))
-
-# ใช้ Detection 
-from camera_card.mediapipe_detection.pose.pose_detector import PoseDetector
-from camera_card.mediapipe_detection.face.face_detector import FaceDetector
-from camera_card.mediapipe_detection.face.face_points import extract_face_points
-from camera_card.mediapipe_detection.face.face_orientation import (
+from app.vision.mediapipe_detection.pose.pose_detector import PoseDetector
+from app.vision.mediapipe_detection.face.face_detector import FaceDetector
+from app.vision.mediapipe_detection.face.face_points import extract_face_points
+from app.vision.mediapipe_detection.face.face_orientation import (
     extract_face_orientation,
 )
-from camera_card.mediapipe_detection.posture.posture_features import (
+from app.vision.mediapipe_detection.posture.posture_features import (
     calculate_shoulder_tilt,
     calculate_neck_lateral_tilt
 )
-from camera_card.mediapipe_detection.posture.relative_distance import (
+from app.vision.mediapipe_detection.posture.relative_distance import (
     calculate_eye_distance,
 )
 
@@ -50,7 +38,7 @@ def _baseline_feature(value, unit, reason="OK"):
 class DetectionService:
 
     def __init__(self):
-        model_dir = BACKEND_DIR / "camera_card" / "models"
+        model_dir = Path(__file__).resolve().parents[1] / "vision" / "models"
 
         pose_model = model_dir / "pose_landmarker_lite.task"
         face_model = model_dir / "face_landmarker.task"

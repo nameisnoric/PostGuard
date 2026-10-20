@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from app.services.alert_history_service import duration_text, local_datetime
 from app.services.api_client import APIClient
 from app.services.session_summary_service import load_session_summary
-from app.ui.pages.alert_history_dialog import AlertHistoryDialog
+from app.ui.dialogs.alert_history_dialog import AlertHistoryDialog
 from app.ui.pages.session_summary_page import SessionSummaryPage
 from app.ui.theme import APP_QSS
 

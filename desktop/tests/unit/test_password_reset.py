@@ -7,7 +7,7 @@ import requests
 from PySide6.QtWidgets import QApplication, QDialog
 from app.services.api_client import APIClient
 from app.core.token_store import TokenStore
-from app.ui.password_reset_dialog import PasswordResetDialog
+from app.ui.dialogs.password_reset_dialog import PasswordResetDialog
 
 
 def response(data, status=200):

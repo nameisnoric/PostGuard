@@ -18,7 +18,7 @@ from app.services.personal_baseline_service import (
     PersonalBaselineCollector,
     PersonalBaselineConfig,
 )
-from app.ui.main_window import MainWindow
+from app.ui.windows.main_window import MainWindow
 
 
 def response(data, status=200):
@@ -241,7 +241,7 @@ class DesktopWorkflowTests(unittest.TestCase):
             "has_current_consent": False,
         })
         with patch(
-            "app.ui.main_window.PrivacyNoticeDialog.exec",
+            "app.ui.windows.main_window.PrivacyNoticeDialog.exec",
             return_value=0,
         ):
             self.window.show_monitor()
@@ -256,7 +256,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         })
         with patch.object(
             APIClient, "request_account_deletion", return_value=deletion
-        ) as request_deletion, patch("app.ui.login_window.LoginWindow") as login:
+        ) as request_deletion, patch("app.ui.windows.login_window.LoginWindow") as login:
             self.window.delete_account()
 
         request_deletion.assert_called_once_with()
@@ -495,7 +495,7 @@ class DesktopWorkflowTests(unittest.TestCase):
     def test_logout_saves_and_opens_login(self):
         self.start_monitoring()
         TokenStore.set_token("test-token")
-        with patch("app.ui.login_window.LoginWindow") as login:
+        with patch("app.ui.windows.login_window.LoginWindow") as login:
             self.window.logout()
             login.return_value.show.assert_called_once()
         self.save.assert_called_once()
@@ -505,7 +505,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.start_monitoring()
         TokenStore.set_token("test-token")
         self.save.return_value = response({}, 503)
-        with patch("app.ui.login_window.LoginWindow") as login:
+        with patch("app.ui.windows.login_window.LoginWindow") as login:
             self.window.logout()
             login.assert_not_called()
         self.assertEqual(TokenStore.get_token(), "test-token")
