@@ -91,7 +91,7 @@ class PasswordResetTests(unittest.TestCase):
             self.dialog.request_code()
         self.assertTrue(self.dialog.pages.isEnabled())
         self.assertEqual(self.dialog.pages.currentIndex(), 0)
-        self.assertIn("Cannot confirm", self.dialog.status_label.text())
+        self.assertIn("ไม่สามารถยืนยัน", self.dialog.status_label.text())
 
     def test_malformed_verification_response_and_resend(self):
         self.request()

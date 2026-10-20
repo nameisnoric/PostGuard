@@ -53,15 +53,15 @@ class CameraPreviewPage(QWidget):
         self.frame_count = 0
 
         self.detection_status_label = QLabel(
-            "Pose: Waiting | Face: Waiting"
+            'ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ'
         )
         
         self.shoulder_tilt_label = QLabel(
-            "Shoulder Tilt: --"
+            'ความเอียงไหล่: --'
         )
         
         self.neck_tilt_label = QLabel(
-            "Neck Lateral Tilt: --"
+            'ความเอียงคอด้านข้าง: --'
         )
 
         # -------------------------
@@ -90,12 +90,12 @@ class CameraPreviewPage(QWidget):
         # -------------------------
 
         self.title_label = QLabel(
-            "Check your camera"
+            "ตรวจสอบกล้องของคุณ"
         )
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Step 2 of 4  ·  Confirm that the selected camera is available."
+            "ขั้นตอน 2 จาก 4  ·  ยืนยันว่ากล้องที่เลือกพร้อมใช้งาน"
         )
         self.description_label.setProperty("role", "muted")
 
@@ -104,7 +104,7 @@ class CameraPreviewPage(QWidget):
         # -------------------------
 
         self.camera_info_label = QLabel(
-            "No camera selected."
+            "ยังไม่ได้เลือกกล้อง"
         )
         self.camera_info_label.setProperty("role", "muted")
 
@@ -113,7 +113,7 @@ class CameraPreviewPage(QWidget):
         # -------------------------
 
         self.preview_label = QLabel(
-            "Camera preview will appear here."
+            "ภาพตัวอย่างจากกล้องจะแสดงที่นี่"
         )
 
         self.preview_label.setAlignment(
@@ -139,11 +139,11 @@ class CameraPreviewPage(QWidget):
         button_layout = QHBoxLayout()
 
         self.back_button = QPushButton(
-            "Back"
+            "ย้อนกลับ"
         )
 
         self.continue_button = QPushButton(
-            "Continue to Camera Preparation"
+            "ไปยังการเตรียมกล้อง"
         )
         self.continue_button.setProperty("variant", "primary")
 
@@ -237,8 +237,8 @@ class CameraPreviewPage(QWidget):
 
         self.camera_info_label.setText(
             (
-                f"Device: {device_index} | "
-                f"Resolution: {width}x{height}"
+                f"อุปกรณ์: {device_index} | "
+                f"ความละเอียด: {width}x{height}"
             )
         )
 
@@ -255,7 +255,7 @@ class CameraPreviewPage(QWidget):
             QMessageBox.warning(
                 self,
                 "PostGuard",
-                "No camera device index was provided."
+                'ไม่พบหมายเลขอุปกรณ์กล้อง'
             )
             return
 
@@ -274,7 +274,7 @@ class CameraPreviewPage(QWidget):
             QMessageBox.critical(
                 self,
                 "PostGuard",
-                "Unable to open the selected camera."
+                'ไม่สามารถเปิดกล้องที่เลือกได้'
             )
 
             return
@@ -292,7 +292,7 @@ class CameraPreviewPage(QWidget):
 
             QMessageBox.critical(
                 self,
-                "Detection Error",
+                'ข้อผิดพลาดของระบบตรวจจับ',
                 str(error)
             )
 
@@ -301,7 +301,7 @@ class CameraPreviewPage(QWidget):
         self.frame_count = 0
 
         self.detection_status_label.setText(
-            "Pose: Waiting | Face: Waiting"
+            'ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ'
         )
 
         # -------------------------
@@ -342,8 +342,8 @@ class CameraPreviewPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Camera Error",
-                "Unable to read a frame from the camera."
+                'ข้อผิดพลาดของกล้อง',
+                'ไม่สามารถอ่านภาพจากกล้องได้'
             )
 
             return
@@ -373,11 +373,11 @@ class CameraPreviewPage(QWidget):
 
                 if shoulder_tilt is not None:   
                     self.shoulder_tilt_label.setText(
-                        f"Shoulder Tilt: {shoulder_tilt:+.2f}°"
+                        f"ความเอียงไหล่: {shoulder_tilt:+.2f}°"
                     )
                 else:
                     self.shoulder_tilt_label.setText(
-                        "Shoulder Tilt: --"
+                        'ความเอียงไหล่: --'
                     )
 
                 neck_result = result["neck_lateral_tilt"]
@@ -387,12 +387,12 @@ class CameraPreviewPage(QWidget):
                     neck_angle = neck_result["neck_tilt"]
 
                     self.neck_tilt_label.setText(
-                    f"Neck Lateral Tilt: {neck_angle:+.2f}°"
+                    f"ความเอียงคอด้านข้าง: {neck_angle:+.2f}°"
                     )
     
                 else:
                     self.neck_tilt_label.setText(
-                    "Neck Lateral Tilt: --"
+                    'ความเอียงคอด้านข้าง: --'
                 )
 
                 pose_detected = (
@@ -406,20 +406,20 @@ class CameraPreviewPage(QWidget):
                 )
 
                 pose_status = (
-                    "Detected"
+                    "ตรวจพบ"
                     if pose_detected
-                    else "Not Found"
+                    else "ไม่พบ"
                 )
 
                 face_status = (
-                    "Detected"
+                    "ตรวจพบ"
                     if face_detected
-                    else "Not Found"
+                    else "ไม่พบ"
                 )
 
                 self.detection_status_label.setText(
-                    f"Pose: {pose_status} | "
-                    f"Face: {face_status}"
+                    f"ท่าทาง: {pose_status} | "
+                    f"ใบหน้า: {face_status}"
                 )
 
             except Exception as error:
@@ -428,7 +428,7 @@ class CameraPreviewPage(QWidget):
 
                 QMessageBox.warning(
                     self,
-                    "Detection Error",
+                    'ข้อผิดพลาดของระบบตรวจจับ',
                     str(error)
                 )
 
@@ -541,7 +541,7 @@ class CameraPreviewPage(QWidget):
         self.preview_label.clear()
 
         self.preview_label.setText(
-            "Camera preview will appear here."
+            "ภาพตัวอย่างจากกล้องจะแสดงที่นี่"
         )
         self.preview_label.setMinimumSize(640, 360)
         self.preview_label.setMaximumSize(960, 540)
@@ -559,11 +559,11 @@ class CameraPreviewPage(QWidget):
         self.last_pose_points = None
         
         self.detection_status_label.setText(
-            "Pose: Waiting | Face: Waiting"
+            'ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ'
         )
         
         self.shoulder_tilt_label.setText(
-            "Shoulder Tilt: --"
+            'ความเอียงไหล่: --'
         )  
 
         # -------------------------

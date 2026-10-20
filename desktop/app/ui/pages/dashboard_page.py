@@ -90,7 +90,7 @@ class DashboardPage(QWidget):
         name = user_data.get("full_name") or user_data.get("username") or "User"
         welcome_copy.addWidget(self._label(f"Welcome back, {name}", "title"))
         welcome_copy.addWidget(self._label(
-            "Review saved sessions or continue the session currently running.",
+            "ตรวจสอบเซสชันที่บันทึกไว้ หรือทำเซสชันปัจจุบันต่อ",
             "muted",
         ))
         welcome_row.addLayout(welcome_copy, 1)
@@ -102,20 +102,20 @@ class DashboardPage(QWidget):
         welcome_layout.addLayout(welcome_row)
         layout.addWidget(welcome)
 
-        self.live_label = self._label("Ready when you are", "heading")
+        self.live_label = self._label("พร้อมเมื่อคุณพร้อม", "heading")
         self.live_note = self._label(
-            "Choose a camera, confirm its preview, and save a baseline.", "muted"
+            "เลือกกล้อง ตรวจสอบภาพตัวอย่าง และบันทึกค่าท่าทางอ้างอิง", "muted"
         )
         layout.addWidget(self.live_label)
         layout.addWidget(self.live_note)
 
         actions = QHBoxLayout()
-        self.monitor_button = QPushButton("Start Monitoring")
+        self.monitor_button = QPushButton("เริ่มการตรวจจับ")
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.clicked.connect(self.monitor_requested.emit)
-        self.history_button = QPushButton("View History")
+        self.history_button = QPushButton("ดูประวัติ")
         self.history_button.clicked.connect(self.history_requested.emit)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("รีเฟรช")
         self.refresh_button.clicked.connect(self.refresh)
         actions.addWidget(self.monitor_button)
         actions.addWidget(self.history_button)
@@ -126,18 +126,18 @@ class DashboardPage(QWidget):
         summary_grid = QGridLayout()
         summary_grid.setHorizontalSpacing(12)
         self.completed_value = self._metric(
-            summary_grid, 0, "Completed sessions", "Saved reports"
+            summary_grid, 0, "เซสชันที่เสร็จสิ้น", "รายงานที่บันทึก"
         )
         self.time_value = self._metric(
-            summary_grid, 1, "Active monitoring time", "Pauses excluded"
+            summary_grid, 1, "เวลาตรวจจับจริง", "ไม่รวมเวลาหยุดชั่วคราว"
         )
         self.interrupted_value = self._metric(
-            summary_grid, 2, "Interrupted sessions", "Excluded from time"
+            summary_grid, 2, "เซสชันที่ถูกขัดจังหวะ", "ไม่นำมารวมเวลา"
         )
         layout.addLayout(summary_grid)
 
         self.data_status = self._label(
-            "Refresh to load your saved activity.", "muted"
+            "กดรีเฟรชเพื่อโหลดกิจกรรมที่บันทึกไว้", "muted"
         )
         layout.addWidget(self.data_status)
 
@@ -150,13 +150,13 @@ class DashboardPage(QWidget):
 
     def _build_usage_card(self):
         card, layout = self._card()
-        layout.addWidget(self._label("Usage history", "heading"))
+        layout.addWidget(self._label("ประวัติการใช้งาน", "heading"))
         layout.addWidget(self._label(
-            "Latest sessions. Active time excludes confirmed pauses.", "muted"
+            "เซสชันล่าสุด โดยเวลาตรวจจับไม่รวมช่วงที่หยุดชั่วคราว", "muted"
         ))
         self.recent_table = QTableWidget(0, 4)
         self.recent_table.setHorizontalHeaderLabels(
-            ["Session", "Started", "Status", "Active time"]
+            ['เซสชัน', 'เริ่มเมื่อ', 'สถานะ', 'เวลาตรวจจับ']
         )
         self.recent_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -173,23 +173,23 @@ class DashboardPage(QWidget):
             lambda *_: self.history_requested.emit()
         )
         layout.addWidget(self.recent_table)
-        self.empty_label = self._label("No data loaded yet.", "muted")
+        self.empty_label = self._label("ยังไม่ได้โหลดข้อมูล", "muted")
         layout.addWidget(self.empty_label)
         return card
 
     def _build_insights_column(self):
         column = QVBoxLayout()
         risk, risk_layout = self._card()
-        risk_layout.addWidget(self._label("Risk score history", "heading"))
+        risk_layout.addWidget(self._label("ประวัติคะแนนความเสี่ยง", "heading"))
         risk_layout.addWidget(self._label(
-            "N/A\nFull risk calculation is not connected. No example score is shown.",
+            'N/A\nยังไม่ได้เชื่อมต่อการคำนวณความเสี่ยงแบบเต็ม จึงไม่แสดงคะแนนตัวอย่าง',
             "muted",
         ))
         column.addWidget(risk)
         blink, blink_layout = self._card()
-        blink_layout.addWidget(self._label("Blink rate history", "heading"))
+        blink_layout.addWidget(self._label("ประวัติอัตราการกะพริบตา", "heading"))
         blink_layout.addWidget(self._label(
-            "N/A\nBlink tracking is not connected. This panel is reserved for future data.",
+            'N/A\nยังไม่ได้เชื่อมต่อการตรวจการกะพริบตา ส่วนนี้สงวนไว้สำหรับข้อมูลในอนาคต',
             "muted",
         ))
         column.addWidget(blink)
@@ -229,25 +229,25 @@ class DashboardPage(QWidget):
         self, session_id, paused=False, stopping=False, camera_ready=True
     ):
         if stopping:
-            title = "Saving your session..."
-            note = "Please wait while the session ends and its report is saved."
+            title = "กำลังบันทึกเซสชัน..."
+            note = "โปรดรอขณะระบบจบเซสชันและบันทึกรายงาน"
         elif session_id is not None:
-            title = f"Session {session_id} - {'Paused' if paused else 'Running'}"
+            title = f"เซสชัน {session_id} - {'หยุดชั่วคราว' if paused else 'กำลังตรวจจับ'}"
             note = (
-                "Detection is paused. Resume this session when ready."
+                "การตรวจจับหยุดชั่วคราว เริ่มเซสชันนี้ต่อเมื่อพร้อม"
                 if paused
-                else "Camera is on. Detection continues when you switch pages."
+                else "กล้องกำลังทำงาน และจะตรวจจับต่อเนื่องเมื่อเปลี่ยนหน้า"
             )
             if not camera_ready:
-                title = f"Session {session_id} - Action needed"
-                note = "Detection stopped. Return to Monitoring and end the session."
+                title = f"เซสชัน {session_id} - ต้องดำเนินการ"
+                note = "การตรวจจับหยุดแล้ว โปรดกลับไปหน้าการตรวจจับและจบเซสชัน"
         else:
-            title = "Ready when you are"
-            note = "Choose a camera, confirm its preview, and save a baseline."
+            title = "พร้อมเมื่อคุณพร้อม"
+            note = "เลือกกล้อง ตรวจสอบภาพตัวอย่าง และบันทึกค่าท่าทางอ้างอิง"
         self.live_label.setText(title)
         self.live_note.setText(note)
         self.monitor_button.setText(
-            "Return to Monitoring" if session_id is not None else "Start Monitoring"
+            "กลับไปหน้าการตรวจจับ" if session_id is not None else "เริ่มการตรวจจับ"
         )
         self.monitor_button.setEnabled(not stopping)
 
@@ -255,7 +255,7 @@ class DashboardPage(QWidget):
         if self._loader is not None:
             return
         self.refresh_button.setEnabled(False)
-        self.data_status.setText("Loading saved activity...")
+        self.data_status.setText('กำลังโหลดกิจกรรมที่บันทึกไว้...')
         self._loader = _SessionLoader()
         self._loader.signals.finished.connect(self._loaded)
         QThreadPool.globalInstance().start(self._loader)
@@ -270,7 +270,7 @@ class DashboardPage(QWidget):
                 self.completed_value, self.time_value, self.interrupted_value
             ):
                 label.setText("--")
-            self.empty_label.setText("Session data unavailable.")
+            self.empty_label.setText('ไม่สามารถเรียกข้อมูลเซสชันได้')
             self.empty_label.show()
             self.data_status.setText(error)
             return
@@ -291,9 +291,9 @@ class DashboardPage(QWidget):
             duration_text(sum(known)) if known or not completed else "N/A"
         )
         missing = len(completed) - len(known)
-        note = f"Updated {datetime.now().strftime('%H:%M:%S')} | All-time saved activity"
+        note = f"อัปเดตเมื่อ {datetime.now().strftime('%H:%M:%S')} | กิจกรรมที่บันทึกทั้งหมด"
         if missing:
-            note += f" | {missing} completed session(s) excluded: duration unavailable"
+            note += f" | ไม่รวมเซสชันที่เสร็จแล้ว {missing} รายการ เนื่องจากไม่มีข้อมูลระยะเวลา"
         self.data_status.setText(note)
 
         recent = sessions[:5]
@@ -317,6 +317,6 @@ class DashboardPage(QWidget):
                     row, column, QTableWidgetItem(str(value))
                 )
         self.empty_label.setText(
-            "No sessions yet. Start your first monitoring session above."
+            'ยังไม่มีเซสชัน เริ่มการตรวจจับครั้งแรกได้จากด้านบน'
         )
         self.empty_label.setVisible(not sessions)

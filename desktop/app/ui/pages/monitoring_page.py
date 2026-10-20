@@ -87,10 +87,10 @@ class MonitoringPage(QWidget):
         layout.setSpacing(12)
         scroll.setWidget(content)
 
-        self.title_label = QLabel("Real-time Monitoring")
+        self.title_label = QLabel("การตรวจจับแบบเรียลไทม์")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
-            "Camera detection continues while you visit Dashboard or History."
+            "กล้องจะตรวจจับต่อเนื่องขณะเปิดหน้าแดชบอร์ดหรือประวัติ"
         )
         self.description_label.setProperty("role", "muted")
 
@@ -132,18 +132,18 @@ class MonitoringPage(QWidget):
         layout.addLayout(columns, 1)
 
     def _create_information_group(self) -> QGroupBox:
-        info_group = QGroupBox("Monitoring Information")
+        info_group = QGroupBox("ข้อมูลการตรวจจับ")
         info_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         info_layout = QVBoxLayout(info_group)
-        self.camera_label = QLabel("Camera: -")
-        self.baseline_label = QLabel("Baseline ID: -")
-        self.session_label = QLabel("Session ID: -")
-        self.baseline_shoulder_label = QLabel("Baseline Shoulder Tilt: -")
-        self.baseline_neck_label = QLabel("Baseline Neck Lateral Tilt: -")
-        self.status_label = QLabel("Status: Not started")
+        self.camera_label = QLabel('กล้อง: -')
+        self.baseline_label = QLabel('Baseline ID: -')
+        self.session_label = QLabel('Session ID: -')
+        self.baseline_shoulder_label = QLabel('ค่าอ้างอิงความเอียงไหล่: -')
+        self.baseline_neck_label = QLabel('ค่าอ้างอิงความเอียงคอด้านข้าง: -')
+        self.status_label = QLabel('สถานะ: ยังไม่เริ่ม')
         for label in (
             self.camera_label, self.baseline_label, self.session_label,
             self.baseline_shoulder_label, self.baseline_neck_label,
@@ -154,7 +154,7 @@ class MonitoringPage(QWidget):
         return info_group
 
     def _setup_preview(self) -> None:
-        self.preview_label = QLabel("Monitoring preview will appear here.")
+        self.preview_label = QLabel("ภาพการตรวจจับจะแสดงที่นี่")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setFixedSize(720, 405)
         self.preview_label.setSizePolicy(
@@ -164,17 +164,17 @@ class MonitoringPage(QWidget):
         self.preview_label.setProperty("preview", True)
 
     def _create_detection_group(self) -> QGroupBox:
-        detection_group = QGroupBox("Live Detection")
+        detection_group = QGroupBox("ผลตรวจจับปัจจุบัน")
         detection_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         detection_layout = QVBoxLayout(detection_group)
-        self.detection_label = QLabel("Pose: Waiting | Face: Waiting")
-        self.shoulder_label = QLabel("Shoulder Tilt: --")
-        self.neck_label = QLabel("Neck Lateral Tilt: --")
-        self.shoulder_difference_label = QLabel("Shoulder Difference: --")
-        self.neck_difference_label = QLabel("Neck Difference: --")
+        self.detection_label = QLabel('ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ')
+        self.shoulder_label = QLabel('ความเอียงไหล่: --')
+        self.neck_label = QLabel('ความเอียงคอด้านข้าง: --')
+        self.shoulder_difference_label = QLabel('ผลต่างความเอียงไหล่: --')
+        self.neck_difference_label = QLabel('ผลต่างความเอียงคอ: --')
         for label in (
             self.detection_label, self.shoulder_label, self.neck_label,
             self.shoulder_difference_label, self.neck_difference_label,
@@ -185,18 +185,18 @@ class MonitoringPage(QWidget):
 
     def _create_risk_group(self) -> QGroupBox:
         # This is a test control, NOT a validated clinical cutoff.
-        risk_group = QGroupBox("Partial Risk Assessment (Experimental)")
+        risk_group = QGroupBox("การประเมินความเสี่ยงบางส่วน (ทดลอง)")
         risk_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         risk_layout = QVBoxLayout(risk_group)
         threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel("Neck side-bending test threshold:"))
+        threshold_layout.addWidget(QLabel('เกณฑ์ทดลองการเอียงคอด้านข้าง:'))
         self._last_neck_threshold = 10.0
-        self.threshold_enabled = QCheckBox("Enable")
+        self.threshold_enabled = QCheckBox("เปิดใช้งาน")
         self.threshold_enabled.setToolTip(
-            "Enable the experimental neck side-bending threshold."
+            'เปิดใช้เกณฑ์ทดลองการเอียงคอด้านข้าง'
         )
         self.threshold_enabled.toggled.connect(self.set_threshold_enabled)
         threshold_layout.addWidget(self.threshold_enabled)
@@ -256,11 +256,11 @@ class MonitoringPage(QWidget):
     def _create_button_layout(self) -> QHBoxLayout:
         button_layout = QHBoxLayout()
 
-        self.pause_button = QPushButton("Pause")
+        self.pause_button = QPushButton("หยุดชั่วคราว")
         self.pause_button.setEnabled(False)
         self.pause_button.clicked.connect(self.handle_pause_resume)
 
-        self.stop_button = QPushButton("Stop Monitoring")
+        self.stop_button = QPushButton("หยุดการตรวจจับ")
         self.stop_button.setProperty("variant", "danger")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.handle_stop)
@@ -335,8 +335,8 @@ class MonitoringPage(QWidget):
         for name, value in (("Shoulder", shoulder), ("Neck", neck)):
             if type(value) not in (int, float) or not math.isfinite(value):
                 raise ValueError(f"Invalid {name} baseline value.")
-        self.baseline_shoulder_label.setText(f"Baseline Shoulder Tilt: {shoulder:+.2f}°")
-        self.baseline_neck_label.setText(f"Baseline Neck Lateral Tilt: {neck:+.2f}°")
+        self.baseline_shoulder_label.setText(f"ค่าอ้างอิงความเอียงไหล่: {shoulder:+.2f}°")
+        self.baseline_neck_label.setText(f"ค่าอ้างอิงความเอียงคอด้านข้าง: {neck:+.2f}°")
         self.baseline_data = baseline
 
         return baseline
@@ -344,7 +344,7 @@ class MonitoringPage(QWidget):
     def start_monitoring(self, camera: dict, baseline_id: int) -> bool:
         if not self.stop_monitoring():
             QMessageBox.warning(
-                self, "Session Error",
+                self, 'ข้อผิดพลาดของเซสชัน',
                 "The previous database session could not be ended. "
                 "Check your connection and retry.",
             )
@@ -355,18 +355,18 @@ class MonitoringPage(QWidget):
         device_index = camera.get("device_index")
         camera_id = camera.get("camera_id")
         if device_index is None:
-            QMessageBox.warning(self, "Monitoring", "Camera device index is missing.")
+            QMessageBox.warning(self, "การตรวจจับ", 'ไม่พบหมายเลขอุปกรณ์กล้อง')
             return False
         if type(baseline_id) is not int or baseline_id <= 0:
-            QMessageBox.warning(self, "Monitoring", "A saved Baseline ID is required.")
+            QMessageBox.warning(self, "การตรวจจับ", 'ต้องมี Baseline ID ที่บันทึกแล้ว')
             return False
 
         try:
             if type(camera_id) is not int or camera_id <= 0:
-                raise ValueError("Invalid Camera ID.")
+                raise ValueError('Camera ID ไม่ถูกต้อง')
             self.load_personal_baseline(baseline_id, camera_id)
         except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Baseline Error", str(error))
+            QMessageBox.warning(self, 'ข้อผิดพลาดของค่าอ้างอิง', str(error))
             return False
 
         self.camera_label.setText("Camera: " + camera.get("camera_name", "Unknown Camera"))
@@ -389,7 +389,7 @@ class MonitoringPage(QWidget):
             self.session_id = session_id
         except (requests.RequestException, RuntimeError, ValueError, TypeError, OSError) as error:
             self.stop_monitoring()
-            QMessageBox.warning(self, "Monitoring Error", str(error))
+            QMessageBox.warning(self, 'ข้อผิดพลาดในการตรวจจับ', str(error))
             return False
         self.frame_count = 0
         self.session_started_at = session.get("started_at") or (
@@ -405,9 +405,9 @@ class MonitoringPage(QWidget):
         self._alert_force_close = False
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
-        self.status_label.setText("Status: Monitoring (RUNNING)")
+        self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
         self.is_paused = False
-        self.pause_button.setText("Pause Monitoring")
+        self.pause_button.setText("หยุดชั่วคราว")
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
         self.timer.start()
@@ -534,7 +534,7 @@ class MonitoringPage(QWidget):
             difference = current_shoulder - baseline_shoulder
             self.shoulder_difference_label.setText(f"Shoulder Difference: {difference:+.2f}°")
         else:
-            self.shoulder_difference_label.setText("Shoulder Difference: --")
+            self.shoulder_difference_label.setText('ผลต่างความเอียงไหล่: --')
         if (
             type(current_neck) in (int, float)
             and type(baseline_neck) in (int, float)
@@ -544,7 +544,7 @@ class MonitoringPage(QWidget):
             difference = current_neck - baseline_neck
             self.neck_difference_label.setText(f"Neck Difference: {difference:+.2f}°")
         else:
-            self.neck_difference_label.setText("Neck Difference: --")
+            self.neck_difference_label.setText('ผลต่างความเอียงคอ: --')
 
     def record_detection_sample(self, result: dict) -> None:
         self.detection_count += 1
@@ -569,7 +569,7 @@ class MonitoringPage(QWidget):
         success, frame = self.capture.read()
         if not success or frame is None:
             self._finish_after_capture_error()
-            QMessageBox.warning(self, "Camera Error", "Unable to read camera frame.")
+            QMessageBox.warning(self, 'ข้อผิดพลาดของกล้อง', "Unable to read camera frame.")
             return
 
         self.frame_count += 1
@@ -582,22 +582,22 @@ class MonitoringPage(QWidget):
                 self._update_detection_labels(result)
             except Exception as error:
                 self._finish_after_capture_error()
-                QMessageBox.warning(self, "Detection Error", str(error))
+                QMessageBox.warning(self, 'ข้อผิดพลาดของระบบตรวจจับ', str(error))
                 return
         self._update_preview(frame)
 
     def _update_detection_labels(self, result: dict) -> None:
-        pose_text = "Detected" if result["pose_points"] is not None else "Not Found"
-        face_text = "Detected" if result["face_detected"] else "Not Found"
-        self.detection_label.setText(f"Pose: {pose_text} | Face: {face_text}")
+        pose_text = "ตรวจพบ" if result["pose_points"] is not None else "ไม่พบ"
+        face_text = "ตรวจพบ" if result["face_detected"] else "ไม่พบ"
+        self.detection_label.setText(f"ท่าทาง: {pose_text} | ใบหน้า: {face_text}")
         shoulder = result["shoulder_tilt"]
         self.shoulder_label.setText(
-            f"Shoulder Tilt: {shoulder:+.2f}°" if shoulder is not None else "Shoulder Tilt: --"
+            f"ความเอียงไหล่: {shoulder:+.2f}°" if shoulder is not None else 'ความเอียงไหล่: --'
         )
         neck_result = result["neck_lateral_tilt"]
         neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
         self.neck_label.setText(
-            f"Neck Lateral Tilt: {neck:+.2f}°" if neck is not None else "Neck Lateral Tilt: --"
+            f"ความเอียงคอด้านข้าง: {neck:+.2f}°" if neck is not None else 'ความเอียงคอด้านข้าง: --'
         )
 
     def _update_preview(self, frame) -> None:
@@ -624,7 +624,7 @@ class MonitoringPage(QWidget):
     def _finish_after_capture_error(self) -> None:
         self._close_capture_resources()
         self.pause_button.setEnabled(False)
-        self.status_label.setText("Status: Detection stopped; ending session")
+        self.status_label.setText('สถานะ: หยุดตรวจจับ กำลังจบเซสชัน')
         self.handle_stop()
 
     def _close_capture_resources(self) -> None:
@@ -645,16 +645,16 @@ class MonitoringPage(QWidget):
     def _release_local_resources(self) -> None:
         self._close_capture_resources()
         self.frame_count = 0
-        self.detection_label.setText("Pose: Waiting | Face: Waiting")
-        self.shoulder_label.setText("Shoulder Tilt: --")
-        self.neck_label.setText("Neck Lateral Tilt: --")
-        self.shoulder_difference_label.setText("Shoulder Difference: --")
-        self.neck_difference_label.setText("Neck Difference: --")
+        self.detection_label.setText('ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ')
+        self.shoulder_label.setText('ความเอียงไหล่: --')
+        self.neck_label.setText('ความเอียงคอด้านข้าง: --')
+        self.shoulder_difference_label.setText('ผลต่างความเอียงไหล่: --')
+        self.neck_difference_label.setText('ผลต่างความเอียงคอ: --')
         self.preview_label.clear()
-        self.preview_label.setText("Monitoring preview will appear here.")
+        self.preview_label.setText("ภาพการตรวจจับจะแสดงที่นี่")
         self.stop_button.setEnabled(False)
         self.pause_button.setEnabled(False)
-        self.pause_button.setText("Pause Monitoring")
+        self.pause_button.setText("หยุดชั่วคราว")
         self.is_paused = False
         self.session_started_at = None
         self.session_started_monotonic = None
@@ -688,17 +688,17 @@ class MonitoringPage(QWidget):
                 ended = False
                 print("SESSION END ERROR:", error)
                 QMessageBox.warning(
-                    self, "Session Not Ended",
+                    self, 'ยังไม่สามารถจบเซสชัน',
                     f"Session {self.session_id} may still be RUNNING on the server.\n"
                     f"{error}\nReconnect and retry before starting another session.",
                 )
 
         self._release_local_resources()
         if ended:
-            self.status_label.setText("Status: Stopped")
-            self.session_label.setText("Session ID: -")
+            self.status_label.setText('สถานะ: หยุดแล้ว')
+            self.session_label.setText('Session ID: -')
         else:
-            self.status_label.setText("Status: Database session end pending")
+            self.status_label.setText('สถานะ: รอยืนยันการจบเซสชันจากฐานข้อมูล')
             self.session_label.setText(f"Session ID: {self.session_id} (pending)")
 
         self.state_changed.emit()
@@ -835,7 +835,7 @@ class MonitoringPage(QWidget):
         ) as error:
             QMessageBox.warning(
                 self,
-                "Pause Failed",
+                'หยุดชั่วคราวไม่สำเร็จ',
                 "ไม่สามารถยืนยันสถานะ PAUSED ได้\n"
                 f"{error}\n"
                 "กรุณาตรวจสอบการเชื่อมต่อ",
@@ -856,17 +856,17 @@ class MonitoringPage(QWidget):
         self.posture_tracker.reset()
 
         self.preview_label.clear()
-        self.preview_label.setText("Monitoring Paused")
+        self.preview_label.setText('หยุดการตรวจจับชั่วคราว')
 
-        self.side_bending_label.setText("Neck Side-bending: Paused")
-        self.duration_label.setText("Continuous Side-bending: Paused")
-        self.alert_label.setText("Experimental Alert: Paused")
+        self.side_bending_label.setText("การเอียงคอด้านข้าง: หยุดชั่วคราว")
+        self.duration_label.setText("ระยะเวลาการเอียงต่อเนื่อง: หยุดชั่วคราว")
+        self.alert_label.setText("การแจ้งเตือนทดลอง: หยุดชั่วคราว")
 
         self.status_label.setText(
-            "Status: PAUSED "
-            f"(Pause count: {remote['pause_count']})"
+            "สถานะ: หยุดชั่วคราว "
+            f"(จำนวนครั้ง: {remote['pause_count']})"
         )
-        self.pause_button.setText("Resume Monitoring")
+        self.pause_button.setText("ตรวจจับต่อ")
 
     def _resume_monitoring(self) -> None:
 
@@ -884,7 +884,7 @@ class MonitoringPage(QWidget):
         ) as error:
             QMessageBox.warning(
                 self,
-                "Resume Failed",
+                'ตรวจจับต่อไม่สำเร็จ',
                 "ไม่สามารถยืนยันสถานะ RUNNING ได้\n"
                 f"{error}\n"
                 "กรุณาตรวจสอบการเชื่อมต่อ",
@@ -898,17 +898,17 @@ class MonitoringPage(QWidget):
         self.alert_service.reset()
         self._alert_force_close = False
 
-        self.preview_label.setText("Resuming Monitoring...")
-        self.alert_label.setText("Experimental Alert: Waiting")
-        self.side_bending_label.setText("Neck Side-bending: Waiting")
-        self.duration_label.setText("Continuous Side-bending: Waiting")
+        self.preview_label.setText('กำลังตรวจจับต่อ...')
+        self.alert_label.setText("การแจ้งเตือนทดลอง: กำลังรอ")
+        self.side_bending_label.setText("การเอียงคอด้านข้าง: กำลังรอ")
+        self.duration_label.setText("ระยะเวลาการเอียงต่อเนื่อง: กำลังรอ")
 
         self.status_label.setText(
-            "Status: Monitoring (RUNNING) "
-            f"| Paused total: "
-            f"{remote['paused_duration']} s"
+            "สถานะ: กำลังตรวจจับ (RUNNING) "
+            f"| เวลาหยุดรวม: "
+            f"{remote['paused_duration']} วินาที"
         )
-        self.pause_button.setText("Pause Monitoring")
+        self.pause_button.setText("หยุดชั่วคราว")
 
         self.timer.start()
 
@@ -945,7 +945,7 @@ class MonitoringPage(QWidget):
         ) as error:
             QMessageBox.warning(
                 self,
-                "Cannot End Session",
+                'ไม่สามารถจบเซสชัน',
                 "Backend ยังไม่ยืนยันว่า Session สิ้นสุด\n"
                 f"{error}\n"
                 "กรุณาตรวจสอบ Backend แล้วกด Stop อีกครั้ง",
@@ -993,7 +993,7 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Summary Save Error",
+                'เกิดข้อผิดพลาดในการบันทึกสรุป',
                 "Session สิ้นสุดแล้ว แต่ยังบันทึก Summary "
                 "ไม่สำเร็จ\n\n"
                 f"{error}\n\n"

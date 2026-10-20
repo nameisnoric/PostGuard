@@ -61,7 +61,7 @@ class AccountRecoveryWindowTests(unittest.TestCase):
         self.addCleanup(window.deleteLater)
 
         self.assertFalse(window.recover_button.isEnabled())
-        self.assertIn("ended", window.status_label.text())
+        self.assertIn("พ้นระยะเวลากู้คืน", window.status_label.text())
 
     def test_back_to_login_clears_token(self):
         TokenStore.set_token("token")

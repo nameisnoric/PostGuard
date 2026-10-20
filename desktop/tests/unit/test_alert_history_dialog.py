@@ -41,7 +41,7 @@ class AlertHistoryDialogTests(unittest.TestCase):
         self.assertEqual(dialog.session_selector.currentData(), 12)
         self.assertTrue(dialog.empty_label.isVisibleTo(dialog))
         self.assertTrue(dialog.table.isHidden())
-        self.assertIn("Total: 0", dialog.stats_label.text())
+        self.assertIn("ทั้งหมด: 0", dialog.stats_label.text())
 
     def test_alert_rows_are_rendered(self):
         alerts = [{

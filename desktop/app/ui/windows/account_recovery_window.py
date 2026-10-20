@@ -24,7 +24,7 @@ class AccountRecoveryWindow(QWidget):
         super().__init__()
         self.user_data = user_data
         self._leaving = False
-        self.setWindowTitle("PostGuard - Account Recovery")
+        self.setWindowTitle("PostGuard - กู้คืนบัญชี")
         self.setObjectName("authWindow")
         self.setStyleSheet(APP_QSS)
         set_centered_window(self, 900, 580, 720, 500)
@@ -40,7 +40,7 @@ class AccountRecoveryWindow(QWidget):
         layout.setContentsMargins(42, 40, 42, 40)
         layout.setSpacing(16)
 
-        title = QLabel("Account scheduled for deletion")
+        title = QLabel("บัญชีอยู่ระหว่างรอการลบ")
         title.setProperty("role", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message = QLabel(
@@ -58,10 +58,10 @@ class AccountRecoveryWindow(QWidget):
         self.status_label.setProperty("role", "muted")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setWordWrap(True)
-        self.recover_button = QPushButton("Recover Account")
+        self.recover_button = QPushButton("กู้คืนบัญชี")
         self.recover_button.setProperty("variant", "primary")
         self.recover_button.clicked.connect(self.recover_account)
-        self.logout_button = QPushButton("Back to Login")
+        self.logout_button = QPushButton("กลับไปหน้าเข้าสู่ระบบ")
         self.logout_button.clicked.connect(self.back_to_login)
 
         layout.addWidget(title)
@@ -77,7 +77,7 @@ class AccountRecoveryWindow(QWidget):
         if self._deadline_has_passed():
             self.recover_button.setEnabled(False)
             self.status_label.setText(
-                "The 14-day recovery period has ended. Permanent deletion is pending."
+                'พ้นระยะเวลากู้คืน 14 วันแล้ว ระบบกำลังรอลบบัญชีถาวร'
             )
 
     def _deadline(self) -> datetime | None:
@@ -104,7 +104,7 @@ class AccountRecoveryWindow(QWidget):
 
     def recover_account(self) -> None:
         self.recover_button.setEnabled(False)
-        self.status_label.setText("Recovering account...")
+        self.status_label.setText('กำลังกู้คืนบัญชี...')
         try:
             response = APIClient.cancel_account_deletion()
         except requests.RequestException:
@@ -130,7 +130,7 @@ class AccountRecoveryWindow(QWidget):
             self.status_label.setText("Account recovery could not be confirmed.")
             return
 
-        QMessageBox.information(self, "Account recovered", "Your PostGuard account is active again.")
+        QMessageBox.information(self, 'กู้คืนบัญชีแล้ว', 'บัญชี PostGuard ของคุณกลับมาใช้งานได้แล้ว')
         from app.ui.windows.main_window import MainWindow
 
         self._leaving = True

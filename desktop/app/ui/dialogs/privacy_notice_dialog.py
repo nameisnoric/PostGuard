@@ -44,7 +44,7 @@ class PrivacyNoticeDialog(QDialog):
     def __init__(self, parent=None, require_acceptance: bool = True):
         super().__init__(parent)
         self.require_acceptance = require_acceptance
-        self.setWindowTitle("PostGuard - Privacy Notice")
+        self.setWindowTitle("PostGuard - ประกาศความเป็นส่วนตัว")
         self.setObjectName("privacyNoticeDialog")
         self.setStyleSheet(APP_QSS)
         set_centered_window(self, 720, 650, 620, 540)
@@ -55,10 +55,10 @@ class PrivacyNoticeDialog(QDialog):
 
         eyebrow = QLabel(f"PRIVACY NOTICE · VERSION {PRIVACY_NOTICE_VERSION}")
         eyebrow.setProperty("role", "eyebrow")
-        title = QLabel("Your camera data stays on this device")
+        title = QLabel("ข้อมูลจากกล้องจะอยู่บนอุปกรณ์นี้")
         title.setProperty("role", "title")
         subtitle = QLabel(
-            "Review how PostGuard processes camera frames and stores calculated data."
+            "ตรวจสอบวิธีที่ PostGuard ประมวลผลภาพจากกล้องและจัดเก็บค่าที่คำนวณได้"
         )
         subtitle.setProperty("role", "muted")
         subtitle.setWordWrap(True)
@@ -79,12 +79,12 @@ class PrivacyNoticeDialog(QDialog):
         actions = QHBoxLayout()
         if require_acceptance:
             self.accept_checkbox = QCheckBox(
-                "I understand and consent to this camera processing."
+                "ฉันเข้าใจและยินยอมให้ประมวลผลข้อมูลจากกล้องตามที่ระบุ"
             )
             layout.addWidget(self.accept_checkbox)
             layout.addWidget(self.status_label)
-            self.cancel_button = QPushButton("Not Now")
-            self.accept_button = QPushButton("Accept and Continue")
+            self.cancel_button = QPushButton("ไว้ภายหลัง")
+            self.accept_button = QPushButton("ยอมรับและดำเนินการต่อ")
             self.accept_button.setProperty("variant", "primary")
             self.accept_button.setEnabled(False)
             self.accept_checkbox.toggled.connect(self.accept_button.setEnabled)
@@ -95,7 +95,7 @@ class PrivacyNoticeDialog(QDialog):
             actions.addWidget(self.accept_button)
         else:
             self.accept_checkbox = None
-            close_button = QPushButton("Close")
+            close_button = QPushButton("ปิด")
             close_button.setProperty("variant", "primary")
             close_button.clicked.connect(self.accept)
             actions.addStretch()
@@ -106,12 +106,12 @@ class PrivacyNoticeDialog(QDialog):
         if self.accept_checkbox is None or not self.accept_checkbox.isChecked():
             return
         self.accept_button.setEnabled(False)
-        self.status_label.setText("Saving your privacy choice...")
+        self.status_label.setText('กำลังบันทึกตัวเลือกความเป็นส่วนตัว...')
         try:
             response = APIClient.accept_privacy_consent(PRIVACY_NOTICE_VERSION)
         except requests.RequestException:
             self.status_label.setText(
-                "Cannot save your privacy choice. Check your connection and try again."
+                'บันทึกตัวเลือกความเป็นส่วนตัวไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ'
             )
             self.accept_button.setEnabled(True)
             return
@@ -128,7 +128,7 @@ class PrivacyNoticeDialog(QDialog):
         except (ValueError, AttributeError):
             payload = None
         if not isinstance(payload, dict) or not payload.get("has_current_consent"):
-            self.status_label.setText("The server did not confirm your privacy consent.")
+            self.status_label.setText('เซิร์ฟเวอร์ไม่ยืนยันการให้ความยินยอม')
             self.accept_button.setEnabled(True)
             return
         self.accept()

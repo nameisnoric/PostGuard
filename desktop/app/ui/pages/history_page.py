@@ -31,10 +31,10 @@ from app.ui.theme import APP_QSS
 
 class HistoryPage(QWidget):
     COLUMNS = (
-        "Session",
-        "Started",
-        "Active time",
-        "Status",
+        'เซสชัน',
+        'เริ่มเมื่อ',
+        'เวลาตรวจจับ',
+        'สถานะ',
         "Pauses",
         "Report",
     )
@@ -62,17 +62,17 @@ class HistoryPage(QWidget):
 
         header = QHBoxLayout()
         copy = QVBoxLayout()
-        self.title_label = self._label("Monitoring History", "title")
+        self.title_label = self._label("ประวัติการตรวจจับ", "title")
         self.description_label = self._label(
-            "Review saved sessions, alert events, and reports for your account.",
+            "ตรวจสอบเซสชัน เหตุการณ์แจ้งเตือน และรายงานในบัญชีของคุณ",
             "muted",
         )
         copy.addWidget(self.title_label)
         copy.addWidget(self.description_label)
         header.addLayout(copy, 1)
-        self.alert_history_button = QPushButton("All Alert Events")
+        self.alert_history_button = QPushButton("เหตุการณ์แจ้งเตือนทั้งหมด")
         self.alert_history_button.clicked.connect(self.open_alert_history)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("รีเฟรช")
         self.refresh_button.setProperty("variant", "primary")
         self.refresh_button.clicked.connect(self.load_sessions)
         header.addWidget(self.alert_history_button)
@@ -81,20 +81,20 @@ class HistoryPage(QWidget):
 
         metrics = QGridLayout()
         metrics.setHorizontalSpacing(12)
-        self.total_value = self._metric(metrics, 0, "Total sessions")
-        self.completed_value = self._metric(metrics, 1, "Completed")
-        self.interrupted_value = self._metric(metrics, 2, "Interrupted")
-        self.reports_value = self._metric(metrics, 3, "Saved reports")
+        self.total_value = self._metric(metrics, 0, "เซสชันทั้งหมด")
+        self.completed_value = self._metric(metrics, 1, "เสร็จสิ้น")
+        self.interrupted_value = self._metric(metrics, 2, "ถูกขัดจังหวะ")
+        self.reports_value = self._metric(metrics, 3, "รายงานที่บันทึก")
         layout.addLayout(metrics)
 
         history_card, history_layout = self._card()
         controls = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search by session, camera, or baseline ID")
+        self.search_input.setPlaceholderText("ค้นหาด้วย Session, Camera หรือ Baseline ID")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._apply_filters)
         self.status_filter = QComboBox()
-        self.status_filter.addItem("All statuses", "")
+        self.status_filter.addItem("ทุกสถานะ", "")
         for status in ("COMPLETED", "RUNNING", "PAUSED", "INTERRUPTED", "ENDED"):
             self.status_filter.addItem(status.title(), status)
         self.status_filter.currentIndexChanged.connect(self._apply_filters)
@@ -102,11 +102,11 @@ class HistoryPage(QWidget):
         controls.addWidget(self.status_filter)
         history_layout.addLayout(controls)
 
-        self.status_label = self._label("Loading saved sessions...", "muted")
+        self.status_label = self._label('กำลังโหลดเซสชันที่บันทึกไว้...', "muted")
         history_layout.addWidget(self.status_label)
 
         self.empty_label = self._label(
-            "No monitoring sessions are available yet.", "muted"
+            'ยังไม่มีเซสชันการตรวจจับ', "muted"
         )
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setMinimumHeight(120)
@@ -126,9 +126,9 @@ class HistoryPage(QWidget):
         layout.addWidget(history_card, 1)
 
         details_card, details_layout = self._card()
-        details_layout.addWidget(self._label("Session Details", "heading"))
+        details_layout.addWidget(self._label("รายละเอียดเซสชัน", "heading"))
         self.details_hint = self._label(
-            "Select a session to view its saved details.", "muted"
+            "เลือกเซสชันเพื่อดูรายละเอียดที่บันทึกไว้", "muted"
         )
         details_layout.addWidget(self.details_hint)
         details_grid = QGridLayout()
@@ -136,11 +136,11 @@ class HistoryPage(QWidget):
         details_grid.setVerticalSpacing(8)
         self.detail_values = {}
         detail_fields = (
-            ("session", "Session"),
-            ("status", "Status"),
-            ("started", "Started"),
+            ("session", 'เซสชัน'),
+            ("status", 'สถานะ'),
+            ("started", 'เริ่มเมื่อ'),
             ("ended", "Ended"),
-            ("active", "Active time"),
+            ("active", 'เวลาตรวจจับ'),
             ("total", "Total time"),
             ("paused", "Paused time"),
             ("pauses", "Pause count"),
@@ -160,10 +160,10 @@ class HistoryPage(QWidget):
         details_layout.addLayout(details_grid)
 
         actions = QHBoxLayout()
-        self.selected_alerts_button = QPushButton("View Session Alerts")
+        self.selected_alerts_button = QPushButton("ดูการแจ้งเตือนของเซสชัน")
         self.selected_alerts_button.setEnabled(False)
         self.selected_alerts_button.clicked.connect(self.open_selected_alert_history)
-        self.report_button = QPushButton("View Saved Report")
+        self.report_button = QPushButton("ดูรายงานที่บันทึก")
         self.report_button.setProperty("variant", "primary")
         self.report_button.setEnabled(False)
         self.report_button.clicked.connect(self.open_saved_report)
@@ -222,7 +222,7 @@ class HistoryPage(QWidget):
 
     def load_sessions(self):
         self.refresh_button.setEnabled(False)
-        self.status_label.setText("Loading saved sessions...")
+        self.status_label.setText('กำลังโหลดเซสชันที่บันทึกไว้...')
         self.sessions = []
         self.report_session_ids = set()
         self.report_index_available = False
@@ -259,7 +259,7 @@ class HistoryPage(QWidget):
             self.table.setRowCount(0)
             self.table.hide()
             self.empty_label.setText(
-                "Session history could not be loaded. Check the connection and try again."
+                'โหลดประวัติเซสชันไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ'
             )
             self.empty_label.show()
             self.status_label.setText(f"History unavailable: {error}")
@@ -317,9 +317,9 @@ class HistoryPage(QWidget):
         self.table.setVisible(has_rows)
         self.empty_label.setVisible(not has_rows)
         if self.sessions and not has_rows:
-            self.empty_label.setText("No sessions match the current filters.")
+            self.empty_label.setText('ไม่มีเซสชันตรงกับตัวกรองปัจจุบัน')
         else:
-            self.empty_label.setText("No monitoring sessions are available yet.")
+            self.empty_label.setText('ยังไม่มีเซสชันการตรวจจับ')
         self.status_label.setText(
             f"Showing {len(self.visible_sessions)} of {len(self.sessions)} session(s)."
             if self.sessions
@@ -332,7 +332,7 @@ class HistoryPage(QWidget):
         self.report_button.setEnabled(False)
         self.selected_alerts_button.setEnabled(False)
         if hasattr(self, "details_hint"):
-            self.details_hint.setText("Select a session to view its saved details.")
+            self.details_hint.setText("เลือกเซสชันเพื่อดูรายละเอียดที่บันทึกไว้")
         for value in getattr(self, "detail_values", {}).values():
             value.setText("--")
 
@@ -357,7 +357,7 @@ class HistoryPage(QWidget):
         )
         self.report_button.setEnabled(can_try_report)
         self.details_hint.setText(
-            "Saved session metadata. Active time excludes confirmed pauses."
+            'ข้อมูลเซสชันที่บันทึกไว้ โดยเวลาตรวจจับไม่รวมช่วงหยุดชั่วคราว'
         )
         values = {
             "session": f"#{session_id}",
@@ -377,7 +377,7 @@ class HistoryPage(QWidget):
 
         if session.get("status") == "INTERRUPTED":
             self.details_hint.setText(
-                "This session ended unexpectedly. Exact duration and a saved report are unavailable."
+                'เซสชันนี้สิ้นสุดอย่างไม่สมบูรณ์ จึงไม่มีระยะเวลาที่แน่นอนและรายงานที่บันทึก'
             )
 
     def open_alert_history(self):
@@ -401,12 +401,12 @@ class HistoryPage(QWidget):
             if saved is None:
                 QMessageBox.information(
                     self,
-                    "Saved Report",
-                    "No saved report is available for this session.",
+                    'รายงานที่บันทึก',
+                    'ไม่มีรายงานที่บันทึกสำหรับเซสชันนี้',
                 )
                 return
             dialog = QDialog(self)
-            dialog.setWindowTitle("PostGuard - Saved Session Report")
+            dialog.setWindowTitle('PostGuard - รายงานเซสชันที่บันทึก')
             dialog.resize(920, 760)
             dialog.setMinimumSize(760, 600)
             dialog.setStyleSheet(APP_QSS)
@@ -421,6 +421,6 @@ class HistoryPage(QWidget):
             dialog_layout.addWidget(report_scroll)
             dialog.exec()
         except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
-            QMessageBox.warning(self, "Saved Report Error", str(error))
+            QMessageBox.warning(self, 'เกิดข้อผิดพลาดของรายงานที่บันทึก', str(error))
         finally:
             self.show_selected_session()

@@ -56,7 +56,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.save_settings()
 
         save.assert_called_once_with(expected)
-        self.assertEqual(self.page.status_label.text(), "Settings saved.")
+        self.assertEqual(self.page.status_label.text(), "บันทึกการตั้งค่าแล้ว")
 
     def test_save_explains_when_backend_has_no_settings_api(self):
         with patch.object(
@@ -111,7 +111,7 @@ class SettingsPageTests(unittest.TestCase):
 
         withdraw.assert_called_once_with()
         changed.assert_called_once_with(False)
-        self.assertIn("Withdrawn", self.page.privacy_status_label.text())
+        self.assertIn("ถอนแล้ว", self.page.privacy_status_label.text())
 
 
 if __name__ == "__main__":

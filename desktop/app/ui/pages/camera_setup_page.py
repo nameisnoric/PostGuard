@@ -28,10 +28,10 @@ class CameraSetupPage(QWidget):
         layout.setContentsMargins(140, 36, 140, 48)
         layout.setSpacing(12)
 
-        title = QLabel("Set up your camera")
+        title = QLabel("ตั้งค่ากล้อง")
         title.setProperty("role", "title")
         description = QLabel(
-            "Step 1 of 4  ·  Scan this device and select the camera you want to use."
+            "ขั้นตอน 1 จาก 4  ·  สแกนอุปกรณ์และเลือกกล้องที่ต้องการใช้"
         )
         description.setProperty("role", "muted")
         layout.addWidget(title)
@@ -43,10 +43,10 @@ class CameraSetupPage(QWidget):
         card_layout.setContentsMargins(22, 20, 22, 20)
         card_layout.setSpacing(12)
 
-        heading = QLabel("Cameras connected to this device")
+        heading = QLabel("กล้องที่เชื่อมต่อกับอุปกรณ์นี้")
         heading.setProperty("role", "heading")
         self.status_label = QLabel(
-            "Select Scan Cameras to look for an available webcam."
+            "เลือกสแกนกล้องเพื่อค้นหาเว็บแคมที่พร้อมใช้งาน"
         )
         self.status_label.setProperty("role", "muted")
         self.status_label.setWordWrap(True)
@@ -59,8 +59,8 @@ class CameraSetupPage(QWidget):
         card_layout.addWidget(self.camera_list)
 
         actions = QHBoxLayout()
-        self.scan_button = QPushButton("Scan Cameras")
-        self.continue_button = QPushButton("Check Camera")
+        self.scan_button = QPushButton("สแกนกล้อง")
+        self.continue_button = QPushButton("ตรวจสอบกล้อง")
         self.continue_button.setProperty("variant", "primary")
         self.continue_button.setEnabled(False)
         actions.addWidget(self.scan_button)
@@ -85,23 +85,23 @@ class CameraSetupPage(QWidget):
 
     def scan_webcams(self):
         self.scan_button.setEnabled(False)
-        self.scan_button.setText("Scanning...")
+        self.scan_button.setText("กำลังสแกน...")
         self.continue_button.setEnabled(False)
         self.camera_list.clear()
         self.camera_list.setEnabled(False)
-        self.status_label.setText("Checking cameras connected to this device...")
+        self.status_label.setText("กำลังตรวจสอบกล้องที่เชื่อมต่อกับอุปกรณ์นี้...")
         QApplication.processEvents()
 
         try:
             cameras = CameraService.scan_cameras()
         except (OSError, RuntimeError, ValueError) as error:
             self.detected_cameras = []
-            self.status_label.setText("Camera scan failed. Check camera permission.")
-            QMessageBox.warning(self, "Camera Scan", str(error))
+            self.status_label.setText('สแกนกล้องไม่สำเร็จ โปรดตรวจสอบสิทธิ์การใช้กล้อง')
+            QMessageBox.warning(self, 'การสแกนกล้อง', str(error))
             return
         finally:
             self.scan_button.setEnabled(True)
-            self.scan_button.setText("Scan Again")
+            self.scan_button.setText("สแกนอีกครั้ง")
 
         self.detected_cameras = cameras
         if not cameras:
@@ -117,13 +117,12 @@ class CameraSetupPage(QWidget):
             width = camera.get("resolution_width", "--")
             height = camera.get("resolution_height", "--")
             self.camera_list.addItem(
-                f"{name}  ·  Device {device_index}  ·  {width}×{height}"
+                f"{name}  ·  อุปกรณ์ {device_index}  ·  {width}×{height}"
             )
 
         count = len(cameras)
-        noun = "camera" if count == 1 else "cameras"
         self.status_label.setText(
-            f"Found {count} available {noun}. Select one to check its preview."
+            f"พบกล้องที่พร้อมใช้งาน {count} ตัว เลือกกล้องเพื่อตรวจสอบภาพตัวอย่าง"
         )
         self.camera_list.setEnabled(True)
         self.camera_list.setCurrentRow(0)
@@ -137,8 +136,8 @@ class CameraSetupPage(QWidget):
         if not 0 <= row < len(self.detected_cameras):
             QMessageBox.warning(
                 self,
-                "Camera Setup",
-                "Scan and select an available camera first.",
+                'การตั้งค่ากล้อง',
+                'โปรดสแกนและเลือกกล้องที่พร้อมใช้งานก่อน',
             )
             return
         self.camera_selected.emit(self.detected_cameras[row].copy())

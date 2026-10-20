@@ -56,7 +56,7 @@ class ProfilePageTests(unittest.TestCase):
             "full_name": "Jane Doe",
             "avatar_path": None,
         })
-        self.assertEqual(self.page.status_label.text(), "Profile information saved.")
+        self.assertEqual(self.page.status_label.text(), "บันทึกข้อมูลโปรไฟล์แล้ว")
 
     def test_keep_editing_does_not_apply_changes(self):
         self.page.first_name_input.setText("Temporary")
@@ -116,7 +116,7 @@ class ProfilePageTests(unittest.TestCase):
     def test_required_fields_are_validated(self):
         self.page.first_name_input.clear()
         self.page.save_changes()
-        self.assertIn("required", self.page.status_label.text())
+        self.assertIn("ต้องกรอก", self.page.status_label.text())
 
     def test_selected_photo_is_uploaded_through_authenticated_api(self):
         self.page.selected_photo_path = "selected.jpg"
@@ -125,7 +125,7 @@ class ProfilePageTests(unittest.TestCase):
             self.page.save_changes()
         upload.assert_called_once_with("selected.jpg")
         self.assertEqual(self.page.user_data["avatar_path"], "users/1/private.webp")
-        self.assertIn("privately", self.page.status_label.text())
+        self.assertIn("แบบส่วนตัว", self.page.status_label.text())
 
     def test_stored_photo_can_be_removed_through_authenticated_api(self):
         self.page.user_data["avatar_path"] = "users/1/private.webp"

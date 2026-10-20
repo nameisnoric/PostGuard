@@ -20,21 +20,21 @@ class OTPWindow(QWidget):
         super().__init__()
 
         self.email = email
-        self.setWindowTitle("PostGuard - Verify Email")
+        self.setWindowTitle("PostGuard - ยืนยันอีเมล")
         set_centered_window(self, 760, 520, 640, 460)
         self.setObjectName("authWindow")
         self.setStyleSheet(APP_QSS)
 
-        eyebrow = QLabel("EMAIL VERIFICATION")
+        eyebrow = QLabel("การยืนยันอีเมล")
         eyebrow.setProperty("role", "eyebrow")
         eyebrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.title_label = QLabel("Verify your email")
+        self.title_label = QLabel("ยืนยันอีเมลของคุณ")
         self.title_label.setProperty("role", "title")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         description = QLabel(
-            "Enter the 6-digit verification code sent to"
+            "กรอกรหัสยืนยัน 6 หลักที่ส่งไปยัง"
         )
         description.setProperty("role", "muted")
         description.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -45,21 +45,21 @@ class OTPWindow(QWidget):
         self.email_label.setWordWrap(True)
 
         self.otp_input = QLineEdit()
-        self.otp_input.setPlaceholderText("6-digit verification code")
+        self.otp_input.setPlaceholderText("รหัสยืนยัน 6 หลัก")
         self.otp_input.setMaxLength(6)
         self.otp_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.otp_input.setClearButtonEnabled(True)
 
         helper = QLabel(
-            "The code expires in 5 minutes. Check your spam folder if it is missing."
+            "รหัสมีอายุ 5 นาที หากไม่พบโปรดตรวจสอบโฟลเดอร์สแปม"
         )
         helper.setProperty("role", "muted")
         helper.setAlignment(Qt.AlignmentFlag.AlignCenter)
         helper.setWordWrap(True)
 
-        self.verify_button = QPushButton("Verify Email")
+        self.verify_button = QPushButton("ยืนยันอีเมล")
         self.verify_button.setProperty("variant", "primary")
-        self.back_button = QPushButton("Back to Registration")
+        self.back_button = QPushButton("กลับไปหน้าสมัครสมาชิก")
 
         self.card = QFrame()
         self.card.setProperty("card", True)
@@ -74,7 +74,7 @@ class OTPWindow(QWidget):
         card_layout.addWidget(description)
         card_layout.addWidget(self.email_label)
         card_layout.addSpacing(8)
-        card_layout.addWidget(QLabel("Verification code"))
+        card_layout.addWidget(QLabel("รหัสยืนยัน"))
         card_layout.addWidget(self.otp_input)
         card_layout.addWidget(helper)
         card_layout.addSpacing(6)
@@ -137,8 +137,8 @@ class OTPWindow(QWidget):
 
         QMessageBox.information(
             self,
-            "Registration Complete",
-            "Your email has been verified. You can now log in.",
+            'สมัครสมาชิกสำเร็จ',
+            'ยืนยันอีเมลแล้ว คุณสามารถเข้าสู่ระบบได้',
         )
         self.open_login()
 

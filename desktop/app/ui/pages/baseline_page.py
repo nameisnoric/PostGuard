@@ -57,7 +57,7 @@ class CalibrationCompletedDialog(QDialog):
 
     def __init__(self, result, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Calibration Completed")
+        self.setWindowTitle("PostGuard - ปรับเทียบสำเร็จ")
         self.setModal(True)
         self.setFixedWidth(460)
         self.setStyleSheet(APP_QSS)
@@ -72,7 +72,7 @@ class CalibrationCompletedDialog(QDialog):
         icon.setFixedSize(50, 50)
         layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        title = QLabel("Calibration completed")
+        title = QLabel("ปรับเทียบสำเร็จ")
         title.setProperty("role", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -101,7 +101,7 @@ class CalibrationCompletedDialog(QDialog):
         layout.addWidget(card)
 
         state = QLabel(
-            "Confirming this reference does not mean the posture is medically safe."
+            'การยืนยันค่าอ้างอิงนี้ไม่ได้หมายความว่าท่าทางปลอดภัยตามหลักการแพทย์'
         )
         state.setProperty("role", "muted")
         state.setWordWrap(True)
@@ -109,9 +109,9 @@ class CalibrationCompletedDialog(QDialog):
         layout.addWidget(state)
 
         actions = QHBoxLayout()
-        retry = QPushButton("Calibrate Again")
+        retry = QPushButton("ปรับเทียบอีกครั้ง")
         retry.clicked.connect(self.reject)
-        done = QPushButton("Use This Baseline")
+        done = QPushButton("ใช้ค่าอ้างอิงนี้")
         done.setProperty("variant", "primary")
         done.clicked.connect(self.accept)
         actions.addWidget(retry)
@@ -124,7 +124,7 @@ class BaselineSavedDialog(QDialog):
 
     def __init__(self, baseline_id, camera_id, result, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Baseline Saved")
+        self.setWindowTitle("PostGuard - บันทึกค่าอ้างอิงแล้ว")
         self.setModal(True)
         self.setFixedWidth(460)
         self.setStyleSheet(APP_QSS)
@@ -139,13 +139,13 @@ class BaselineSavedDialog(QDialog):
         icon.setFixedSize(50, 50)
         layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        title = QLabel("Personal baseline saved")
+        title = QLabel("บันทึกค่าท่าทางอ้างอิงแล้ว")
         title.setProperty("role", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         note = QLabel(
-            "Your reference posture is ready. You can now start monitoring."
+            "ค่าท่าทางอ้างอิงพร้อมใช้งาน คุณสามารถเริ่มการตรวจจับได้แล้ว"
         )
         note.setProperty("role", "muted")
         note.setWordWrap(True)
@@ -167,7 +167,7 @@ class BaselineSavedDialog(QDialog):
         add_detail_rows(details, rows)
         layout.addWidget(card)
 
-        done = QPushButton("Done")
+        done = QPushButton("เสร็จสิ้น")
         done.setProperty("variant", "primary")
         done.clicked.connect(self.accept)
         layout.addWidget(done)
@@ -226,12 +226,12 @@ class BaselinePage(QWidget):
         # -------------------------
 
         self.title_label = QLabel(
-            "Set your baseline posture"
+            "ตั้งค่าท่าทางอ้างอิง"
         )
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "Step 4 of 4  ·  Sit naturally and hold still while PostGuard captures your reference."
+            "ขั้นตอน 4 จาก 4  ·  นั่งในท่าธรรมชาติและอยู่นิ่งขณะระบบเก็บค่าอ้างอิง"
         )
         self.description_label.setProperty("role", "muted")
 
@@ -240,7 +240,7 @@ class BaselinePage(QWidget):
         # -------------------------
 
         camera_group = QGroupBox(
-            "Selected Camera"
+            "กล้องที่เลือก"
         )
 
         camera_layout = QGridLayout(
@@ -252,21 +252,21 @@ class BaselinePage(QWidget):
         )
 
         self.camera_name_label = QLabel(
-            "Camera: Not selected"
+            'กล้อง: ยังไม่ได้เลือก'
         )
 
         self.device_label = QLabel(
-            "Device: -"
+            'อุปกรณ์: -'
         )
 
         self.camera_id_label = QLabel(
-            "Camera ID: -"
+            'Camera ID: -'
         )
 
         self.resolution_label = QLabel(
-            "Resolution: -"
+            'ความละเอียด: -'
         )
-        self.camera_reference_label = QLabel("Camera preparation: Not completed")
+        self.camera_reference_label = QLabel('การเตรียมกล้อง: ยังไม่เสร็จ')
         for label in (
             self.camera_name_label,
             self.device_label,
@@ -291,7 +291,7 @@ class BaselinePage(QWidget):
         # -------------------------
 
         self.preview_label = QLabel(
-            "Camera preview will appear here."
+            "ภาพตัวอย่างจากกล้องจะแสดงที่นี่"
         )
 
         self.preview_label.setAlignment(
@@ -315,7 +315,7 @@ class BaselinePage(QWidget):
         # -------------------------
 
         calibration_group = QGroupBox(
-            "Calibration"
+            "การปรับเทียบ"
         )
 
         calibration_layout = QVBoxLayout(
@@ -334,7 +334,7 @@ class BaselinePage(QWidget):
         )
 
         self.status_label = QLabel(
-            "Status: Waiting for camera"
+            'สถานะ: รอกล้อง'
         )
 
         # -------------------------
@@ -342,15 +342,15 @@ class BaselinePage(QWidget):
         # -------------------------
 
         self.detection_label = QLabel(
-            "Pose: Waiting | Face: Waiting"
+            'ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ'
         )
 
         self.shoulder_tilt_label = QLabel(
-            "Shoulder Tilt: --"
+            'ความเอียงไหล่: --'
         )
 
         self.neck_tilt_label = QLabel(
-            "Neck Lateral Tilt: --"
+            'ความเอียงคอด้านข้าง: --'
         )
 
         calibration_layout.addWidget(
@@ -380,21 +380,21 @@ class BaselinePage(QWidget):
         button_layout = QHBoxLayout()
 
         self.back_button = QPushButton(
-            "Back to Camera Preparation"
+            "กลับไปเตรียมกล้อง"
         )
 
         self.calibrate_button = QPushButton(
-            "Start Calibration"
+            "เริ่มปรับเทียบ"
         )
         
         self.save_button = QPushButton(
-            "Save Personal Baseline"
+            "บันทึกค่าท่าทางอ้างอิง"
         )
         #Save ไม่ได้จนกว่า calibrate จะเสร็จ
         self.save_button.setEnabled(False)
         
         self.monitor_button = QPushButton(
-            "Start Monitoring"  
+            "เริ่มการตรวจจับ"
         )
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.setEnabled(False)
@@ -511,21 +511,21 @@ class BaselinePage(QWidget):
         )
 
         self.camera_name_label.setText(
-            f"Camera: {camera_name}"
+            f"กล้อง: {camera_name}"
         )
 
         self.device_label.setText(
-            f"Device: {device_index}"
+            f"อุปกรณ์: {device_index}"
         )
 
         self.resolution_label.setText(
-            f"Resolution: {width}x{height}"
+            f"ความละเอียด: {width}x{height}"
         )
 
         camera_reference = camera.get("camera_calibration")
         if not isinstance(camera_reference, dict) or camera_reference.get("status") != "VALID":
-            self.camera_reference_label.setText("Camera preparation: Required")
-            self.status_label.setText("Status: Complete camera preparation first")
+            self.camera_reference_label.setText('การเตรียมกล้อง: จำเป็น')
+            self.status_label.setText('สถานะ: โปรดเตรียมกล้องให้เสร็จก่อน')
             self.calibrate_button.setEnabled(False)
             return
         self.camera_reference_label.setText(
@@ -561,7 +561,7 @@ class BaselinePage(QWidget):
         if device_index is None:
 
             self.status_label.setText(
-                "Status: Camera not selected"
+                'สถานะ: ยังไม่ได้เลือกกล้อง'
             )
 
             return
@@ -577,7 +577,7 @@ class BaselinePage(QWidget):
 
             if not self.capture.isOpened():
                 raise RuntimeError(
-                    "Unable to open the selected camera."
+                    'ไม่สามารถเปิดกล้องที่เลือกได้'
                 )
 
         except Exception as error:
@@ -585,12 +585,12 @@ class BaselinePage(QWidget):
             self.stop_camera_preview()
 
             self.status_label.setText(
-                "Status: Camera unavailable"
+                'สถานะ: กล้องไม่พร้อมใช้งาน'
             )
 
             QMessageBox.warning(
                 self,
-                "Camera Error",
+                'ข้อผิดพลาดของกล้อง',
                 str(error)
             )
 
@@ -608,12 +608,12 @@ class BaselinePage(QWidget):
             self.stop_camera_preview()
 
             self.status_label.setText(
-                "Status: Detection unavailable"
+                'สถานะ: ระบบตรวจจับไม่พร้อมใช้งาน'
             )
 
             QMessageBox.critical(
                 self,
-                "Detection Error",
+                'ข้อผิดพลาดของระบบตรวจจับ',
                 str(error)
             )
 
@@ -626,14 +626,14 @@ class BaselinePage(QWidget):
         self.frame_count = 0
 
         self.status_label.setText(
-            "Status: Camera and detection ready"
+            'สถานะ: กล้องและระบบตรวจจับพร้อม'
         )
 
        # เปิดปุ่มเมื่อกล้องและ Detection พร้อมแล้ว  
         self.calibrate_button.setEnabled(True)
 
         self.calibrate_button.setText(
-            "Start Calibration"
+            "เริ่มปรับเทียบ"
         )
 
         self.timer.start()
@@ -648,8 +648,8 @@ class BaselinePage(QWidget):
         ):
             QMessageBox.warning(
                 self,
-                "Calibration",
-                "Camera or detection is not ready."
+                "การปรับเทียบ",
+                'กล้องหรือระบบตรวจจับยังไม่พร้อม'
             )
             return
 
@@ -701,7 +701,7 @@ class BaselinePage(QWidget):
 
         self.is_calibrating = False
         self.calibrate_button.setEnabled(True)
-        self.calibrate_button.setText("Recalibrate")
+        self.calibrate_button.setText('ปรับเทียบใหม่')
         self.baseline_collection_result = status
 
         if state == BASELINE_FAILED:
@@ -712,14 +712,14 @@ class BaselinePage(QWidget):
             self.status_label.setText(f"Status: Baseline failed · {reason}")
             QMessageBox.warning(
                 self,
-                "Personal Baseline",
+                'ค่าท่าทางอ้างอิงส่วนบุคคล',
                 "The baseline could not be validated. Keep your face and shoulders "
                 f"visible, then try again.\n\nReason: {reason}",
             )
             return
 
         if state != BASELINE_NEED_CONFIRMATION:
-            self.status_label.setText("Status: Unexpected baseline state")
+            self.status_label.setText('สถานะ: ค่าท่าทางอ้างอิงผิดปกติ')
             return
 
         candidate = status.get("baseline") or {}
@@ -742,7 +742,7 @@ class BaselinePage(QWidget):
             confirmed = self.baseline_collector.confirm()
             usable = self.baseline_collector.get_usable_baseline()
         except RuntimeError as error:
-            QMessageBox.warning(self, "Personal Baseline", str(error))
+            QMessageBox.warning(self, 'ค่าท่าทางอ้างอิงส่วนบุคคล', str(error))
             return
 
         statistics_by_feature = confirmed.get("statistics", {})
@@ -758,7 +758,7 @@ class BaselinePage(QWidget):
         }
         self.baseline_collection_result = confirmed
         self.save_button.setEnabled(True)
-        self.status_label.setText("Status: Personal baseline confirmed and ready to save")
+        self.status_label.setText('สถานะ: ยืนยันค่าท่าทางอ้างอิงแล้ว พร้อมบันทึก')
 
     def reject_baseline(self) -> None:
         """Discard the candidate while keeping technical validation distinct."""
@@ -789,8 +789,8 @@ class BaselinePage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Save Baseline",
-                "Please complete calibration first."
+                'บันทึกค่าอ้างอิง',
+                'โปรดปรับเทียบให้เสร็จก่อน'
             )
 
             return
@@ -799,8 +799,8 @@ class BaselinePage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Save Baseline",
-                "No camera selected."
+                'บันทึกค่าอ้างอิง',
+                "ยังไม่ได้เลือกกล้อง"
             )
 
             return
@@ -820,8 +820,8 @@ class BaselinePage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Save Baseline",
-                "Invalid Camera ID."
+                'บันทึกค่าอ้างอิง',
+                'Camera ID ไม่ถูกต้อง'
             )
 
             return
@@ -867,7 +867,7 @@ class BaselinePage(QWidget):
         self.save_button.setEnabled(False)
 
         self.status_label.setText(
-            "Status: Saving baseline..."
+            'สถานะ: กำลังบันทึกค่าอ้างอิง...'
         )
 
         try:
@@ -915,7 +915,7 @@ class BaselinePage(QWidget):
             self.monitor_button.setEnabled(True)
 
             self.status_label.setText(
-                "Status: Baseline saved successfully"
+                'สถานะ: บันทึกค่าอ้างอิงสำเร็จ'
             )
 
             print(
@@ -934,12 +934,12 @@ class BaselinePage(QWidget):
         except Exception as error:
 
             self.status_label.setText(
-                "Status: Failed to save baseline"
+                'สถานะ: บันทึกค่าอ้างอิงไม่สำเร็จ'
             )
 
             QMessageBox.warning(
                 self,
-                "Save Baseline Error",
+                'เกิดข้อผิดพลาดในการบันทึกค่าอ้างอิง',
                 str(error)
             )
 
@@ -972,13 +972,13 @@ class BaselinePage(QWidget):
             self.stop_camera_preview()
 
             self.status_label.setText(
-                "Status: Camera read failed"
+                'สถานะ: อ่านภาพจากกล้องไม่สำเร็จ'
             )
 
             QMessageBox.warning(
                 self,
-                "Camera Error",
-                "Unable to read a camera frame."
+                'ข้อผิดพลาดของกล้อง',
+                'ไม่สามารถอ่านภาพจากกล้องได้'
             )
 
             return
@@ -1032,8 +1032,8 @@ class BaselinePage(QWidget):
                 )
 
                 self.detection_label.setText(
-                    f"Pose: {pose_text} | "
-                    f"Face: {face_text}"
+                    f"ท่าทาง: {pose_text} | "
+                    f"ใบหน้า: {face_text}"
                 )
 
                 # -------------------------
@@ -1054,7 +1054,7 @@ class BaselinePage(QWidget):
                 else:
 
                     self.shoulder_tilt_label.setText(
-                        "Shoulder Tilt: --"
+                        'ความเอียงไหล่: --'
                     )
 
                 # -------------------------
@@ -1079,7 +1079,7 @@ class BaselinePage(QWidget):
                 else:
 
                     self.neck_tilt_label.setText(
-                        "Neck Lateral Tilt: --"
+                        'ความเอียงคอด้านข้าง: --'
                     )
 
             except Exception as error:
@@ -1087,12 +1087,12 @@ class BaselinePage(QWidget):
                 self.stop_camera_preview()
 
                 self.status_label.setText(
-                    "Status: Detection error"
+                    'สถานะ: ระบบตรวจจับเกิดข้อผิดพลาด'
                 )
 
                 QMessageBox.warning(
                     self,
-                    "Detection Error",
+                    'ข้อผิดพลาดของระบบตรวจจับ',
                     str(error)
                 )
 
@@ -1200,20 +1200,20 @@ class BaselinePage(QWidget):
         self.calibrate_button.setEnabled(False)
 
         self.calibrate_button.setText(
-            "Start Calibration"
+            "เริ่มปรับเทียบ"
         )
 
 
         self.detection_label.setText(
-            "Pose: Waiting | Face: Waiting"
+            'ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ'
         )
 
         self.shoulder_tilt_label.setText(
-            "Shoulder Tilt: --"
+            'ความเอียงไหล่: --'
         )
 
         self.neck_tilt_label.setText(
-            "Neck Lateral Tilt: --"
+            'ความเอียงคอด้านข้าง: --'
         )
 
         # -------------------------
@@ -1223,7 +1223,7 @@ class BaselinePage(QWidget):
         self.preview_label.clear()
 
         self.preview_label.setText(
-            "Camera preview will appear here."
+            "ภาพตัวอย่างจากกล้องจะแสดงที่นี่"
         )
 
         print(
@@ -1241,7 +1241,7 @@ class BaselinePage(QWidget):
             QMessageBox.warning(
                 self,
                 "PostGuard",
-                "No camera selected."
+                "ยังไม่ได้เลือกกล้อง"
             )
 
             return
@@ -1274,8 +1274,8 @@ class BaselinePage(QWidget):
         ):
             QMessageBox.warning(
                 self,
-                "Monitoring",
-                "Please save your Personal Baseline first."
+                "การตรวจจับ",
+                'โปรดบันทึกค่าท่าทางอ้างอิงส่วนบุคคลก่อน'
             )
             return
 

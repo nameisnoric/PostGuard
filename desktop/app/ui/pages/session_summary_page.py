@@ -60,30 +60,30 @@ class SessionSummaryPage(QWidget):
         scroll_area.setWidget(content)
         page_layout.addWidget(scroll_area)
 
-        self.title_label = QLabel("Session Summary")
+        self.title_label = QLabel("สรุปเซสชัน")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
-            "Completed monitoring session report"
+            "รายงานเซสชันการตรวจจับที่เสร็จสิ้น"
         )
         self.description_label.setProperty("role", "muted")
 
         # Session information
-        info_group = QGroupBox("Session Information")
+        info_group = QGroupBox("ข้อมูลเซสชัน")
         info_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         info_layout = QVBoxLayout(info_group)
 
-        self.session_label = QLabel("Session ID: --")
-        self.database_label = QLabel("Session Status: --")
-        self.camera_label = QLabel("Camera: --")
+        self.session_label = QLabel('Session ID: --')
+        self.database_label = QLabel('สถานะเซสชัน: --')
+        self.camera_label = QLabel('กล้อง: --')
         self.baseline_label = QLabel("Baseline ID: --")
-        self.start_label = QLabel("Started: --")
-        self.end_label = QLabel("Ended: --")
-        self.duration_label = QLabel("Duration: --")
-        self.paused_duration_label = QLabel("Paused Duration: --")
-        self.pause_count_label = QLabel("Pause Count: --")
+        self.start_label = QLabel('เริ่มเมื่อ: --')
+        self.end_label = QLabel('สิ้นสุดเมื่อ: --')
+        self.duration_label = QLabel('ระยะเวลา: --')
+        self.paused_duration_label = QLabel('เวลาหยุดชั่วคราว: --')
+        self.pause_count_label = QLabel('จำนวนครั้งที่หยุด: --')
 
         for widget in (
             self.session_label,
@@ -99,23 +99,23 @@ class SessionSummaryPage(QWidget):
             info_layout.addWidget(widget)
 
         # Detection summary
-        detection_group = QGroupBox("Detection Summary")
+        detection_group = QGroupBox("สรุปผลการตรวจจับ")
         detection_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         detection_layout = QVBoxLayout(detection_group)
 
-        self.count_label = QLabel("Detection Cycles: --")
-        self.pose_label = QLabel("Pose Detected: --")
-        self.face_label = QLabel("Face Detected: --")
-        self.shoulder_label = QLabel("Average Shoulder: --")
-        self.neck_label = QLabel("Average Neck: --")
+        self.count_label = QLabel('รอบการตรวจจับ: --')
+        self.pose_label = QLabel('ตรวจพบท่าทาง: --')
+        self.face_label = QLabel('ตรวจพบใบหน้า: --')
+        self.shoulder_label = QLabel('ความเอียงไหล่เฉลี่ย: --')
+        self.neck_label = QLabel('ความเอียงคอเฉลี่ย: --')
         self.baseline_shoulder_label = QLabel(
-            "Baseline Shoulder: --"
+            'ค่าอ้างอิงไหล่: --'
         )
         self.baseline_neck_label = QLabel(
-            "Baseline Neck: --"
+            'ค่าอ้างอิงคอ: --'
         )
 
         for widget in (
@@ -129,18 +129,18 @@ class SessionSummaryPage(QWidget):
         ):
             detection_layout.addWidget(widget)
 
-        report_group = QGroupBox("Stored Report Metrics")
+        report_group = QGroupBox("ข้อมูลสรุปในรายงาน")
         report_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         report_layout = QVBoxLayout(report_group)
-        self.average_risk_label = QLabel("Average Risk Score: N/A")
-        self.maximum_risk_label = QLabel("Maximum Risk Score: N/A")
-        self.blink_rate_label = QLabel("Blink Rate: N/A")
-        self.report_alert_count_label = QLabel("Stored Alert Count: --")
-        self.frequent_event_label = QLabel("Most Frequent Alert: N/A")
-        self.risk_breakdown_label = QLabel("Risk Breakdown: --")
+        self.average_risk_label = QLabel('คะแนนความเสี่ยงเฉลี่ย: N/A')
+        self.maximum_risk_label = QLabel('คะแนนความเสี่ยงสูงสุด: N/A')
+        self.blink_rate_label = QLabel('อัตราการกะพริบตา: N/A')
+        self.report_alert_count_label = QLabel('จำนวนการแจ้งเตือนที่บันทึก: --')
+        self.frequent_event_label = QLabel('การแจ้งเตือนที่พบบ่อยที่สุด: N/A')
+        self.risk_breakdown_label = QLabel('รายละเอียดความเสี่ยง: --')
         self.risk_breakdown_label.setWordWrap(True)
         for widget in (
             self.average_risk_label,
@@ -153,18 +153,18 @@ class SessionSummaryPage(QWidget):
             report_layout.addWidget(widget)
 
         # Database save status
-        self.save_group = QGroupBox("Summary Save Problem")
+        self.save_group = QGroupBox("เกิดปัญหาในการบันทึกสรุป")
         self.save_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         save_layout = QVBoxLayout(self.save_group)
 
-        self.save_status_label = QLabel("No report save status is available.")
+        self.save_status_label = QLabel('ไม่มีข้อมูลสถานะการบันทึกรายงาน')
         self.save_status_label.setWordWrap(True)
 
         self.retry_button = QPushButton(
-            "Retry Save Summary"
+            "ลองบันทึกสรุปอีกครั้ง"
         )
         self.retry_button.setEnabled(False)
         self.retry_button.clicked.connect(
@@ -176,7 +176,7 @@ class SessionSummaryPage(QWidget):
 
         # Alert overview
         alert_group = QGroupBox(
-            "Alert Events (Experimental)"
+            "เหตุการณ์แจ้งเตือน (ทดลอง)"
         )
         alert_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
@@ -184,11 +184,11 @@ class SessionSummaryPage(QWidget):
         )
         alert_layout = QVBoxLayout(alert_group)
 
-        self.alert_total_label = QLabel("Total Alerts: --")
-        self.alert_closed_label = QLabel("Closed Alerts: --")
-        self.alert_active_label = QLabel("Active Alerts: --")
+        self.alert_total_label = QLabel('การแจ้งเตือนทั้งหมด: --')
+        self.alert_closed_label = QLabel('การแจ้งเตือนที่จบแล้ว: --')
+        self.alert_active_label = QLabel('การแจ้งเตือนที่ยังทำงาน: --')
         self.alert_duration_label = QLabel(
-            "Closed Alert Duration: --"
+            'ระยะเวลาการแจ้งเตือนที่จบแล้ว: --'
         )
         self.alert_error_label = QLabel("")
         self.alert_error_label.setWordWrap(True)
@@ -205,14 +205,14 @@ class SessionSummaryPage(QWidget):
         alert_buttons = QHBoxLayout()
 
         self.refresh_alerts_button = QPushButton(
-            "Refresh Alert Summary"
+            "รีเฟรชสรุปการแจ้งเตือน"
         )
         self.refresh_alerts_button.clicked.connect(
             self.refresh_alerts
         )
 
         self.view_alerts_button = QPushButton(
-            "View Alert History"
+            "ดูประวัติการแจ้งเตือน"
         )
         self.view_alerts_button.clicked.connect(
             self.open_alert_history
@@ -235,7 +235,7 @@ class SessionSummaryPage(QWidget):
         self.note_label.setProperty("role", "muted")
 
         self.back_button = QPushButton(
-            "Back to Dashboard"
+            "กลับไปแดชบอร์ด"
         )
         self.back_button.clicked.connect(
             self.go_back
@@ -272,8 +272,8 @@ class SessionSummaryPage(QWidget):
             "summary_save_status": "LOADED",
         }
         self.set_summary(report)
-        self.title_label.setText("Saved Session Report")
-        self.back_button.setText("Close Report")
+        self.title_label.setText("รายงานเซสชันที่บันทึก")
+        self.back_button.setText("ปิดรายงาน")
 
     def set_summary(self, summary: dict) -> None:
         self.current_summary = summary.copy()
@@ -306,67 +306,67 @@ class SessionSummaryPage(QWidget):
         )
 
         seconds = summary.get("duration_seconds")
-        self.duration_label.setText(f"Total Duration: {duration_text(seconds)}")
+        self.duration_label.setText(f"ระยะเวลารวม: {duration_text(seconds)}")
         self.paused_duration_label.setText(
-            f"Paused Duration: {duration_text(summary.get('paused_duration'))}"
+            f"เวลาหยุดชั่วคราว: {duration_text(summary.get('paused_duration'))}"
         )
         self.pause_count_label.setText(
-            f"Pause Count: {summary.get('pause_count', 0)}"
+            f"จำนวนครั้งที่หยุด: {summary.get('pause_count', 0)}"
         )
 
         for label, title, key in (
-            (self.count_label, "Detection Cycles", "detection_count"),
-            (self.pose_label, "Pose Detected", "pose_detected_count"),
-            (self.face_label, "Face Detected", "face_detected_count"),
+            (self.count_label, "รอบการตรวจจับ", "detection_count"),
+            (self.pose_label, "ตรวจพบท่าทาง", "pose_detected_count"),
+            (self.face_label, "ตรวจพบใบหน้า", "face_detected_count"),
         ):
             value = summary.get(key)
             label.setText(f"{title}: {value if value is not None else 'N/A'}")
         self.shoulder_label.setText(
-            "Average Shoulder: "
+            "ความเอียงไหล่เฉลี่ย: "
             + self.format_angle(
                 summary.get("average_shoulder")
             )
         )
         self.neck_label.setText(
-            "Average Neck: "
+            "ความเอียงคอเฉลี่ย: "
             + self.format_angle(
                 summary.get("average_neck")
             )
         )
         self.baseline_shoulder_label.setText(
-            "Baseline Shoulder: "
+            "ค่าอ้างอิงไหล่: "
             + self.format_angle(
                 summary.get("baseline_shoulder")
             )
         )
         self.baseline_neck_label.setText(
-            "Baseline Neck: "
+            "ค่าอ้างอิงคอ: "
             + self.format_angle(
                 summary.get("baseline_neck")
             )
         )
 
         self.average_risk_label.setText(
-            "Average Risk Score: "
+            "คะแนนความเสี่ยงเฉลี่ย: "
             + self._number_or_na(report_metrics.get("average_risk_score"))
         )
         self.maximum_risk_label.setText(
-            "Maximum Risk Score: "
+            "คะแนนความเสี่ยงสูงสุด: "
             + self._number_or_na(report_metrics.get("maximum_risk_score"))
         )
         self.blink_rate_label.setText(
-            "Blink Rate: " + self._number_or_na(report_metrics.get("blink_rate"))
+            "อัตราการกะพริบตา: " + self._number_or_na(report_metrics.get("blink_rate"))
         )
         alert_count = report_metrics.get("total_alert_count")
         self.report_alert_count_label.setText(
-            f"Stored Alert Count: {alert_count if alert_count is not None else 'N/A'}"
+            f"จำนวนการแจ้งเตือนที่บันทึก: {alert_count if alert_count is not None else 'N/A'}"
         )
         frequent = report_metrics.get("most_frequent_alert_event")
         self.frequent_event_label.setText(
-            f"Most Frequent Alert: {event_type_label(frequent)}"
+            f"การแจ้งเตือนที่พบบ่อยที่สุด: {event_type_label(frequent)}"
         )
         self.risk_breakdown_label.setText(
-            "Risk Breakdown: " + self._risk_breakdown(report_metrics)
+            "รายละเอียดความเสี่ยง: " + self._risk_breakdown(report_metrics)
         )
 
         self.update_save_status()
@@ -403,15 +403,15 @@ class SessionSummaryPage(QWidget):
         error = summary.get("summary_save_error")
 
         if status == "LOADED":
-            self.save_status_label.setText("Loaded saved report from database.")
+            self.save_status_label.setText('โหลดรายงานจากฐานข้อมูลแล้ว')
             self.retry_button.setEnabled(False)
             self.save_group.hide()
         elif status == "SAVED":
-            self.save_status_label.setText("Session report saved successfully.")
+            self.save_status_label.setText('บันทึกรายงานเซสชันสำเร็จ')
             self.retry_button.setEnabled(False)
             self.save_group.hide()
         elif status == "ALREADY_EXISTS":
-            self.save_status_label.setText("A saved report already exists for this session.")
+            self.save_status_label.setText('เซสชันนี้มีรายงานที่บันทึกไว้แล้ว')
             self.retry_button.setEnabled(False)
             self.save_group.hide()
         else:
@@ -486,16 +486,16 @@ class SessionSummaryPage(QWidget):
             )
 
             self.alert_total_label.setText(
-                f"Total Alerts: {stats['total_alerts']}"
+                f"การแจ้งเตือนทั้งหมด: {stats['total_alerts']}"
             )
             self.alert_closed_label.setText(
-                f"Closed Alerts: {stats['closed_alerts']}"
+                f"การแจ้งเตือนที่จบแล้ว: {stats['closed_alerts']}"
             )
             self.alert_active_label.setText(
-                f"Active Alerts: {stats['active_alerts']}"
+                f"การแจ้งเตือนที่ยังทำงาน: {stats['active_alerts']}"
             )
             self.alert_duration_label.setText(
-                "Closed Alert Duration: "
+                "ระยะเวลาการแจ้งเตือนที่จบแล้ว: "
                 f"{stats['closed_alert_seconds']} seconds"
             )
 
@@ -520,7 +520,7 @@ class SessionSummaryPage(QWidget):
         if status not in ("SAVED", "ALREADY_EXISTS", "LOADED"):
             answer = QMessageBox.question(
                 self,
-                "Unsaved Report",
+                'รายงานยังไม่ถูกบันทึก',
                 "This session report has not been saved successfully. "
                 "If you leave now, you may not be able to retry with the same data.\n\n"
                 "Leave this report?",

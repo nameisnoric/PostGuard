@@ -39,7 +39,7 @@ class CameraCalibrationPage(QWidget):
         layout.setContentsMargins(48, 24, 48, 32)
         layout.setSpacing(12)
 
-        title = QLabel("Prepare your camera")
+        title = QLabel("เตรียมกล้อง")
         title.setProperty("role", "title")
         subtitle = QLabel(
             "Step 3 of 4  ·  Hold a standard ID-size card inside the guide. "
@@ -57,7 +57,7 @@ class CameraCalibrationPage(QWidget):
         preview_layout = QVBoxLayout(preview_card)
         preview_layout.setContentsMargins(16, 14, 16, 16)
         preview_layout.setSpacing(10)
-        self.preview_label = QLabel("Camera preparation preview will appear here.")
+        self.preview_label = QLabel("ภาพสำหรับเตรียมกล้องจะแสดงที่นี่")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setProperty("preview", True)
         self.preview_label.setMinimumSize(640, 360)
@@ -73,14 +73,14 @@ class CameraCalibrationPage(QWidget):
         status_layout = QVBoxLayout(status_card)
         status_layout.setContentsMargins(18, 16, 18, 16)
         status_layout.setSpacing(10)
-        heading = QLabel("Camera reference")
+        heading = QLabel("ข้อมูลอ้างอิงกล้อง")
         heading.setProperty("role", "heading")
         status_layout.addWidget(heading)
-        self.camera_label = QLabel("Camera: --")
+        self.camera_label = QLabel('กล้อง: --')
         self.camera_label.setProperty("role", "muted")
-        self.guidance_label = QLabel("Place a card inside the guide.")
+        self.guidance_label = QLabel("วางบัตรให้อยู่ภายในกรอบ")
         self.guidance_label.setWordWrap(True)
-        self.progress_label = QLabel("Stable frames: 0 / 10")
+        self.progress_label = QLabel('เฟรมที่นิ่ง: 0 / 10')
         self.progress_label.setProperty("role", "muted")
         status_layout.addWidget(self.camera_label)
         status_layout.addWidget(self.guidance_label)
@@ -106,7 +106,7 @@ class CameraCalibrationPage(QWidget):
             result_grid.addWidget(value, row, 1)
         status_layout.addLayout(result_grid)
         privacy = QLabel(
-            "Frames and card images remain on this device and are not saved or uploaded."
+            'ภาพจากกล้องและภาพบัตรจะอยู่บนอุปกรณ์นี้ โดยไม่บันทึกหรืออัปโหลด'
         )
         privacy.setProperty("role", "muted")
         privacy.setWordWrap(True)
@@ -116,9 +116,9 @@ class CameraCalibrationPage(QWidget):
         layout.addLayout(body, 1)
 
         actions = QHBoxLayout()
-        self.back_button = QPushButton("Back to Camera Preview")
-        self.retry_button = QPushButton("Restart Preparation")
-        self.continue_button = QPushButton("Continue to Personal Baseline")
+        self.back_button = QPushButton("กลับไปดูภาพตัวอย่าง")
+        self.retry_button = QPushButton("เริ่มเตรียมกล้องใหม่")
+        self.continue_button = QPushButton("ไปยังค่าท่าทางอ้างอิงส่วนบุคคล")
         self.continue_button.setProperty("variant", "primary")
         self.continue_button.setEnabled(False)
         self.back_button.clicked.connect(self.handle_back)
@@ -139,7 +139,7 @@ class CameraCalibrationPage(QWidget):
         self.continue_button.setEnabled(False)
         self._clear_result()
         self.camera_label.setText(
-            f"Camera: {camera.get('camera_name', 'Unknown')} | "
+            f"กล้อง: {camera.get('camera_name', 'ไม่ทราบ')} | "
             f"{camera.get('resolution_width', '--')}x"
             f"{camera.get('resolution_height', '--')}"
         )
@@ -151,14 +151,14 @@ class CameraCalibrationPage(QWidget):
         device_index = self.selected_camera.get("device_index")
         if type(device_index) is not int or device_index < 0:
             QMessageBox.warning(
-                self, "Camera Preparation", "A valid camera device is required."
+                self, 'การเตรียมกล้อง', 'ต้องเลือกอุปกรณ์กล้องที่ถูกต้อง'
             )
             return
         self.capture = cv2.VideoCapture(device_index)
         if not self.capture.isOpened():
             self.stop_camera()
             QMessageBox.critical(
-                self, "Camera Preparation", "Unable to open the selected camera."
+                self, 'การเตรียมกล้อง', 'ไม่สามารถเปิดกล้องที่เลือกได้'
             )
             return
         width = self.selected_camera.get("resolution_width")
@@ -166,7 +166,7 @@ class CameraCalibrationPage(QWidget):
         if type(width) is int and type(height) is int:
             self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.guidance_label.setText("Place a standard ID-size card inside the guide.")
+        self.guidance_label.setText('วางบัตรขนาดมาตรฐานไว้ภายในกรอบ')
         self.timer.start()
 
     def restart_preparation(self):
@@ -184,13 +184,13 @@ class CameraCalibrationPage(QWidget):
         success, frame = self.capture.read()
         if not success or frame is None:
             self.stop_camera()
-            self.guidance_label.setText("Camera frame could not be read.")
+            self.guidance_label.setText('ไม่สามารถอ่านภาพจากกล้องได้')
             return
         prepared_frame = cv2.flip(frame, 1)
         result = self.tracker.process(prepared_frame)
         self.guidance_label.setText(result["guidance"])
         self.progress_label.setText(
-            f"Stable frames: {result['stable_count']} / {result['stable_frames']}"
+            f"เฟรมที่นิ่ง: {result['stable_count']} / {result['stable_frames']}"
         )
         if result["reference"] is not None and self.calibration_reference is None:
             self._complete_preparation(result["reference"])
@@ -205,9 +205,9 @@ class CameraCalibrationPage(QWidget):
         self.completion_notified = True
         QMessageBox.information(
             self,
-            "Camera Preparation Complete",
+            'เตรียมกล้องสำเร็จ',
             "Your camera reference is ready.\n\n"
-            f"Stable frames: {self.tracker.stable_frames}/{self.tracker.stable_frames}\n"
+            f"เฟรมที่นิ่ง: {self.tracker.stable_frames}/{self.tracker.stable_frames}\n"
             f"Pixel scale: {reference['scale_avg']:.2f} px/mm\n"
             f"Card roll: {reference['card_roll_deg']:+.2f}°\n\n"
             "You can now continue to Personal Baseline.",
@@ -244,7 +244,7 @@ class CameraCalibrationPage(QWidget):
     def _clear_result(self):
         for value in self.result_values.values():
             value.setText("--")
-        self.progress_label.setText("Stable frames: 0 / 10")
+        self.progress_label.setText('เฟรมที่นิ่ง: 0 / 10')
 
     def stop_camera(self):
         self.timer.stop()
@@ -253,7 +253,7 @@ class CameraCalibrationPage(QWidget):
                 self.capture.release()
             self.capture = None
         self.preview_label.clear()
-        self.preview_label.setText("Camera preparation preview will appear here.")
+        self.preview_label.setText("ภาพสำหรับเตรียมกล้องจะแสดงที่นี่")
 
     def handle_back(self):
         camera = self.selected_camera.copy() if self.selected_camera else {}

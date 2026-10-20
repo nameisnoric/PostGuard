@@ -43,9 +43,9 @@ class SettingsPage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("Settings")
+        title = QLabel("การตั้งค่า")
         title.setProperty("role", "title")
-        subtitle = QLabel("Manage posture notifications and alert sound preferences.")
+        subtitle = QLabel("จัดการการแจ้งเตือนท่าทางและเสียงแจ้งเตือน")
         subtitle.setProperty("role", "muted")
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -59,19 +59,19 @@ class SettingsPage(QWidget):
         card_layout.setContentsMargins(28, 26, 28, 26)
         card_layout.setSpacing(18)
 
-        heading = QLabel("Alert preferences")
+        heading = QLabel("การตั้งค่าการแจ้งเตือน")
         heading.setProperty("role", "heading")
         card_layout.addWidget(heading)
 
-        self.notifications_enabled = QCheckBox("Enable posture notifications")
+        self.notifications_enabled = QCheckBox("เปิดการแจ้งเตือนท่าทาง")
         self.notifications_enabled.toggled.connect(self._sync_enabled_state)
-        self.sound_enabled = QCheckBox("Play a sound for posture alerts")
+        self.sound_enabled = QCheckBox("เล่นเสียงเมื่อมีการแจ้งเตือนท่าทาง")
         self.sound_enabled.toggled.connect(self._sync_enabled_state)
         card_layout.addWidget(self.notifications_enabled)
         card_layout.addWidget(self.sound_enabled)
 
         volume_row = QHBoxLayout()
-        volume_row.addWidget(QLabel("Alert volume"))
+        volume_row.addWidget(QLabel("ระดับเสียงแจ้งเตือน"))
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setSingleStep(5)
@@ -83,7 +83,7 @@ class SettingsPage(QWidget):
         card_layout.addLayout(volume_row)
 
         reminder_row = QHBoxLayout()
-        reminder_row.addWidget(QLabel("Repeat sound while the alert remains active"))
+        reminder_row.addWidget(QLabel("เล่นเสียงซ้ำขณะที่การแจ้งเตือนยังทำงาน"))
         self.reminder_interval = QComboBox()
         for minutes in (1, 5, 10, 15, 30, 60):
             self.reminder_interval.addItem(
@@ -107,9 +107,9 @@ class SettingsPage(QWidget):
         card_layout.addWidget(self.status_label)
 
         actions = QHBoxLayout()
-        self.test_sound_button = QPushButton("Test Sound")
+        self.test_sound_button = QPushButton("ทดสอบเสียง")
         self.test_sound_button.clicked.connect(self.test_sound)
-        self.save_button = QPushButton("Save Changes")
+        self.save_button = QPushButton("บันทึกการเปลี่ยนแปลง")
         self.save_button.setProperty("variant", "primary")
         self.save_button.clicked.connect(self.save_settings)
         actions.addWidget(self.test_sound_button)
@@ -130,7 +130,7 @@ class SettingsPage(QWidget):
         privacy_layout.setContentsMargins(28, 26, 28, 26)
         privacy_layout.setSpacing(12)
 
-        privacy_heading = QLabel("Privacy and camera data")
+        privacy_heading = QLabel("ความเป็นส่วนตัวและข้อมูลกล้อง")
         privacy_heading.setProperty("role", "heading")
         privacy_note = QLabel(
             "Review how camera frames are processed, check your consent status, "
@@ -138,13 +138,13 @@ class SettingsPage(QWidget):
         )
         privacy_note.setProperty("role", "muted")
         privacy_note.setWordWrap(True)
-        self.privacy_status_label = QLabel("Consent status: Not loaded")
+        self.privacy_status_label = QLabel('สถานะความยินยอม: ยังไม่ได้โหลด')
         self.privacy_status_label.setWordWrap(True)
 
         privacy_actions = QHBoxLayout()
-        self.review_privacy_button = QPushButton("Review Privacy Notice")
+        self.review_privacy_button = QPushButton("อ่านประกาศความเป็นส่วนตัว")
         self.review_privacy_button.clicked.connect(self.review_privacy_notice)
-        self.withdraw_privacy_button = QPushButton("Withdraw Consent")
+        self.withdraw_privacy_button = QPushButton("ถอนความยินยอม")
         self.withdraw_privacy_button.setProperty("variant", "danger")
         self.withdraw_privacy_button.clicked.connect(self.withdraw_privacy_consent)
         privacy_actions.addWidget(self.review_privacy_button)
@@ -163,7 +163,7 @@ class SettingsPage(QWidget):
         self.withdraw_privacy_button.setEnabled(False)
 
     def load_settings(self) -> None:
-        self.status_label.setText("Loading settings...")
+        self.status_label.setText('กำลังโหลดการตั้งค่า...')
         try:
             response = APIClient.get_settings()
         except requests.RequestException:
@@ -190,7 +190,7 @@ class SettingsPage(QWidget):
     def save_settings(self) -> None:
         settings = self.form_settings()
         self.save_button.setEnabled(False)
-        self.status_label.setText("Saving settings...")
+        self.status_label.setText('กำลังบันทึกการตั้งค่า...')
         try:
             response = APIClient.update_settings(settings)
         except (requests.RequestException, ValueError):
@@ -214,7 +214,7 @@ class SettingsPage(QWidget):
         self.current_settings = self._settings_only(payload)
         self._populate(self.current_settings)
         self.settings_updated.emit(self.current_settings.copy())
-        self.status_label.setText("Settings saved.")
+        self.status_label.setText('บันทึกการตั้งค่าแล้ว')
 
     def form_settings(self) -> dict:
         return {
@@ -232,10 +232,10 @@ class SettingsPage(QWidget):
             self.status_label.setText("Increase the alert volume to test the sound.")
             return
         self.sound_player.play_preview(self.volume_slider.value())
-        self.status_label.setText("Playing alert sound.")
+        self.status_label.setText('กำลังเล่นเสียงแจ้งเตือน')
 
     def load_privacy_consent(self) -> None:
-        self.privacy_status_label.setText("Consent status: Loading...")
+        self.privacy_status_label.setText('สถานะความยินยอม: กำลังโหลด...')
         try:
             response = APIClient.get_privacy_consent()
         except requests.RequestException:
@@ -271,7 +271,7 @@ class SettingsPage(QWidget):
                 f"Consent status: Withdrawn · {payload['withdrawn_at']}"
             )
         else:
-            self.privacy_status_label.setText("Consent status: Not accepted")
+            self.privacy_status_label.setText('สถานะความยินยอม: ยังไม่ยอมรับ')
 
     def review_privacy_notice(self) -> None:
         from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
@@ -281,7 +281,7 @@ class SettingsPage(QWidget):
     def withdraw_privacy_consent(self) -> None:
         answer = QMessageBox.question(
             self,
-            "Withdraw camera consent",
+            'ถอนความยินยอมการใช้กล้อง',
             "Withdraw consent for future camera monitoring? Existing history "
             "will remain available.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -312,7 +312,7 @@ class SettingsPage(QWidget):
             self.privacy_status_label.setText("Consent withdrawal was not confirmed.")
             self.withdraw_privacy_button.setEnabled(True)
             return
-        self.privacy_status_label.setText("Consent status: Withdrawn")
+        self.privacy_status_label.setText('สถานะความยินยอม: ถอนแล้ว')
         self.privacy_consent_changed.emit(False)
 
     def _populate(self, settings: dict) -> None:

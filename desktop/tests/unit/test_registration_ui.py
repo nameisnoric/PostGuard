@@ -31,7 +31,7 @@ class RegistrationUITests(unittest.TestCase):
     def test_confirm_password_is_present_and_masked(self):
         self.assertEqual(
             self.window.confirm_password_input.placeholderText(),
-            "Confirm Password",
+            "ยืนยันรหัสผ่าน",
         )
         self.assertEqual(
             self.window.confirm_password_input.echoMode(),

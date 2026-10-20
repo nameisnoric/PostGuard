@@ -22,7 +22,7 @@ class RegisterWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle(
-            "PostGuard - Register"
+            "PostGuard - สมัครสมาชิก"
         )
 
         set_centered_window(self, 900, 680, 720, 600)
@@ -34,12 +34,12 @@ class RegisterWindow(QWidget):
         # -------------------------
 
         self.title_label = QLabel(
-            "Create PostGuard Account"
+            "สร้างบัญชี PostGuard"
         )
         self.title_label.setProperty("role", "title")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        subtitle = QLabel("Create an account with your KU email")
+        subtitle = QLabel("สร้างบัญชีด้วยอีเมล KU ของคุณ")
         subtitle.setProperty("role", "muted")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -50,7 +50,7 @@ class RegisterWindow(QWidget):
         self.full_name_input = QLineEdit()
 
         self.full_name_input.setPlaceholderText(
-            "Full Name"
+            "ชื่อ-นามสกุล"
         )
 
         # -------------------------
@@ -60,7 +60,7 @@ class RegisterWindow(QWidget):
         self.username_input = QLineEdit()
 
         self.username_input.setPlaceholderText(
-            "Username"
+            "ชื่อผู้ใช้"
         )
 
         # -------------------------
@@ -70,7 +70,7 @@ class RegisterWindow(QWidget):
         self.email_input = QLineEdit()
 
         self.email_input.setPlaceholderText(
-            "KU Email"
+            "อีเมล KU"
         )
 
         # -------------------------
@@ -80,7 +80,7 @@ class RegisterWindow(QWidget):
         self.password_input = QLineEdit()
 
         self.password_input.setPlaceholderText(
-            "Password"
+            "รหัสผ่าน"
         )
 
         self.password_input.setEchoMode(
@@ -89,7 +89,7 @@ class RegisterWindow(QWidget):
 
         self.confirm_password_input = QLineEdit()
         self.confirm_password_input.setPlaceholderText(
-            "Confirm Password"
+            "ยืนยันรหัสผ่าน"
         )
         self.confirm_password_input.setEchoMode(
             QLineEdit.EchoMode.Password
@@ -100,12 +100,12 @@ class RegisterWindow(QWidget):
         # -------------------------
 
         self.register_button = QPushButton(
-            "Send OTP"
+            "ส่งรหัส OTP"
         )
         self.register_button.setProperty("variant", "primary")
 
         self.back_button = QPushButton(
-            "Back to Login"
+            "กลับไปหน้าเข้าสู่ระบบ"
         )
 
         # -------------------------
@@ -126,11 +126,11 @@ class RegisterWindow(QWidget):
         layout.addWidget(subtitle)
         layout.addSpacing(10)
         for label, field in (
-            ("Full name", self.full_name_input),
-            ("Username", self.username_input),
-            ("KU Email", self.email_input),
-            ("Password", self.password_input),
-            ("Confirm password", self.confirm_password_input),
+            ("ชื่อ-นามสกุล", self.full_name_input),
+            ("ชื่อผู้ใช้", self.username_input),
+            ("อีเมล KU", self.email_input),
+            ("รหัสผ่าน", self.password_input),
+            ("ยืนยันรหัสผ่าน", self.confirm_password_input),
         ):
             layout.addWidget(QLabel(label))
             layout.addWidget(field)

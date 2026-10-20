@@ -19,7 +19,7 @@ class ProfileSaveConfirmationDialog(QDialog):
 
     def __init__(self, changes: list[str], parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Confirm Profile Changes")
+        self.setWindowTitle('PostGuard - ยืนยันการแก้ไขโปรไฟล์')
         self.setModal(True)
         self.setFixedWidth(480)
 
@@ -27,7 +27,7 @@ class ProfileSaveConfirmationDialog(QDialog):
         layout.setContentsMargins(28, 26, 28, 24)
         layout.setSpacing(16)
 
-        heading = QLabel("Save profile changes?")
+        heading = QLabel("ยืนยันการบันทึกโปรไฟล์?")
         heading.setProperty("role", "title")
         message = QLabel(
             "Please review the changes below. Your photo stays private and is "
@@ -48,9 +48,9 @@ class ProfileSaveConfirmationDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch()
-        keep_editing = QPushButton("Keep editing")
+        keep_editing = QPushButton("แก้ไขต่อ")
         keep_editing.clicked.connect(self.reject)
-        confirm = QPushButton("Save changes")
+        confirm = QPushButton("บันทึกการเปลี่ยนแปลง")
         confirm.setProperty("variant", "primary")
         confirm.clicked.connect(self.accept)
         confirm.setDefault(True)
@@ -68,7 +68,7 @@ class AccountDeletionConfirmationDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Delete Account")
+        self.setWindowTitle('PostGuard - ลบบัญชี')
         self.setModal(True)
         self.setFixedWidth(520)
 
@@ -76,7 +76,7 @@ class AccountDeletionConfirmationDialog(QDialog):
         layout.setContentsMargins(28, 26, 28, 24)
         layout.setSpacing(16)
 
-        heading = QLabel("Request account deletion?")
+        heading = QLabel("ยืนยันคำขอลบบัญชี?")
         heading.setProperty("role", "title")
         message = QLabel(
             "Your account will be disabled immediately and scheduled for permanent "
@@ -88,9 +88,9 @@ class AccountDeletionConfirmationDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch()
-        cancel = QPushButton("Keep account")
+        cancel = QPushButton("เก็บบัญชีไว้")
         cancel.clicked.connect(self.reject)
-        confirm = QPushButton("Request deletion")
+        confirm = QPushButton("ส่งคำขอลบบัญชี")
         confirm.setProperty("variant", "danger")
         confirm.clicked.connect(self.accept)
         buttons.addWidget(cancel)
@@ -124,9 +124,9 @@ class ProfilePage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("Profile")
+        title = QLabel("โปรไฟล์")
         title.setProperty("role", "title")
-        subtitle = QLabel("Manage your profile photo and personal information.")
+        subtitle = QLabel("จัดการรูปโปรไฟล์และข้อมูลส่วนตัวของคุณ")
         subtitle.setProperty("role", "muted")
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -140,7 +140,7 @@ class ProfilePage(QWidget):
         card_layout.setContentsMargins(24, 24, 24, 24)
         card_layout.setSpacing(18)
 
-        photo_title = QLabel("Profile photo")
+        photo_title = QLabel("รูปโปรไฟล์")
         photo_title.setProperty("role", "heading")
         card_layout.addWidget(photo_title)
 
@@ -154,13 +154,13 @@ class ProfilePage(QWidget):
 
         photo_actions = QVBoxLayout()
         photo_buttons = QHBoxLayout()
-        self.change_photo_button = QPushButton("Change photo")
+        self.change_photo_button = QPushButton("เปลี่ยนรูป")
         self.change_photo_button.clicked.connect(self.choose_photo)
-        self.remove_photo_button = QPushButton("Remove photo")
+        self.remove_photo_button = QPushButton("ลบรูป")
         self.remove_photo_button.clicked.connect(self.remove_photo)
         photo_buttons.addWidget(self.change_photo_button)
         photo_buttons.addWidget(self.remove_photo_button)
-        photo_note = QLabel("JPG or PNG up to 5 MB. Recommended 400 x 400.")
+        photo_note = QLabel('รองรับ JPG หรือ PNG ขนาดไม่เกิน 5 MB แนะนำ 400 x 400 พิกเซล')
         photo_note.setProperty("role", "muted")
         photo_actions.addStretch()
         photo_actions.addLayout(photo_buttons)
@@ -175,7 +175,7 @@ class ProfilePage(QWidget):
         divider.setObjectName("divider")
         card_layout.addWidget(divider)
 
-        personal_title = QLabel("Personal information")
+        personal_title = QLabel("ข้อมูลส่วนตัว")
         personal_title.setProperty("role", "heading")
         card_layout.addWidget(personal_title)
 
@@ -185,11 +185,11 @@ class ProfilePage(QWidget):
         self.first_name_input = QLineEdit()
         self.last_name_input = QLineEdit()
         self.username_input = QLineEdit()
-        fields.addWidget(QLabel("First Name"), 0, 0)
-        fields.addWidget(QLabel("Last Name"), 0, 1)
+        fields.addWidget(QLabel("ชื่อ"), 0, 0)
+        fields.addWidget(QLabel("นามสกุล"), 0, 1)
         fields.addWidget(self.first_name_input, 1, 0)
         fields.addWidget(self.last_name_input, 1, 1)
-        fields.addWidget(QLabel("Username"), 2, 0, 1, 2)
+        fields.addWidget(QLabel("ชื่อผู้ใช้"), 2, 0, 1, 2)
         fields.addWidget(self.username_input, 3, 0, 1, 2)
         fields.setColumnStretch(0, 1)
         fields.setColumnStretch(1, 1)
@@ -201,7 +201,7 @@ class ProfilePage(QWidget):
         card_layout.addWidget(self.status_label)
 
         actions = QHBoxLayout()
-        self.save_button = QPushButton("Save Changes")
+        self.save_button = QPushButton("บันทึกการเปลี่ยนแปลง")
         self.save_button.setProperty("variant", "primary")
         self.save_button.clicked.connect(self.request_save_changes)
         actions.addWidget(self.save_button)
@@ -213,7 +213,7 @@ class ProfilePage(QWidget):
         danger_divider.setObjectName("divider")
         card_layout.addWidget(danger_divider)
 
-        danger_title = QLabel("Delete account")
+        danger_title = QLabel("ลบบัญชี")
         danger_title.setProperty("role", "heading")
         danger_message = QLabel(
             "Disable this account now and permanently delete it after a 14-day "
@@ -221,7 +221,7 @@ class ProfilePage(QWidget):
         )
         danger_message.setProperty("role", "muted")
         danger_message.setWordWrap(True)
-        self.delete_account_button = QPushButton("Delete Account")
+        self.delete_account_button = QPushButton("ลบบัญชี")
         self.delete_account_button.setProperty("variant", "danger")
         self.delete_account_button.clicked.connect(self.confirm_account_deletion)
         danger_actions = QHBoxLayout()
@@ -284,19 +284,19 @@ class ProfilePage(QWidget):
             response = APIClient.get_avatar()
         except requests.RequestException:
             self._set_avatar_pixmap(None)
-            self.status_label.setText("Profile photo could not be loaded.")
+            self.status_label.setText('ไม่สามารถโหลดรูปโปรไฟล์ได้')
             return
         if response.status_code == 404:
             self._set_avatar_pixmap(None)
             return
         if not response.ok:
             self._set_avatar_pixmap(None)
-            self.status_label.setText("Profile photo could not be loaded.")
+            self.status_label.setText('ไม่สามารถโหลดรูปโปรไฟล์ได้')
             return
         pixmap = QPixmap()
         if not pixmap.loadFromData(response.content):
             self._set_avatar_pixmap(None)
-            self.status_label.setText("Profile photo response was invalid.")
+            self.status_label.setText('ข้อมูลรูปโปรไฟล์ไม่ถูกต้อง')
             return
         self._set_avatar_pixmap(pixmap)
 
@@ -312,32 +312,32 @@ class ProfilePage(QWidget):
         file_path = Path(path)
 
         if file_path.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
-            self.status_label.setText("Choose a JPG or PNG image.")
+            self.status_label.setText('โปรดเลือกรูป JPG หรือ PNG')
             return
         try:
             if file_path.stat().st_size > 5 * 1024 * 1024:
-                self.status_label.setText("The selected image is larger than 5 MB.")
+                self.status_label.setText('รูปที่เลือกมีขนาดเกิน 5 MB')
                 return
 
         except OSError:
-            self.status_label.setText("The selected image could not be opened.")
+            self.status_label.setText('ไม่สามารถเปิดรูปที่เลือกได้')
             return
         preview = QPixmap(path)
 
         if preview.isNull():
-            self.status_label.setText("The selected file is not a readable image.")
+            self.status_label.setText('ไฟล์ที่เลือกไม่ใช่รูปภาพที่อ่านได้')
             return
         self.selected_photo_path = path
         self._set_avatar_pixmap(preview)
         self.remove_photo_button.setEnabled(True)
-        self.status_label.setText("Photo selected. Save Changes to upload it privately.")
+        self.status_label.setText('เลือกรูปแล้ว กดบันทึกการเปลี่ยนแปลงเพื่ออัปโหลดแบบส่วนตัว')
 
     def remove_photo(self) -> None:
         """Remove the signed-in user's stored avatar and restore initials."""
         has_stored_avatar = bool(self.user_data.get("avatar_path"))
         if has_stored_avatar:
             self.remove_photo_button.setEnabled(False)
-            self.status_label.setText("Removing private profile photo...")
+            self.status_label.setText('กำลังลบรูปโปรไฟล์ส่วนตัว...')
             QApplication.processEvents()
             try:
                 response = APIClient.delete_avatar()
@@ -356,7 +356,7 @@ class ProfilePage(QWidget):
         self.user_data["avatar_path"] = None
         self._set_avatar_pixmap(None)
         self.remove_photo_button.setEnabled(False)
-        self.status_label.setText("Profile photo removed.")
+        self.status_label.setText('ลบรูปโปรไฟล์แล้ว')
         self.profile_updated.emit({"avatar_path": None})
 
     def reset_form(self) -> None:
@@ -378,7 +378,7 @@ class ProfilePage(QWidget):
         last = self.last_name_input.text().strip()
         username = self.username_input.text().strip()
         if not first or not username:
-            self.status_label.setText("First Name and Username are required.")
+            self.status_label.setText('ต้องกรอกชื่อและชื่อผู้ใช้')
             return
 
         full_name = " ".join(part for part in (first, last) if part)
@@ -391,7 +391,7 @@ class ProfilePage(QWidget):
             changes.append("Your new profile photo will be uploaded to private storage.")
 
         if not changes:
-            self.status_label.setText("No profile changes to save.")
+            self.status_label.setText('ไม่มีการเปลี่ยนแปลงโปรไฟล์ให้บันทึก')
             return
 
         dialog = ProfileSaveConfirmationDialog(changes, self)
@@ -403,7 +403,7 @@ class ProfilePage(QWidget):
         last = self.last_name_input.text().strip()
         username = self.username_input.text().strip()
         if not first or not username:
-            self.status_label.setText("First Name and Username are required.")
+            self.status_label.setText('ต้องกรอกชื่อและชื่อผู้ใช้')
             return
 
         full_name = " ".join(part for part in (first, last) if part)
@@ -412,7 +412,7 @@ class ProfilePage(QWidget):
             or full_name != str(self.user_data.get("full_name") or "")
         )
         if not profile_changed and not self.selected_photo_path:
-            self.status_label.setText("No profile changes to save.")
+            self.status_label.setText('ไม่มีการเปลี่ยนแปลงโปรไฟล์ให้บันทึก')
             return
 
         avatar_path = self.user_data.get("avatar_path")
@@ -422,7 +422,7 @@ class ProfilePage(QWidget):
         QApplication.processEvents()
         try:
             if profile_changed:
-                self.status_label.setText("Saving profile information...")
+                self.status_label.setText('กำลังบันทึกข้อมูลโปรไฟล์...')
                 QApplication.processEvents()
                 try:
                     response = APIClient.update_profile(username, full_name)
@@ -457,7 +457,7 @@ class ProfilePage(QWidget):
                 profile_saved = True
 
             if self.selected_photo_path:
-                self.status_label.setText("Uploading private profile photo...")
+                self.status_label.setText('กำลังอัปโหลดรูปโปรไฟล์แบบส่วนตัว...')
                 QApplication.processEvents()
                 try:
                     response = APIClient.upload_avatar(self.selected_photo_path)
@@ -508,11 +508,11 @@ class ProfilePage(QWidget):
         self.user_data.update(updated)
         self.selected_photo_path = None
         if profile_saved and photo_uploaded:
-            self.status_label.setText("Profile information and photo saved.")
+            self.status_label.setText('บันทึกข้อมูลและรูปโปรไฟล์แล้ว')
         elif photo_uploaded:
-            self.status_label.setText("Profile photo saved privately.")
+            self.status_label.setText('บันทึกรูปโปรไฟล์แบบส่วนตัวแล้ว')
         else:
-            self.status_label.setText("Profile information saved.")
+            self.status_label.setText('บันทึกข้อมูลโปรไฟล์แล้ว')
         self.profile_updated.emit(updated)
 
     def _current_profile_update(self) -> dict:

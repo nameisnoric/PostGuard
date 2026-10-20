@@ -23,7 +23,7 @@ class LoginWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
 
-        self.setWindowTitle("PostGuard - Login")
+        self.setWindowTitle("PostGuard - เข้าสู่ระบบ")
         set_centered_window(self, 900, 580, 720, 500)
         self.setObjectName("authWindow")
         self.setStyleSheet(APP_QSS)
@@ -32,23 +32,23 @@ class LoginWindow(QWidget):
         self.title_label.setProperty("role", "title")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        subtitle = QLabel("Sign in to continue posture monitoring")
+        subtitle = QLabel("เข้าสู่ระบบเพื่อเริ่มตรวจติดตามท่าทาง")
         subtitle.setProperty("role", "muted")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("KU Email")
+        self.email_input.setPlaceholderText("อีเมล KU")
 
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Password")
+        self.password_input.setPlaceholderText("รหัสผ่าน")
         self.password_input.setEchoMode(
             QLineEdit.EchoMode.Password
         )
 
-        self.login_button = QPushButton("Login")
+        self.login_button = QPushButton("เข้าสู่ระบบ")
         self.login_button.setProperty("variant", "primary")
-        self.register_button = QPushButton("Create Account")
-        self.forgot_password_button = QPushButton("Forgot Password?")
+        self.register_button = QPushButton("สร้างบัญชี")
+        self.forgot_password_button = QPushButton("ลืมรหัสผ่าน?")
         self.forgot_password_button.clicked.connect(self.open_password_reset)
         self.login_button.clicked.connect(
             self.handle_login
@@ -70,9 +70,9 @@ class LoginWindow(QWidget):
         layout.addWidget(self.title_label)
         layout.addWidget(subtitle)
         layout.addSpacing(12)
-        layout.addWidget(QLabel("KU Email"))
+        layout.addWidget(QLabel("อีเมล KU"))
         layout.addWidget(self.email_input)
-        layout.addWidget(QLabel("Password"))
+        layout.addWidget(QLabel("รหัสผ่าน"))
         layout.addWidget(self.password_input)
         layout.addWidget(self.forgot_password_button, alignment=Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.login_button)

@@ -32,7 +32,7 @@ class DashboardTests(unittest.TestCase):
     def test_missing_duration_is_not_zero(self):
         self.page._loaded([dict(status="COMPLETED", total_duration=100)], "")
         self.assertEqual(self.page.time_value.text(), "N/A")
-        self.assertIn("excluded", self.page.data_status.text())
+        self.assertIn("ไม่รวม", self.page.data_status.text())
         self.assertIsNone(active_seconds(dict(status="COMPLETED", total_duration=20, paused_duration=30)))
 
     def test_empty_and_error_states(self):
@@ -49,8 +49,8 @@ class DashboardTests(unittest.TestCase):
         self.page.monitor_requested.connect(monitor)
         self.page.history_requested.connect(history)
         self.page.set_monitoring_state(9, paused=True)
-        self.assertIn("Paused", self.page.live_label.text())
-        self.assertEqual(self.page.monitor_button.text(), "Return to Monitoring")
+        self.assertIn("หยุดชั่วคราว", self.page.live_label.text())
+        self.assertEqual(self.page.monitor_button.text(), "กลับไปหน้าการตรวจจับ")
         self.page.monitor_button.click()
         self.page.history_button.click()
         monitor.assert_called_once()

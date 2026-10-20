@@ -20,7 +20,7 @@ from app.ui.theme import APP_QSS
 class AlertHistoryDialog(QDialog):
     def __init__(self, parent=None, session_id=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Alert Events History")
+        self.setWindowTitle("PostGuard - ประวัติเหตุการณ์แจ้งเตือน")
         self.resize(980, 600)
         self.setMinimumSize(760, 480)
         self.setStyleSheet(APP_QSS)
@@ -29,7 +29,7 @@ class AlertHistoryDialog(QDialog):
         self.layout().setContentsMargins(24, 22, 24, 22)
         self.layout().setSpacing(14)
 
-        title = QLabel("Alert Events")
+        title = QLabel("เหตุการณ์แจ้งเตือน")
         title.setProperty("role", "title")
         self.layout().addWidget(title)
 
@@ -41,7 +41,7 @@ class AlertHistoryDialog(QDialog):
         self.layout().addWidget(self.description)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Session:"))
+        controls.addWidget(QLabel("เซสชัน:"))
         self.session_selector = QComboBox()
         selector_view = QListView(self.session_selector)
         selector_view.setUniformItemSizes(True)
@@ -50,16 +50,16 @@ class AlertHistoryDialog(QDialog):
         self.session_selector.setMaxVisibleItems(8)
         self.session_selector.currentIndexChanged.connect(self.load_selected_alerts)
         controls.addWidget(self.session_selector, 1)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("รีเฟรช")
         self.refresh_button.clicked.connect(self.load_selected_alerts)
         controls.addWidget(self.refresh_button)
         self.layout().addLayout(controls)
 
-        self.stats_label = QLabel("Select a session to load alerts.")
+        self.stats_label = QLabel('เลือกเซสชันเพื่อโหลดการแจ้งเตือน')
         self.stats_label.setWordWrap(True)
         self.layout().addWidget(self.stats_label)
 
-        self.empty_label = QLabel("No alert events were recorded for this session.")
+        self.empty_label = QLabel('เซสชันนี้ไม่มีเหตุการณ์แจ้งเตือน')
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setProperty("role", "muted")
         self.empty_label.setMinimumHeight(90)
@@ -68,8 +68,8 @@ class AlertHistoryDialog(QDialog):
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels([
-            "Event", "Type", "Risk", "Started (local)",
-            "Ended (local)", "Open duration", "Status",
+            'เหตุการณ์', 'ประเภท', 'ความเสี่ยง', 'เริ่ม (เวลาท้องถิ่น)',
+            'สิ้นสุด (เวลาท้องถิ่น)', 'ระยะเวลา', 'สถานะ',
         ])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -81,7 +81,7 @@ class AlertHistoryDialog(QDialog):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.layout().addWidget(self.table)
 
-        close_button = QPushButton("Close")
+        close_button = QPushButton("ปิด")
         close_button.clicked.connect(self.accept)
         self.layout().addWidget(close_button)
 
@@ -128,15 +128,15 @@ class AlertHistoryDialog(QDialog):
             self.session_selector.blockSignals(False)
             self.load_selected_alerts()
         except (requests.RequestException, ValueError, RuntimeError) as exc:
-            self.stats_label.setText("Could not load sessions.")
-            QMessageBox.warning(self, "Alert History", str(exc))
+            self.stats_label.setText('ไม่สามารถโหลดเซสชันได้')
+            QMessageBox.warning(self, 'ประวัติการแจ้งเตือน', str(exc))
 
     def load_selected_alerts(self, *_):
         session_id = self.session_selector.currentData()
         if session_id is None:
             self.table.setRowCount(0)
-            self.stats_label.setText("No sessions available.")
-            self.empty_label.setText("No monitoring sessions are available yet.")
+            self.stats_label.setText('ไม่มีเซสชันที่พร้อมแสดง')
+            self.empty_label.setText('ยังไม่มีเซสชันการตรวจจับ')
             self.empty_label.show()
             self.table.hide()
             return
@@ -152,18 +152,18 @@ class AlertHistoryDialog(QDialog):
             stats = summarize_alerts(alerts)
         except (requests.RequestException, ValueError, RuntimeError) as exc:
             self.table.setRowCount(0)
-            self.stats_label.setText("Alert data unavailable (not zero).")
-            self.empty_label.setText("Alert events could not be loaded. Use Refresh to try again.")
+            self.stats_label.setText('ไม่สามารถเรียกข้อมูลการแจ้งเตือนได้ (ไม่ได้หมายถึงศูนย์)')
+            self.empty_label.setText('ไม่สามารถโหลดเหตุการณ์แจ้งเตือนได้ กดรีเฟรชเพื่อลองอีกครั้ง')
             self.empty_label.show()
             self.table.hide()
-            QMessageBox.warning(self, "Alert History", str(exc))
+            QMessageBox.warning(self, 'ประวัติการแจ้งเตือน', str(exc))
             return
 
         self.stats_label.setText(
-            f"Total: {stats['total_alerts']} | Closed: {stats['closed_alerts']} | "
-            f"Active: {stats['active_alerts']} | "
-            f"Incomplete: {stats['incomplete_alerts']} | "
-            "Closed alert-open time: "
+            f"ทั้งหมด: {stats['total_alerts']} | จบแล้ว: {stats['closed_alerts']} | "
+            f"ยังทำงาน: {stats['active_alerts']} | "
+            f"ไม่สมบูรณ์: {stats['incomplete_alerts']} | "
+            "เวลาที่เปิดแจ้งเตือน: "
             f"{duration_text(stats['closed_alert_seconds'])}"
         )
         self.empty_label.setVisible(not alerts)
@@ -190,7 +190,7 @@ class AlertHistoryDialog(QDialog):
 
 def add_alert_history_button(sidebar_layout, main_window):
     """Optional, non-invasive integration with an existing MainWindow sidebar."""
-    button = QPushButton("Alert Events")
+    button = QPushButton("เหตุการณ์แจ้งเตือน")
     sidebar_layout.addWidget(button)
     button.clicked.connect(lambda: AlertHistoryDialog(main_window).exec())
     main_window.alert_history_button = button

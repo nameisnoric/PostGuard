@@ -70,9 +70,9 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(app_title)
         navigation_layout.addStretch()
 
-        self.monitor_button = self._nav_button("Monitoring")
-        self.dashboard_button = self._nav_button("Dashboard")
-        self.history_button = self._nav_button("History")
+        self.monitor_button = self._nav_button("การตรวจจับ")
+        self.dashboard_button = self._nav_button("แดชบอร์ด")
+        self.history_button = self._nav_button("ประวัติ")
         navigation_layout.addWidget(self.monitor_button)
         navigation_layout.addWidget(self.dashboard_button)
         navigation_layout.addWidget(self.history_button)
@@ -83,10 +83,10 @@ class MainWindow(QMainWindow):
         self.account_button.setProperty("accountActive", False)
         self.account_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         account_menu = QMenu(self.account_button)
-        self.profile_action = account_menu.addAction("Profile")
-        self.settings_action = account_menu.addAction("Settings")
+        self.profile_action = account_menu.addAction("โปรไฟล์")
+        self.settings_action = account_menu.addAction("การตั้งค่า")
         account_menu.addSeparator()
-        self.logout_action = account_menu.addAction("Log out")
+        self.logout_action = account_menu.addAction("ออกจากระบบ")
         self.account_button.setMenu(account_menu)
         navigation_layout.addWidget(self.account_button)
         main_layout.addWidget(navigation)
@@ -95,10 +95,10 @@ class MainWindow(QMainWindow):
         self.session_bar.setProperty("variant", "sessionBar")
         session_layout = QHBoxLayout(self.session_bar)
         session_layout.setContentsMargins(32, 8, 24, 8)
-        self.monitoring_status_label = QLabel("Monitoring: Not started")
+        self.monitoring_status_label = QLabel("การตรวจจับ: ยังไม่เริ่ม")
         self.monitoring_status_label.setProperty("status", "idle")
-        self.global_pause_button = QPushButton("Pause Monitoring")
-        self.global_stop_button = QPushButton("Stop Monitoring")
+        self.global_pause_button = QPushButton("หยุดชั่วคราว")
+        self.global_stop_button = QPushButton("หยุดการตรวจจับ")
         self.global_stop_button.setProperty("variant", "danger")
         session_layout.addWidget(self.monitoring_status_label, 1)
         session_layout.addWidget(self.global_pause_button)
@@ -386,7 +386,7 @@ class MainWindow(QMainWindow):
         except requests.RequestException:
             QMessageBox.warning(
                 self,
-                "Privacy Notice",
+                'ประกาศความเป็นส่วนตัว',
                 "Cannot check your privacy choice. Check your connection before "
                 "opening the camera.",
             )
@@ -394,7 +394,7 @@ class MainWindow(QMainWindow):
         if not response.ok:
             QMessageBox.warning(
                 self,
-                "Privacy Notice",
+                'ประกาศความเป็นส่วนตัว',
                 "Your privacy choice could not be loaded. Restart the backend and "
                 "try again.",
             )
@@ -423,12 +423,12 @@ class MainWindow(QMainWindow):
         """Finish local work, request deletion, then return to login."""
         if not self._finish_before_exit():
             self.profile_page.status_label.setText(
-                "Finish and save the current monitoring session before deleting the account."
+                'โปรดจบและบันทึกเซสชันปัจจุบันก่อนลบบัญชี'
             )
             return
 
         self.profile_page.delete_account_button.setEnabled(False)
-        self.profile_page.status_label.setText("Requesting account deletion...")
+        self.profile_page.status_label.setText('กำลังส่งคำขอลบบัญชี...')
         try:
             response = APIClient.request_account_deletion()
         except requests.RequestException:
@@ -454,7 +454,7 @@ class MainWindow(QMainWindow):
             scheduled_for = None
         QMessageBox.information(
             self,
-            "Account deletion requested",
+            'ส่งคำขอลบบัญชีแล้ว',
             "Your account is disabled and scheduled for permanent deletion in 14 days. "
             "Sign in again before the deadline to recover it."
             + (f"\n\nDeletion deadline: {scheduled_for}" if scheduled_for else ""),
@@ -513,7 +513,7 @@ class MainWindow(QMainWindow):
             state = "Paused" if monitor.is_paused else "Running (camera on)"
             if monitor.capture is None:
                 state = "Stopped locally; session end pending"
-            status = f"Session {monitor.session_id}: {state}"
+            status = f"เซสชัน {monitor.session_id}: {state}"
         else:
             status = "Monitoring: Not running"
         self.monitoring_status_label.setText(status)
@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
         )
         polish(self.monitoring_status_label)
         self.global_pause_button.setText(
-            "Resume Monitoring" if monitor.is_paused else "Pause Monitoring"
+            "ตรวจจับต่อ" if monitor.is_paused else "หยุดชั่วคราว"
         )
         can_control = active and not monitor.is_stopping
         self.session_bar.setVisible(active or monitor.is_stopping)
@@ -546,7 +546,7 @@ class MainWindow(QMainWindow):
             sessions = find_unclosed_sessions()
             for session in sessions:
                 answer = QMessageBox.question(
-                    self, "Unclosed Session",
+                    self, 'พบเซสชันที่ยังไม่จบ',
                     f"Session {session['session_id']} is still {session['status']}.\n"
                     "It may be running on another device.\n\n"
                     "Mark it as interrupted so you can start a new session?\n"
@@ -563,7 +563,7 @@ class MainWindow(QMainWindow):
             return True
         except (requests.RequestException, RuntimeError, ValueError) as error:
             self.monitoring_status_label.setText("Session check failed; Monitor to retry")
-            QMessageBox.warning(self, "Session Recovery", str(error))
+            QMessageBox.warning(self, 'การกู้คืนเซสชัน', str(error))
             return False
         finally:
             self._recovery_in_progress = False
@@ -573,8 +573,8 @@ class MainWindow(QMainWindow):
         if summary and summary.get("summary_save_status") not in ("SAVED", "ALREADY_EXISTS"):
             self.pages.setCurrentWidget(self.session_summary_page)
             QMessageBox.warning(
-                self, "Unsaved Summary",
-                "Please retry saving this summary before starting another session or exiting.",
+                self, 'สรุปยังไม่ถูกบันทึก',
+                'โปรดลองบันทึกสรุปนี้อีกครั้งก่อนเริ่มเซสชันใหม่หรือออกจากโปรแกรม',
             )
             return True
         return False
@@ -668,7 +668,7 @@ class MainWindow(QMainWindow):
 
             if device_index is None:
                 raise ValueError(
-                    "Camera device index is missing."
+                    'ไม่พบหมายเลขอุปกรณ์กล้อง'
                 )
 
             # Temporary Device Identifier
@@ -771,7 +771,7 @@ class MainWindow(QMainWindow):
 
             QMessageBox.warning(
                 self,
-                "Camera Registration Error",
+                'เกิดข้อผิดพลาดในการลงทะเบียนกล้อง',
                 str(error)
             )
 
@@ -794,8 +794,8 @@ class MainWindow(QMainWindow):
         if calibration_reference.get("status") != "VALID":
             QMessageBox.warning(
                 self,
-                "Camera Preparation",
-                "Complete camera preparation before creating a Personal Baseline.",
+                'การเตรียมกล้อง',
+                'โปรดเตรียมกล้องให้เสร็จก่อนสร้างค่าท่าทางอ้างอิงส่วนบุคคล',
             )
             return
         camera_data = camera.copy()
