@@ -132,7 +132,13 @@ class TestRiskEvaluatorContractV11(
     unittest.TestCase
 ):
 
-    def test_contract_is_v11(self):
+    # ========================================================
+    # CONTRACT UPGRADE
+    # ========================================================
+
+    def test_contract_upgraded_to_v12_without_breaking_v11_evidence(
+        self,
+    ):
         result = evaluate_risk(
             make_assessment(),
             make_temporal(),
@@ -140,8 +146,12 @@ class TestRiskEvaluatorContractV11(
 
         self.assertEqual(
             result["risk_contract_version"],
-            "1.1",
+            "1.2",
         )
+
+    # ========================================================
+    # COMPLETE / NEUTRAL
+    # ========================================================
 
     def test_all_neutral_ready(self):
         result = evaluate_risk(
@@ -157,6 +167,15 @@ class TestRiskEvaluatorContractV11(
         self.assertTrue(
             result["risk_level_available"]
         )
+
+        self.assertEqual(
+            result["risk_level"],
+            "NONE",
+        )
+
+    # ========================================================
+    # MATCHING ACTIVE FACTOR
+    # ========================================================
 
     def test_matching_active_factor_ready(self):
         result = evaluate_risk(
@@ -186,6 +205,10 @@ class TestRiskEvaluatorContractV11(
             ],
             12.0,
         )
+
+    # ========================================================
+    # FACTOR MISMATCH
+    # ========================================================
 
     def test_opposite_factor_is_mismatch(self):
         result = evaluate_risk(
@@ -226,6 +249,10 @@ class TestRiskEvaluatorContractV11(
             ]
         )
 
+    # ========================================================
+    # NEUTRAL ASSESSMENT / ACTIVE TEMPORAL
+    # ========================================================
+
     def test_neutral_assessment_active_temporal_mismatch(self):
         result = evaluate_risk(
             make_assessment(),
@@ -245,6 +272,10 @@ class TestRiskEvaluatorContractV11(
             ]["status"],
             "FACTOR_MISMATCH",
         )
+
+    # ========================================================
+    # ACTIVE ASSESSMENT / NEUTRAL TEMPORAL
+    # ========================================================
 
     def test_active_assessment_neutral_temporal_mismatch(self):
         result = evaluate_risk(
@@ -267,6 +298,10 @@ class TestRiskEvaluatorContractV11(
             ]["status"],
             "FACTOR_MISMATCH",
         )
+
+    # ========================================================
+    # TEMPORAL NOT EVALUATED
+    # ========================================================
 
     def test_temporal_not_evaluated_unavailable(self):
         result = evaluate_risk(
@@ -295,6 +330,10 @@ class TestRiskEvaluatorContractV11(
             ]
         )
 
+    # ========================================================
+    # ASSESSMENT NOT EVALUATED
+    # ========================================================
+
     def test_assessment_not_evaluated(self):
         result = evaluate_risk(
             make_assessment(
@@ -321,6 +360,10 @@ class TestRiskEvaluatorContractV11(
             "PARTIAL",
         )
 
+    # ========================================================
+    # ALL INVALID
+    # ========================================================
+
     def test_all_assessment_invalid_not_evaluated(self):
         result = evaluate_risk(
             make_assessment(
@@ -345,6 +388,14 @@ class TestRiskEvaluatorContractV11(
                 "risk_level_available"
             ]
         )
+
+        self.assertIsNone(
+            result["risk_level"]
+        )
+
+    # ========================================================
+    # PARTIAL MUST NOT BECOME NONE
+    # ========================================================
 
     def test_partial_neutral_is_not_none_risk(self):
         result = evaluate_risk(
@@ -373,6 +424,10 @@ class TestRiskEvaluatorContractV11(
             ]
         )
 
+    # ========================================================
+    # LATERAL GROUP - SHOULDER
+    # ========================================================
+
     def test_lateral_group_contains_shoulder(self):
         result = evaluate_risk(
             make_assessment(
@@ -397,6 +452,10 @@ class TestRiskEvaluatorContractV11(
             group["active_features"],
         )
 
+    # ========================================================
+    # LATERAL GROUP - NECK
+    # ========================================================
+
     def test_lateral_group_contains_neck_lateral(self):
         result = evaluate_risk(
             make_assessment(
@@ -416,6 +475,10 @@ class TestRiskEvaluatorContractV11(
             "neck_lateral_tilt",
             group["active_features"],
         )
+
+    # ========================================================
+    # SAGITTAL GROUP
+    # ========================================================
 
     def test_sagittal_group_contains_flexion(self):
         result = evaluate_risk(
@@ -440,6 +503,10 @@ class TestRiskEvaluatorContractV11(
             "neck_flexion",
             group["active_features"],
         )
+
+    # ========================================================
+    # COUPLED FEATURES STAY ONE GROUP
+    # ========================================================
 
     def test_coupled_features_remain_same_group(self):
         result = evaluate_risk(
@@ -474,6 +541,19 @@ class TestRiskEvaluatorContractV11(
             ]
         )
 
+        self.assertEqual(
+            result[
+                "risk_level_mapping"
+            ][
+                "active_group_count"
+            ],
+            1,
+        )
+
+    # ========================================================
+    # DURATION BELOW 60
+    # ========================================================
+
     def test_duration_below_60_not_static(self):
         result = evaluate_risk(
             make_assessment(
@@ -493,6 +573,15 @@ class TestRiskEvaluatorContractV11(
             evidence,
             [],
         )
+
+        self.assertEqual(
+            result["risk_level"],
+            "LOW",
+        )
+
+    # ========================================================
+    # EXACT 60
+    # ========================================================
 
     def test_duration_60_creates_temporal_evidence(self):
         result = evaluate_risk(
@@ -524,6 +613,15 @@ class TestRiskEvaluatorContractV11(
             "POSTGUARD_TEMPORAL_PROTOTYPE",
         )
 
+        self.assertEqual(
+            result["risk_level"],
+            "MODERATE",
+        )
+
+    # ========================================================
+    # MISMATCH DURATION CANNOT COUNT
+    # ========================================================
+
     def test_mismatch_duration_cannot_create_static_evidence(self):
         result = evaluate_risk(
             make_assessment(
@@ -544,6 +642,14 @@ class TestRiskEvaluatorContractV11(
             [],
         )
 
+        self.assertIsNone(
+            result["risk_level"]
+        )
+
+    # ========================================================
+    # FULL RULA STILL UNSUPPORTED
+    # ========================================================
+
     def test_no_full_rula_score(self):
         result = evaluate_risk(
             make_assessment(
@@ -563,7 +669,15 @@ class TestRiskEvaluatorContractV11(
             result["full_rula"]["score"]
         )
 
-    def test_no_risk_level_mapping_yet(self):
+        self.assertIsNone(
+            result["full_rula"]["action_level"]
+        )
+
+    # ========================================================
+    # V1.2 MAPPING ENABLED
+    # ========================================================
+
+    def test_v12_risk_level_mapping_enabled(self):
         result = evaluate_risk(
             make_assessment(
                 flexion="FLEXION"
@@ -574,15 +688,26 @@ class TestRiskEvaluatorContractV11(
             ),
         )
 
-        self.assertFalse(
+        self.assertTrue(
             result[
                 "risk_level_mapping_enabled"
             ]
         )
 
-        self.assertIsNone(
-            result["risk_level"]
+        self.assertTrue(
+            result[
+                "risk_level_available"
+            ]
         )
+
+        self.assertEqual(
+            result["risk_level"],
+            "MODERATE",
+        )
+
+    # ========================================================
+    # NO RISK EVENT / ALERT YET
+    # ========================================================
 
     def test_no_risk_event_or_alert(self):
         result = evaluate_risk(
@@ -598,6 +723,10 @@ class TestRiskEvaluatorContractV11(
             result["alert"]
         )
 
+    # ========================================================
+    # INPUT IMMUTABILITY
+    # ========================================================
+
     def test_inputs_not_modified(self):
         assessment = make_assessment(
             lateral="TILT_LEFT"
@@ -609,11 +738,15 @@ class TestRiskEvaluatorContractV11(
         )
 
         assessment_before = (
-            copy.deepcopy(assessment)
+            copy.deepcopy(
+                assessment
+            )
         )
 
         temporal_before = (
-            copy.deepcopy(temporal)
+            copy.deepcopy(
+                temporal
+            )
         )
 
         evaluate_risk(

@@ -1,0 +1,103 @@
+{
+  "rules_version": "1.1-evidence-consistency",
+  "method": "MODIFIED_RULA_INSPIRED_POSTGUARD",
+
+  "full_rula_score_supported": false,
+
+  "supported_features": [
+    "shoulder_tilt",
+    "neck_lateral_tilt",
+    "neck_flexion"
+  ],
+
+  "evidence_groups": {
+    "LATERAL_ASYMMETRY": [
+      "shoulder_tilt",
+      "neck_lateral_tilt"
+    ],
+    "NECK_SAGITTAL": [
+      "neck_flexion"
+    ]
+  },
+
+  "rula_derived_evidence": {
+    "neck_side_bending": {
+      "assessment_feature": "neck_lateral_tilt",
+      "active_factors": [
+        "TILT_LEFT",
+        "TILT_RIGHT"
+      ],
+      "description": "RULA includes neck side-bending in neck posture assessment.",
+      "official_rula_score_applied": false
+    },
+
+    "neck_flexion_extension": {
+      "assessment_feature": "neck_flexion",
+      "active_factors": [
+        "FLEXION",
+        "EXTENSION"
+      ],
+      "description": "RULA evaluates neck flexion and extension. PostGuard uses its validated prototype classification as posture evidence only.",
+      "official_rula_score_applied": false
+    }
+  },
+
+  "postguard_specific_evidence": {
+    "shoulder_asymmetry": {
+      "assessment_feature": "shoulder_tilt",
+      "active_factors": [
+        "LEFT_SHOULDER_HIGH",
+        "RIGHT_SHOULDER_HIGH"
+      ],
+      "description": "PostGuard shoulder-line asymmetry measurement.",
+      "rula_equivalent": false
+    }
+  },
+
+  "temporal_evidence": {
+    "static_duration": {
+      "threshold_seconds": 60.0,
+      "comparison": "GREATER_THAN_OR_EQUAL",
+      "source": "POSTGUARD_TEMPORAL_PROTOTYPE",
+      "informed_by": "RULA muscle-use static-posture concept",
+      "description": "A PostGuard prototype duration evidence rule. It must not be interpreted as a standalone RULA risk threshold or automatic risk level."
+    }
+  },
+
+  "interaction_policy": {
+    "shoulder_neck_relation": "GEOMETRICALLY_COUPLED",
+    "automatic_score_addition": false,
+    "suppress_factor": false,
+    "description": "shoulder_tilt and relative neck_lateral_tilt remain visible as separate evidence, but Risk Evaluation must not automatically add scores simply because both are active."
+  },
+
+  "consistency_policy": {
+    "ready": "READY",
+    "factor_mismatch": "FACTOR_MISMATCH",
+    "temporal_unavailable": "TEMPORAL_UNAVAILABLE",
+    "assessment_not_evaluated": "ASSESSMENT_NOT_EVALUATED"
+  },
+
+  "missing_data_policy": {
+    "all_features_unavailable": "NOT_EVALUATED",
+    "some_features_unavailable": "PARTIAL",
+    "factor_mismatch": "PARTIAL",
+    "all_features_ready": "EVALUATED"
+  },
+
+  "risk_policy": {
+    "risk_level_mapping_enabled": false,
+    "risk_score_enabled": false,
+    "risk_event_enabled": false,
+    "alert_enabled": false
+  },
+
+  "limitations": [
+    "PostGuard does not currently measure all body regions required for full RULA.",
+    "PostGuard does not currently calculate the official RULA Table A, Table B, or Table C score.",
+    "shoulder_tilt is not equivalent to the RULA shoulder-raised adjustment.",
+    "PostGuard neck measurements are prototype computer-vision measurements and are not represented as validated anatomical RULA angles.",
+    "The 60-second temporal threshold is a PostGuard prototype evidence rule and does not independently define a RULA or clinical risk level.",
+    "PostGuard Prototype Risk Level mapping is not enabled in Risk Evaluation Contract v1.1."
+  ]
+}

@@ -119,6 +119,7 @@ def make_temporal(
 class TestRiskEvaluator(unittest.TestCase):
 
     def test_contract_version(self):
+
         assessment = make_assessment()
         temporal = make_temporal()
 
@@ -129,7 +130,7 @@ class TestRiskEvaluator(unittest.TestCase):
 
         self.assertEqual(
             result["risk_contract_version"],
-            "1.1",
+            "1.2",
         )
 
     def test_neutral_is_evaluated(self):
@@ -602,7 +603,8 @@ class TestRiskEvaluator(unittest.TestCase):
             result["full_rula"]["score"]
         )
 
-    def test_risk_level_not_generated_yet(self):
+    def test_risk_level_generated_in_v12(self):
+
         result = evaluate_risk(
             make_assessment(
                 neck_flexion_factor="FLEXION",
@@ -613,12 +615,15 @@ class TestRiskEvaluator(unittest.TestCase):
             ),
         )
 
+        # v1.2 still does not create numeric risk score.
         self.assertIsNone(
             result["risk_score"]
         )
 
-        self.assertIsNone(
-            result["risk_level"]
+        # One active group + static duration >= 60 sec.
+        self.assertEqual(
+            result["risk_level"],
+            "MODERATE",
         )
 
     def test_no_risk_event_or_alert(self):
