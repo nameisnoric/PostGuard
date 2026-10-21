@@ -1,160 +1,151 @@
+"""Desktop adapter for the shared camera detection and session pipeline."""
+
+from __future__ import annotations
+
 import math
-import time
 from pathlib import Path
+from typing import Any, Mapping
 
-from app.vision.mediapipe_detection.pose.pose_detector import PoseDetector
-from app.vision.mediapipe_detection.face.face_detector import FaceDetector
-from app.vision.mediapipe_detection.face.face_points import extract_face_points
-from app.vision.mediapipe_detection.face.face_orientation import (
-    extract_face_orientation,
+from app.vision.mediapipe_detection.detection_pipeline import DetectionPipeline
+from app.vision.mediapipe_detection.eye.blink_statistics import BlinkStatistics
+from app.vision.posture_assessment.current_posture_assessment import (
+    assess_current_posture,
 )
-from app.vision.mediapipe_detection.posture.posture_features import (
-    calculate_shoulder_tilt,
-    calculate_neck_lateral_tilt
+from app.vision.session_monitoring.measurement_change_gate import (
+    evaluate_measurement_change,
+    load_measurement_change_thresholds,
 )
-from app.vision.mediapipe_detection.posture.relative_distance import (
-    calculate_eye_distance,
+from app.vision.session_monitoring.session_monitor import (
+    build_session_monitoring_snapshot,
+)
+from app.vision.temporal_tracking.temporal_posture_tracker import (
+    TemporalPostureTracker,
 )
 
 
-VALIDATED_STATUS = "validated_prototype"
+def _feature_value(result: Mapping[str, Any], name: str) -> float | None:
+    """Read a finite numeric value from Detection Contract v1."""
+    feature = result.get("features", {}).get(name)
+    if not isinstance(feature, Mapping) or feature.get("valid") is not True:
+        return None
 
+    value = feature.get("value")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
+        return None
+    return float(value)
 
-def _baseline_feature(value, unit, reason="OK"):
-    """Build the validated feature contract consumed by PersonalBaselineCollector."""
-    valid = (
-        type(value) in (int, float)
-        and not isinstance(value, bool)
-        and math.isfinite(value)
-    )
-    return {
-        "valid": valid,
-        "value": float(value) if valid else None,
-        "unit": unit,
-        "reason": "OK" if valid else reason,
-        "status": VALIDATED_STATUS,
-    }
 
 class DetectionService:
+    """Run shared detection while preserving the current desktop page keys."""
 
     def __init__(self):
-        model_dir = Path(__file__).resolve().parents[1] / "vision" / "models"
+        self.pipeline = DetectionPipeline()
+        self.pipeline.start_eye_calibration()
 
-        pose_model = model_dir / "pose_landmarker_lite.task"
-        face_model = model_dir / "face_landmarker.task"
+        self.pose_detector = self.pipeline.pose_detector
+        self.face_detector = self.pipeline.face_detector
 
-        self.pose_detector = PoseDetector(
-            model_path=str(pose_model)
+        self.blink_statistics = BlinkStatistics()
+        self.blink_statistics.start()
+        self.temporal_tracker = TemporalPostureTracker()
+
+        threshold_path = (
+            Path(__file__).resolve().parents[1]
+            / "vision"
+            / "session_monitoring"
+            / "measurement_change_thresholds.json"
         )
+        self.measurement_thresholds = load_measurement_change_thresholds(
+            threshold_path
+        )
+        self.session_context: tuple[Mapping[str, Any], Mapping[str, Any]] | None = None
 
-        try:
-            self.face_detector = FaceDetector(
-                model_path=str(face_model)
-            )
-        except Exception:
-            self.pose_detector.close()
-            raise
+    def configure_session(
+        self,
+        session: Mapping[str, Any],
+        baseline: Mapping[str, Any],
+    ) -> None:
+        """Attach a running session and baseline for per-frame comparison."""
+        if not isinstance(session, Mapping) or not isinstance(baseline, Mapping):
+            raise TypeError("session and baseline must be mappings")
+        self.session_context = (dict(session), dict(baseline))
+        self.temporal_tracker.reset()
+
+    def reset_runtime(self) -> None:
+        """Reset eye, posture-context, and temporal state for a new session."""
+        self.pipeline.reset_runtime()
+        self.pipeline.start_eye_calibration()
+        self.blink_statistics.start()
+        self.temporal_tracker.reset()
 
     def process_frame(self, frame):
         if frame is None or frame.size == 0:
             raise ValueError("Invalid camera frame")
 
-        # เรียก Detection ของเพื่อนโดยไม่แก้การทำงาน
-        pose_points = self.pose_detector.detect(frame)
-        face_result = self.face_detector.detect(frame)
+        detection = self.pipeline.process_frame(frame)
+        timestamp = detection.get("timestamp")
+        eye = detection.get("eye") if isinstance(detection.get("eye"), Mapping) else {}
+        blink = eye.get("blink") if isinstance(eye.get("blink"), Mapping) else {}
+        blink_statistics = self.blink_statistics.update(
+            blink_event=blink.get("blink_event") is True,
+            timestamp=timestamp,
+        )
 
-        # -------------------------
-        # shoulder Tilt
-        # -------------------------
-        
-        shoulder_tilt = None
+        assessment = assess_current_posture(detection)
+        temporal = self.temporal_tracker.update(assessment, now=timestamp)
 
-        if pose_points is not None:
-            shoulder_tilt = calculate_shoulder_tilt(
-                pose_points.get("left_shoulder"),
-                pose_points.get("right_shoulder")
+        monitoring_snapshot = None
+        measurement_change = None
+        if self.session_context is not None:
+            session, baseline = self.session_context
+            monitoring_snapshot = build_session_monitoring_snapshot(
+                session=session,
+                baseline=baseline,
+                detection_result=detection,
+            )
+            measurement_change = evaluate_measurement_change(
+                monitoring_snapshot=monitoring_snapshot,
+                threshold_config=self.measurement_thresholds,
             )
 
-        face_detected = bool(
-            face_result is not None
-            and face_result.face_landmarks
-        )
+        landmarks = detection.get("landmarks")
+        if not isinstance(landmarks, Mapping):
+            landmarks = {}
+        pose_points = landmarks.get("pose")
+        face_points = landmarks.get("face")
 
-        frame_height, frame_width = frame.shape[:2]
-        face_points = extract_face_points(
-            face_result,
-            frame_width,
-            frame_height,
-        )
-        orientation = extract_face_orientation(face_result)
-        neck_flexion = (
-            orientation.get("pitch")
-            if isinstance(orientation, dict)
-            else None
-        )
-        eye_measurement = calculate_eye_distance(face_points)
-        eye_distance = (
-            eye_measurement.get("eye_distance_px")
-            if isinstance(eye_measurement, dict)
-            else None
-        )
-           
-        # -------------------------
-        # Neck Lateral Tilt
-        # -------------------------
+        shoulder_tilt = _feature_value(detection, "shoulder_tilt")
+        neck_lateral = _feature_value(detection, "neck_lateral_tilt")
+        neck_flexion = _feature_value(detection, "neck_flexion")
+        eye_distance = _feature_value(detection, "eye_distance")
 
-        neck_lateral_tilt = None
-
-        if pose_points is not None:
-            neck_lateral_tilt = calculate_neck_lateral_tilt(
-                pose_points.get("left_ear"),
-                pose_points.get("right_ear"),
-                pose_points.get("left_shoulder"),
-                pose_points.get("right_shoulder")
-            )
-
-
-        neck_value = (
-            neck_lateral_tilt.get("neck_tilt")
-            if isinstance(neck_lateral_tilt, dict)
-            else None
-        )
-        context_valid = bool(pose_points is not None and face_detected)
-        features = {
-            "shoulder_tilt": _baseline_feature(
-                shoulder_tilt, "deg", "SHOULDER_NOT_AVAILABLE"
-            ),
-            "neck_lateral_tilt": _baseline_feature(
-                neck_value, "deg", "NECK_LATERAL_NOT_AVAILABLE"
-            ),
-            "neck_flexion": _baseline_feature(
-                neck_flexion, "deg", "FACE_ORIENTATION_NOT_AVAILABLE"
-            ),
-            "eye_distance": _baseline_feature(
-                eye_distance, "px", "EYE_DISTANCE_NOT_AVAILABLE"
-            ),
-        }
-
-        return {
-            "contract_version": "1.0",
-            "timestamp": time.time(),
-            "context": {
-                "state": "VALID" if context_valid else "INVALID",
-                "reason": "OK" if context_valid else "POSE_OR_FACE_MISSING",
-                "allow_posture_evaluation": context_valid,
-            },
-            "features": features,
+        result = dict(detection)
+        result.update({
+            "detection": detection,
+            "assessment": assessment,
+            "temporal": temporal,
+            "monitoring_snapshot": monitoring_snapshot,
+            "measurement_change": measurement_change,
+            "blink_statistics": blink_statistics,
             "pose_points": pose_points,
-            "pose_detected": pose_points is not None,
-            "face_detected": face_detected,
-            "face_result": face_result,
             "face_points": face_points,
+            "face_result": None,
             "shoulder_tilt": shoulder_tilt,
-            "neck_lateral_tilt": neck_lateral_tilt,
+            "neck_lateral_tilt": (
+                {"neck_tilt": neck_lateral}
+                if neck_lateral is not None
+                else None
+            ),
             "neck_flexion": neck_flexion,
             "eye_distance": eye_distance,
-        }
+            "eye_openness": eye.get("measurement"),
+            "eye_state": eye.get("state"),
+        })
+        return result
 
     def close(self):
-        self.pose_detector.close()
-        self.face_detector.close()
+        self.pipeline.close()

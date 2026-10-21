@@ -1,0 +1,25 @@
+{
+  "contract_version": "1.0",
+  "config_version": "1.0",
+  "source": "final_validation",
+  "validation_session_id": 22,
+  "validation_baseline_id": 21,
+  "threshold_role": "prototype_measurement_change_from_personal_baseline",
+  "features": {
+    "shoulder_tilt": {
+      "threshold": 1.153450451105357,
+      "unit": "deg",
+      "status": "validated_prototype"
+    },
+    "neck_lateral_tilt": {
+      "threshold": 2.27582502032104,
+      "unit": "deg",
+      "status": "validated_prototype"
+    },
+    "neck_flexion": {
+      "threshold": 3.5415836524717967,
+      "unit": "deg",
+      "status": "validated_prototype"
+    }
+  }
+}

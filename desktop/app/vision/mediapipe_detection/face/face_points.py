@@ -3,12 +3,6 @@
 #
 # left / right หมายถึง Anatomical Left / Right ของผู้ใช้
 # ไม่ใช่ด้านซ้าย/ขวาของภาพ Mirror
-#
-# ตอนนี้เตรียม:
-# - Head / Face landmarks
-# - Eye / Eyelid landmarks
-#
-# Eyelid points ยังไม่ได้ใช้คำนวณ Blink ในขั้นนี้
 # ==========================================================
 
 FACE_POINTS = {
@@ -28,7 +22,6 @@ FACE_POINTS = {
     "right_eye_outer": 33,
     "right_eye_inner": 133,
 
-    # Eyelid
     "right_eye_upper": 159,
     "right_eye_lower": 145,
 
@@ -40,7 +33,6 @@ FACE_POINTS = {
     "left_eye_outer": 263,
     "left_eye_inner": 362,
 
-    # Eyelid
     "left_eye_upper": 386,
     "left_eye_lower": 374,
 
@@ -121,11 +113,6 @@ def extract_face_points(
 
         # --------------------------------------------------
         # Normalized Coordinate
-        #
-        # x / y = normalized coordinate
-        # z     = relative depth
-        #
-        # z ของ Face Landmarker ไม่ใช่เมตร
         # --------------------------------------------------
 
         x_norm = float(
@@ -142,17 +129,50 @@ def extract_face_points(
 
 
         # --------------------------------------------------
-        # Normalized -> Pixel
+        # Normalized -> Sub-pixel Coordinate
+        #
+        # สำคัญ:
+        #
+        # ตรงนี้ยังเป็น float
+        #
+        # ใช้กับ geometric measurement เช่น
+        # Eye Openness Ratio
+        #
+        # เพื่อไม่ให้เสีย precision จากการ int()
+        # --------------------------------------------------
+
+        x_pixel_float = (
+            x_norm
+            *
+            frame_width
+        )
+
+        y_pixel_float = (
+            y_norm
+            *
+            frame_height
+        )
+
+
+        # --------------------------------------------------
+        # Sub-pixel -> Integer Pixel
+        #
+        # ใช้สำหรับ:
+        #
+        # - OpenCV drawing
+        # - Debug
+        # - Compatibility กับ code เดิม
+        #
+        # ตรงนี้คือส่วนที่หายไป
+        # จึงเกิด NameError
         # --------------------------------------------------
 
         x_pixel = int(
-            x_norm
-            * frame_width
+            x_pixel_float
         )
 
         y_pixel = int(
-            y_norm
-            * frame_height
+            y_pixel_float
         )
 
 
@@ -164,12 +184,38 @@ def extract_face_points(
 
             "id": landmark_id,
 
-            # Normalized
+
+            # ==============================================
+            # Normalized Coordinate
+            # ==============================================
+
             "x_norm": x_norm,
             "y_norm": y_norm,
             "z": z,
 
-            # Pixel
+
+            # ==============================================
+            # Sub-pixel Coordinate
+            #
+            # สำหรับ measurement ที่ต้องการ precision
+            # เช่น Eye Openness
+            # ==============================================
+
+            "x_float": float(
+                x_pixel_float
+            ),
+
+            "y_float": float(
+                y_pixel_float
+            ),
+
+
+            # ==============================================
+            # Integer Pixel
+            #
+            # สำหรับ Drawing / Debug / Code เดิม
+            # ==============================================
+
             "x": x_pixel,
             "y": y_pixel,
         }

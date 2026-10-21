@@ -62,6 +62,7 @@ class MonitoringPage(QWidget):
         self.shoulder_samples = []
         self.neck_samples = []
         self.posture_tracker = PostureDurationTracker()
+        self.latest_blink_rate = None
         self.alert_service = ExperimentalAlertService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
@@ -177,9 +178,12 @@ class MonitoringPage(QWidget):
         self.neck_label = QLabel('ความเอียงคอด้านข้าง: --')
         self.shoulder_difference_label = QLabel('ผลต่างความเอียงไหล่: --')
         self.neck_difference_label = QLabel('ผลต่างความเอียงคอ: --')
+        self.eye_state_label = QLabel('Eye State: กำลังปรับเทียบ')
+        self.blink_rate_label = QLabel('Blink Rate: N/A')
         for label in (
             self.detection_label, self.shoulder_label, self.neck_label,
             self.shoulder_difference_label, self.neck_difference_label,
+            self.eye_state_label, self.blink_rate_label,
         ):
             detection_layout.addWidget(label)
 
@@ -389,6 +393,7 @@ class MonitoringPage(QWidget):
             if session.get("status") != "RUNNING":
                 raise ValueError("Backend did not confirm RUNNING status.")
             self.session_id = session_id
+            self.detector.configure_session(session, self.baseline_data)
         except (requests.RequestException, RuntimeError, ValueError, TypeError, OSError) as error:
             self.stop_monitoring()
             QMessageBox.warning(self, 'ข้อผิดพลาดในการตรวจจับ', str(error))
@@ -404,6 +409,7 @@ class MonitoringPage(QWidget):
         self.shoulder_samples.clear()
         self.neck_samples.clear()
         self.alert_service.reset()
+        self.latest_blink_rate = None
         self._alert_force_close = False
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
@@ -585,6 +591,10 @@ class MonitoringPage(QWidget):
         if type(neck) in (int, float) and math.isfinite(neck):
             self.neck_samples.append(float(neck))
 
+        blink_statistics = result.get("blink_statistics")
+        if isinstance(blink_statistics, dict):
+            self.latest_blink_rate = blink_statistics.get("blink_rate")
+
     def update_frame(self) -> None:
         if self.capture is None or self.is_paused or self.is_stopping:
             return
@@ -621,6 +631,27 @@ class MonitoringPage(QWidget):
         neck = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
         self.neck_label.setText(
             f"ความเอียงคอด้านข้าง: {neck:+.2f}°" if neck is not None else 'ความเอียงคอด้านข้าง: --'
+        )
+        eye_state_result = result.get("eye_state")
+        eye_state = (
+            eye_state_result.get("eye_state", "UNKNOWN")
+            if isinstance(eye_state_result, dict)
+            else "UNKNOWN"
+        )
+        calibrated = bool(
+            isinstance(eye_state_result, dict)
+            and eye_state_result.get("calibrated")
+        )
+        self.eye_state_label.setText(
+            f"Eye State: {eye_state}"
+            if calibrated
+            else "Eye State: กำลังปรับเทียบ"
+        )
+        rate = self.latest_blink_rate
+        self.blink_rate_label.setText(
+            f"Blink Rate: {rate:.1f} ครั้ง/นาที"
+            if rate is not None
+            else "Blink Rate: N/A"
         )
 
     def _update_preview(self, frame) -> None:
@@ -676,6 +707,8 @@ class MonitoringPage(QWidget):
         self.neck_label.setText('ความเอียงคอด้านข้าง: --')
         self.shoulder_difference_label.setText('ผลต่างความเอียงไหล่: --')
         self.neck_difference_label.setText('ผลต่างความเอียงคอ: --')
+        self.eye_state_label.setText('Eye State: กำลังปรับเทียบ')
+        self.blink_rate_label.setText('Blink Rate: N/A')
         self.preview_label.clear()
         self.preview_label.setText("ภาพการตรวจจับจะแสดงที่นี่")
         self.stop_button.setEnabled(False)
@@ -692,6 +725,7 @@ class MonitoringPage(QWidget):
         self.face_detected_count = 0
         self.shoulder_samples.clear()
         self.neck_samples.clear()
+        self.latest_blink_rate = None
 
         self.posture_tracker.reset()
         self.side_bending_label.setText("Neck Side-bending: N/A")
@@ -756,6 +790,7 @@ class MonitoringPage(QWidget):
             ),
             "baseline_shoulder": baseline.get("shoulder_angle"),
             "baseline_neck": baseline.get("lateral_tilt_baseline"),
+            "blink_rate": self.latest_blink_rate,
         }
 
     def _change_remote_session_status(

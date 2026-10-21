@@ -36,7 +36,7 @@ def build_summary_payload(summary: dict) -> dict:
     payload = {
         "average_risk_score": None,
         "maximum_risk_score": None,
-        "blink_rate": None,
+        "blink_rate": _optional_float(summary.get("blink_rate")),
 
         "detection_count": _count(
             summary["detection_count"]

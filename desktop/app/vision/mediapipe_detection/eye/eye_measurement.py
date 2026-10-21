@@ -93,43 +93,52 @@ def _is_finite_number(
 def _get_pixel_xy(
     point
 ):
-    """
-    รับ point จาก face_points.py
-
-    Expected structure:
-
-    {
-        "id": ...,
-        "x_norm": ...,
-        "y_norm": ...,
-        "z": ...,
-        "x": pixel_x,
-        "y": pixel_y,
-    }
-
-    สำหรับ Eye Openness เราใช้ x/y pixel
-    """
 
     if point is None:
         return None
 
 
+    # ======================================================
+    # Prefer Sub-pixel Coordinate
+    # ======================================================
+
     if (
-        "x" not in point
-        or
-        "y" not in point
+        "x_float" in point
+        and
+        "y_float" in point
     ):
+
+        x = point[
+            "x_float"
+        ]
+
+        y = point[
+            "y_float"
+        ]
+
+
+    # ======================================================
+    # Fallback
+    # ======================================================
+
+    elif (
+        "x" in point
+        and
+        "y" in point
+    ):
+
+        x = point[
+            "x"
+        ]
+
+        y = point[
+            "y"
+        ]
+
+
+    else:
+
         return None
-
-
-    x = point[
-        "x"
-    ]
-
-
-    y = point[
-        "y"
-    ]
 
 
     if (
@@ -141,6 +150,7 @@ def _get_pixel_xy(
             y
         )
     ):
+
         return None
 
 
@@ -148,7 +158,6 @@ def _get_pixel_xy(
         float(x),
         float(y)
     )
-
 
 # ==========================================================
 # Helper: 2D Euclidean Distance

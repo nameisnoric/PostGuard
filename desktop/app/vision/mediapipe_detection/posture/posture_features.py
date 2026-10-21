@@ -150,69 +150,77 @@ def calculate_shoulder_tilt(
 def calculate_shoulder_elevation(
     nose,
     left_shoulder,
-    right_shoulder
+    right_shoulder,
 ):
     """
-    Validated Prototype Metric: Shoulder Elevation
+    Candidate Prototype Metric:
+    Shoulder Elevation v2
 
-    Formula:
+    IMPORTANT
+    ---------
+    nose ถูกเก็บไว้ใน parameter
+    เพื่อให้ DetectionPipeline เดิมยังเรียก function นี้ได้
 
-        left_vertical_distance
-            = left_shoulder_y - nose_y
+    แต่สูตรใหม่นี้จะไม่ใช้ nose
 
-        right_vertical_distance
-            = right_shoulder_y - nose_y
+    เหตุผล:
+    สูตรเดิมใช้:
 
-        left_elevation
-            = left_vertical_distance
+        shoulder_y - nose_y
+
+    ทำให้ตอน Neck Flexion
+    nose เคลื่อนลงมาก
+    และเกิด Cross-talk กับ Shoulder Elevation
+
+    สูตรใหม่ใช้เฉพาะ Shoulder Landmark
+
+        left_metric
+            = left_shoulder_y
               / shoulder_width
 
-        right_elevation
-            = right_vertical_distance
+        right_metric
+            = right_shoulder_y
               / shoulder_width
 
-    shoulder_width ใช้ระยะระหว่าง
-    Left Shoulder และ Right Shoulder
+    Convention:
 
-    Convention จาก validation:
+        Shoulder moves upward
+        -> image Y decreases
+        -> metric decreases
 
-        ยกไหล่ขึ้น
-        -> Metric ลดลง
-        -> Delta เป็น Negative
+    Metric นี้ออกแบบให้ใช้ร่วมกับ
+    Personal Baseline
 
-    ผ่าน prototype validation:
-        LEFT Response  3/3
-        RIGHT Response 3/3
-        BOTH Response  3/3
-        Normal Return  3/3
-
-    ยังไม่ใช่:
-    - Risk threshold
-    - RULA score
-    - Clinical measurement
+    ห้ามใช้ absolute value เป็น Risk Threshold
+    ข้ามผู้ใช้หรือข้ามตำแหน่งกล้อง
     """
 
     # ======================================================
-    # 1. ตรวจ Landmark
+    # 1. Compatibility
+    #
+    # nose ยังรับเข้ามาเพื่อไม่ให้ Pipeline เดิมพัง
+    # แต่ไม่ใช้ในการคำนวณ
+    # ======================================================
+
+    _ = nose
+
+
+    # ======================================================
+    # 2. Validate Landmarks
     # ======================================================
 
     if (
-        nose is None
-        or left_shoulder is None
+        left_shoulder is None
         or right_shoulder is None
     ):
         return None
 
 
     # ======================================================
-    # 2. อ่านค่าที่ต้องใช้
+    # 3. Read Coordinates
     # ======================================================
 
     try:
-
-        nose_y = float(
-            nose["y"]
-        )
 
         left_x = float(
             left_shoulder["x"]
@@ -233,17 +241,17 @@ def calculate_shoulder_elevation(
     except (
         KeyError,
         TypeError,
-        ValueError
+        ValueError,
     ):
+
         return None
 
 
     # ======================================================
-    # 3. Validate numeric values
+    # 4. Validate Numbers
     # ======================================================
 
     values = (
-        nose_y,
         left_x,
         left_y,
         right_x,
@@ -259,19 +267,17 @@ def calculate_shoulder_elevation(
 
 
     # ======================================================
-    # 4. Shoulder Width
+    # 5. Shoulder Width
     # ======================================================
 
     shoulder_dx = (
         right_x
-        -
-        left_x
+        - left_x
     )
 
     shoulder_dy = (
         right_y
-        -
-        left_y
+        - left_y
     )
 
 
@@ -282,53 +288,30 @@ def calculate_shoulder_elevation(
     )
 
 
-    # ป้องกันหารด้วย 0
     if shoulder_width <= 1e-6:
         return None
 
 
     # ======================================================
-    # 5. Nose -> Left Shoulder
-    # ======================================================
-
-    left_vertical_distance = (
-        left_y
-        -
-        nose_y
-    )
-
-
-    # ======================================================
-    # 6. Nose -> Right Shoulder
-    # ======================================================
-
-    right_vertical_distance = (
-        right_y
-        -
-        nose_y
-    )
-
-
-    # ======================================================
-    # 7. Normalize
+    # 6. Shoulder-only Elevation Metric
     # ======================================================
 
     left_metric = (
-        left_vertical_distance
+        left_y
         /
         shoulder_width
     )
 
 
     right_metric = (
-        right_vertical_distance
+        right_y
         /
         shoulder_width
     )
 
 
     # ======================================================
-    # 8. Return
+    # 7. Return
     # ======================================================
 
     return {
@@ -339,6 +322,14 @@ def calculate_shoulder_elevation(
 
         "right": float(
             right_metric
+        ),
+
+        "shoulder_width": float(
+            shoulder_width
+        ),
+
+        "status": (
+            "candidate_prototype"
         ),
     }
 
