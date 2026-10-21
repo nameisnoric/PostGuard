@@ -1,16 +1,15 @@
 # PostGuard: flow และผลทดสอบ
 
-## Full RULA assessment — 22 October 2026
+## Camera-supported RULA neck assessment — 22 October 2026
 
-- Added the official RULA body-part scoring rules and Tables A, B and C.
-- Camera-derived neck evidence is displayed as a lower bound because the
-  current camera contract does not measure every required RULA observation.
-- An active session now provides a Full RULA form for the missing arm, wrist,
-  trunk, leg, muscle-use and force/load scores. The highest completed score is
-  stored with its action level in Session Summary.
-- Session Report and Dashboard display Full RULA separately from the existing
-  Prototype Risk 0–3 scale. A missing manual assessment remains `N/A`.
-- Automated verification: Desktop 154 unit tests and Backend 37 unit tests pass.
+- RULA is limited to the neck observations available from the camera:
+  flexion/extension and lateral side-bending.
+- The result is displayed as a lower bound because neck twist is unavailable.
+  No Full RULA score or action level is calculated.
+- The highest camera-derived RULA Neck score is stored in Session Summary and
+  displayed in Session Report and Dashboard.
+- Prototype Risk 0–3 remains a separate PostGuard alert scale.
+- Automated verification: Desktop 149 unit tests and Backend 37 unit tests pass.
 
 ## Detection and Dashboard integration — 22 October 2026
 

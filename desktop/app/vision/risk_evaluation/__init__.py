@@ -5,8 +5,8 @@ from .risk_level_mapper import map_prototype_risk_level
 from .rula import (
     RULA_CONTRACT_VERSION,
     RulaInputError,
-    assess_full_rula,
     camera_rula_partial,
+    neck_score,
 )
 
 __all__ = [
@@ -16,6 +16,6 @@ __all__ = [
     "map_prototype_risk_level",
     "RULA_CONTRACT_VERSION",
     "RulaInputError",
-    "assess_full_rula",
     "camera_rula_partial",
+    "neck_score",
 ]

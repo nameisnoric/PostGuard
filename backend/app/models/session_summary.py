@@ -27,10 +27,7 @@ class SessionSummary(Base):
     maximum_risk_score: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )
-    rula_final_score: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
-    rula_action_level: Mapped[int | None] = mapped_column(
+    rula_neck_score: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
 

@@ -210,7 +210,6 @@ def evaluate_risk(
         "prototype_score": PROTOTYPE_RISK_VALUES.get(level),
         "risk_score": None,
         "rula": rula,
-        "full_rula": rula,
         "risk_event": None,
         "alert": None,
     }

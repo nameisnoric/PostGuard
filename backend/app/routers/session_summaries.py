@@ -132,8 +132,7 @@ def create_session_summary(
 
         average_risk_score=request.average_risk_score,
         maximum_risk_score=request.maximum_risk_score,
-        rula_final_score=request.rula_final_score,
-        rula_action_level=request.rula_action_level,
+        rula_neck_score=request.rula_neck_score,
 
         detection_count=request.detection_count,
         pose_detected_count=request.pose_detected_count,

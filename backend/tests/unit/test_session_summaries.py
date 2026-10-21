@@ -78,8 +78,7 @@ class SessionSummaryTests(unittest.TestCase):
             average_risk_score=1.25,
             maximum_risk_score=3.0,
             blink_rate=14.0,
-            rula_final_score=5,
-            rula_action_level=3,
+            rula_neck_score=5,
         )
 
     def tearDown(self):
@@ -100,8 +99,7 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertEqual(saved["average_risk_score"], 1.25)
         self.assertEqual(saved["maximum_risk_score"], 3.0)
         self.assertEqual(saved["blink_rate"], 14.0)
-        self.assertEqual(saved["rula_final_score"], 5)
-        self.assertEqual(saved["rula_action_level"], 3)
+        self.assertEqual(saved["rula_neck_score"], 5)
         self.assertEqual(saved["medium_risk_duration"], 12)
         self.assertEqual(saved["total_alert_count"], 1)
         self.assertEqual(self.client.get("/summaries").json(), [saved])
@@ -154,9 +152,8 @@ class SessionSummaryTests(unittest.TestCase):
             {"maximum_risk_score": 3.1},
             {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
             {"blink_rate": -1.0},
-            {"rula_final_score": 0, "rula_action_level": 1},
-            {"rula_final_score": 5, "rula_action_level": 2},
-            {"rula_final_score": 5, "rula_action_level": None},
+            {"rula_neck_score": 0},
+            {"rula_neck_score": 7},
         ):
             with self.subTest(change=change):
                 response = self.client.post(

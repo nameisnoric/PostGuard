@@ -99,9 +99,9 @@ def _risk_number(value):
     return value if value is not None and 0 <= value <= 3 else None
 
 
-def _rula_number(value):
+def _rula_neck_number(value):
     value = _finite_number(value)
-    return int(value) if value is not None and value.is_integer() and 1 <= value <= 7 else None
+    return int(value) if value is not None and value.is_integer() and 1 <= value <= 6 else None
 
 
 def _nonnegative_number(value):
@@ -129,10 +129,10 @@ def summary_insights(summaries):
         for summary in summaries
         if (value := _nonnegative_number(summary.get("blink_rate"))) is not None
     ]
-    rula_scores = [
+    rula_neck_scores = [
         value
         for summary in summaries
-        if (value := _rula_number(summary.get("rula_final_score"))) is not None
+        if (value := _rula_neck_number(summary.get("rula_neck_score"))) is not None
     ]
     alert_counts = [
         value
@@ -150,8 +150,8 @@ def summary_insights(summaries):
         ),
         "maximum_risk": max(maximum_risks) if maximum_risks else None,
         "risk_report_count": len(average_risks),
-        "maximum_rula": max(rula_scores) if rula_scores else None,
-        "rula_report_count": len(rula_scores),
+        "maximum_rula_neck": max(rula_neck_scores) if rula_neck_scores else None,
+        "rula_neck_report_count": len(rula_neck_scores),
         "average_blink_rate": (
             sum(blink_rates) / len(blink_rates) if blink_rates else None
         ),
@@ -294,10 +294,10 @@ class DashboardPage(QWidget):
         column.addWidget(risk)
 
         rula, rula_layout = self._card()
-        rula_layout.addWidget(self._label("Full RULA", "heading"))
+        rula_layout.addWidget(self._label("RULA Neck", "heading"))
         self.rula_value = self._label("N/A", "metric")
         self.rula_note = self._label(
-            "รอผลประเมิน RULA ที่กรอกข้อมูลครบ", "muted"
+            "Partial score จาก Neck Flexion และ Side-bending", "muted"
         )
         rula_layout.addWidget(self.rula_value)
         rula_layout.addWidget(self.rula_note)
@@ -386,7 +386,7 @@ class DashboardPage(QWidget):
         self.rula_value.setText("N/A")
         self.blink_value.setText("N/A")
         self.risk_note.setText("ยังไม่มี Prototype Risk ที่บันทึกใน Report")
-        self.rula_note.setText("ยังไม่มี Full RULA ที่บันทึกใน Report")
+        self.rula_note.setText("ยังไม่มี RULA Neck ที่บันทึกใน Report")
         self.blink_note.setText("ยังไม่มี Blink Rate ที่บันทึกใน Report")
 
     def _update_report_metrics(self, summaries):
@@ -411,14 +411,14 @@ class DashboardPage(QWidget):
                 f"ค่าเฉลี่ยจาก {insights['risk_report_count']} Report{maximum_text}"
             )
 
-        maximum_rula = insights["maximum_rula"]
+        maximum_rula = insights["maximum_rula_neck"]
         if maximum_rula is None:
             self.rula_value.setText("N/A")
-            self.rula_note.setText("ยังไม่มี Full RULA ที่บันทึกใน Report")
+            self.rula_note.setText("ยังไม่มี RULA Neck ที่บันทึกใน Report")
         else:
-            self.rula_value.setText(f"{maximum_rula} / 7")
+            self.rula_value.setText(f"≥{maximum_rula} / 6")
             self.rula_note.setText(
-                f"คะแนนสูงสุดจาก {insights['rula_report_count']} Report"
+                f"Partial score สูงสุดจาก {insights['rula_neck_report_count']} Report"
             )
 
         average_blink = insights["average_blink_rate"]
@@ -499,14 +499,14 @@ class DashboardPage(QWidget):
 
             report = summary_by_session.get(session.get("session_id"))
             risk = _risk_number(report.get("average_risk_score")) if report else None
-            rula = _rula_number(report.get("rula_final_score")) if report else None
+            rula = _rula_neck_number(report.get("rula_neck_score")) if report else None
             alerts = report.get("total_alert_count") if report else None
             values = (
                 session.get("session_id", "N/A"), started,
                 session.get("status", "N/A"),
                 duration_text(active_seconds(session)),
                 f"{risk:.1f}/3" if risk is not None else "N/A",
-                f"{rula}/7" if rula is not None else "N/A",
+                f"≥{rula}/6" if rula is not None else "N/A",
                 alerts if type(alerts) is int and alerts >= 0 else "N/A",
             )
             for column, value in enumerate(values):
