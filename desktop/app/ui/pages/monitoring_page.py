@@ -29,6 +29,7 @@ from app.services.risk_alert_service import RiskAlertService
 from app.services.alert_sound import AlertSoundPlayer
 from app.services.session_summary_service import save_session_summary
 from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
+from app.ui.dialogs.rula_assessment_dialog import RulaAssessmentDialog
 from app.ui.utils.preview_sizing import fit_preview_label
 
 
@@ -57,6 +58,7 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples = []
         self.latest_risk_result = None
+        self.rula_assessments = []
         self.alert_service = RiskAlertService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
@@ -193,6 +195,7 @@ class MonitoringPage(QWidget):
         self.duration_label = QLabel("Active posture duration: --")
         self.partial_factors_label = QLabel("Baseline change: --")
         self.risk_label = QLabel("Prototype Risk: N/A")
+        self.rula_label = QLabel("RULA: N/A")
         self.alert_label = QLabel("Alert: Waiting")
         self.alert_label.setWordWrap(True)
         self.risk_note_label = QLabel(
@@ -202,10 +205,15 @@ class MonitoringPage(QWidget):
         self.risk_note_label.setWordWrap(True)
         for label in (
             self.side_bending_label, self.duration_label,
-            self.partial_factors_label, self.risk_label,
+            self.partial_factors_label, self.risk_label, self.rula_label,
             self.alert_label, self.risk_note_label,
         ):
             risk_layout.addWidget(label)
+
+        self.rula_button = QPushButton("Full RULA Assessment")
+        self.rula_button.setEnabled(False)
+        self.rula_button.clicked.connect(self.open_rula_assessment)
+        risk_layout.addWidget(self.rula_button)
 
         return risk_group
 
@@ -362,6 +370,7 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
+        self.rula_assessments.clear()
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
@@ -369,6 +378,7 @@ class MonitoringPage(QWidget):
         self.pause_button.setText("Pause Monitoring")
         self.pause_button.setEnabled(True)
         self.stop_button.setEnabled(True)
+        self.rula_button.setEnabled(True)
         self.timer.start()
         self.state_changed.emit()
         print("MONITORING STARTED: SESSION ID", self.session_id)
@@ -382,6 +392,7 @@ class MonitoringPage(QWidget):
         self.duration_label.setText("Active posture duration: --")
         self.partial_factors_label.setText("Baseline change: --")
         self.risk_label.setText("Prototype Risk: N/A")
+        self.rula_label.setText("RULA: N/A")
         self.alert_label.setText("Alert: Waiting")
         self.sound_player.notify(False)
 
@@ -436,6 +447,25 @@ class MonitoringPage(QWidget):
         if score is not None:
             self.risk_samples.append(float(score))
 
+        rula = risk.get("rula") if isinstance(risk, dict) else None
+        neck_rula = (
+            rula.get("neck_score_lower_bound")
+            if isinstance(rula, dict)
+            else None
+        )
+        full_rula = self._worst_rula_assessment()
+        if full_rula is not None:
+            self.rula_label.setText(
+                f"Full RULA: {full_rula['final_score']}/7 | "
+                f"Action Level {full_rula['action_level']}"
+            )
+        elif neck_rula is None:
+            self.rula_label.setText("RULA: N/A (insufficient camera evidence)")
+        else:
+            self.rula_label.setText(
+                f"RULA-derived neck: ≥{neck_rula} | Full RULA: N/A"
+            )
+
         if self.session_id is None:
             return
         actions = self.alert_service.update(self.session_id, risk)
@@ -456,6 +486,33 @@ class MonitoringPage(QWidget):
         self.sound_player.notify(
             self.alert_service.has_active_alerts,
             new_alert=bool(created),
+        )
+
+    def _worst_rula_assessment(self):
+        if not self.rula_assessments:
+            return None
+        return max(
+            self.rula_assessments,
+            key=lambda item: item.get("final_score", 0),
+        )
+
+    def open_rula_assessment(self) -> None:
+        """Collect observations unavailable from the camera contract."""
+        if self.session_id is None or self.is_stopping:
+            return
+        partial = (
+            self.latest_risk_result.get("rula")
+            if isinstance(self.latest_risk_result, dict)
+            else None
+        )
+        dialog = RulaAssessmentDialog(partial, self)
+        if dialog.exec() != dialog.DialogCode.Accepted or not dialog.result_data:
+            return
+        self.rula_assessments.append(dialog.result_data)
+        worst = self._worst_rula_assessment()
+        self.rula_label.setText(
+            f"Full RULA: {worst['final_score']}/7 | "
+            f"Action Level {worst['action_level']}"
         )
 
     def show_posture_alert(
@@ -658,6 +715,7 @@ class MonitoringPage(QWidget):
         self.preview_label.setText("ภาพการตรวจจับจะแสดงที่นี่")
         self.stop_button.setEnabled(False)
         self.pause_button.setEnabled(False)
+        self.rula_button.setEnabled(False)
         self.pause_button.setText("Pause Monitoring")
         self.is_paused = False
         self.session_started_at = None
@@ -673,10 +731,12 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
+        self.rula_assessments.clear()
         self.side_bending_label.setText("Assessment: Waiting")
         self.duration_label.setText("Active posture duration: --")
         self.partial_factors_label.setText("Baseline change: --")
         self.risk_label.setText("Prototype Risk: N/A")
+        self.rula_label.setText("RULA: N/A")
         # Successful session end automatically closes backend alert events.
         # Preserve IDs when session end fails, for a later retry.
         if self.session_id is None:
@@ -714,6 +774,7 @@ class MonitoringPage(QWidget):
         duration = max(0.0, time.monotonic() - self.session_started_monotonic)
         baseline = self.baseline_data or {}
         camera = self.selected_camera or {}
+        rula = self._worst_rula_assessment()
         return {
             "session_id": self.session_id,
             "database_status": "RUNNING",
@@ -741,6 +802,8 @@ class MonitoringPage(QWidget):
             "maximum_risk_score": (
                 max(self.risk_samples) if self.risk_samples else None
             ),
+            "rula_final_score": rula.get("final_score") if rula else None,
+            "rula_action_level": rula.get("action_level") if rula else None,
         }
 
     def _change_remote_session_status(

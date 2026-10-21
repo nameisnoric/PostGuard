@@ -137,6 +137,7 @@ class SessionSummaryPage(QWidget):
         report_layout = QVBoxLayout(report_group)
         self.average_risk_label = QLabel('คะแนนความเสี่ยงเฉลี่ย: N/A')
         self.maximum_risk_label = QLabel('คะแนนความเสี่ยงสูงสุด: N/A')
+        self.rula_label = QLabel('Full RULA: N/A')
         self.blink_rate_label = QLabel('อัตราการกะพริบตา: N/A')
         self.report_alert_count_label = QLabel('จำนวนการแจ้งเตือนที่บันทึก: --')
         self.frequent_event_label = QLabel('การแจ้งเตือนที่พบบ่อยที่สุด: N/A')
@@ -145,6 +146,7 @@ class SessionSummaryPage(QWidget):
         for widget in (
             self.average_risk_label,
             self.maximum_risk_label,
+            self.rula_label,
             self.blink_rate_label,
             self.report_alert_count_label,
             self.frequent_event_label,
@@ -229,7 +231,8 @@ class SessionSummaryPage(QWidget):
 
         self.note_label = QLabel(
             "Prototype risk uses a 0-3 engineering scale and is not Full RULA or a "
-            "clinical diagnosis. Blink rate appears after a complete 60-second window. "
+            "clinical diagnosis. Full RULA is saved only after all manual observations "
+            "are completed. Blink rate appears after a complete 60-second window. "
             "Alert duration is the time an alert record remained open."
         )
         self.note_label.setWordWrap(True)
@@ -354,6 +357,13 @@ class SessionSummaryPage(QWidget):
         self.maximum_risk_label.setText(
             "คะแนนความเสี่ยงสูงสุด: "
             + self._number_or_na(report_metrics.get("maximum_risk_score"))
+        )
+        rula_score = report_metrics.get("rula_final_score")
+        rula_level = report_metrics.get("rula_action_level")
+        self.rula_label.setText(
+            f"Full RULA: {rula_score}/7 | Action Level {rula_level}"
+            if rula_score is not None and rula_level is not None
+            else "Full RULA: N/A"
         )
         self.blink_rate_label.setText(
             "อัตราการกะพริบตา: " + self._number_or_na(report_metrics.get("blink_rate"))

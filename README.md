@@ -87,3 +87,4 @@ Additional documentation:
 - [Flow and test report](docs/FLOW_AND_TEST_REPORT.md)
 - [Private avatar setup](docs/PRIVATE_AVATAR_SETUP.md)
 - [TOR desktop requirements](docs/TOR_DESKTOP_REQUIREMENTS.md)
+- [RULA scoring and camera mapping](docs/RULA_MAPPING.md)

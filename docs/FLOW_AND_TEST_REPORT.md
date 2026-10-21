@@ -1,5 +1,17 @@
 # PostGuard: flow และผลทดสอบ
 
+## Full RULA assessment — 22 October 2026
+
+- Added the official RULA body-part scoring rules and Tables A, B and C.
+- Camera-derived neck evidence is displayed as a lower bound because the
+  current camera contract does not measure every required RULA observation.
+- An active session now provides a Full RULA form for the missing arm, wrist,
+  trunk, leg, muscle-use and force/load scores. The highest completed score is
+  stored with its action level in Session Summary.
+- Session Report and Dashboard display Full RULA separately from the existing
+  Prototype Risk 0–3 scale. A missing manual assessment remains `N/A`.
+- Automated verification: Desktop 154 unit tests and Backend 37 unit tests pass.
+
 ## Detection and Dashboard integration — 22 October 2026
 
 - The Desktop pipeline now connects MediaPipe Detection Contract 1.0,
@@ -12,7 +24,7 @@
 - Dashboard loads both `GET /sessions` and `GET /summaries` in a worker thread.
   It displays real Active Time, Prototype Risk, Blink Rate and Alert totals;
   absent or unavailable report values remain `N/A`.
-- Automated verification: Desktop 145 unit tests and Backend 37 unit tests
+- Automated verification before the RULA addition: Desktop 145 unit tests and Backend 37 unit tests
   pass. MediaPipe DetectionPipeline and TemporalPostureTracker initialize with
   the packaged model files.
 - Remaining acceptance work requires physical hardware: full webcam flow,

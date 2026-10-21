@@ -85,7 +85,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Implemented | Complete final live Desktop acceptance test |
 | Settings | Implemented with popup and optional sound alerts | Final live popup, sound and persistence acceptance test |
-| Dashboard, history and reports | Implemented with saved Session, Prototype Risk, Blink Rate and Alert data | Complete final live Supabase acceptance test |
+| Dashboard, history and reports | Implemented with saved Session, Prototype Risk, Full RULA, Blink Rate and Alert data | Complete final live Supabase acceptance test |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
 | Camera preparation and detection pipeline | Implemented | Run final hardware acceptance with the reference card, webcam and sustained posture alerts |
 | Image/video privacy | Implemented by design | Add explicit user-facing notice and acceptance test |

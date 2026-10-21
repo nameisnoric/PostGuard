@@ -7,6 +7,8 @@ class SessionSummaryCreate(BaseModel):
 
     average_risk_score: float | None = Field(default=None, ge=0, le=3)
     maximum_risk_score: float | None = Field(default=None, ge=0, le=3)
+    rula_final_score: int | None = Field(default=None, ge=1, le=7, strict=True)
+    rula_action_level: int | None = Field(default=None, ge=1, le=4, strict=True)
     blink_rate: float | None = Field(default=None, ge=0)
 
     detection_count: int = Field(default=0, ge=0, strict=True)
@@ -28,6 +30,16 @@ class SessionSummaryCreate(BaseModel):
             raise ValueError(
                 "maximum_risk_score cannot be below average_risk_score"
             )
+        if (self.rula_final_score is None) != (self.rula_action_level is None):
+            raise ValueError("RULA score and action level must be provided together")
+        if self.rula_final_score is not None:
+            expected_level = (
+                1 if self.rula_final_score <= 2 else
+                2 if self.rula_final_score <= 4 else
+                3 if self.rula_final_score <= 6 else 4
+            )
+            if self.rula_action_level != expected_level:
+                raise ValueError("RULA action level does not match final score")
         return self
 
 
@@ -37,6 +49,8 @@ class SessionSummaryResponse(BaseModel):
 
     average_risk_score: float | None
     maximum_risk_score: float | None
+    rula_final_score: int | None
+    rula_action_level: int | None
 
     detection_count: int
     pose_detected_count: int

@@ -48,6 +48,7 @@ class RiskEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["prototype_score"], 0.0)
         self.assertIsNone(result["risk_score"])
         self.assertFalse(result["full_rula"]["supported"])
+        self.assertIsNone(result["full_rula"]["final_score"])
 
     def test_single_active_group_progresses_with_duration(self):
         factors = {"neck_lateral_tilt": "NECK_LATERAL_RIGHT"}

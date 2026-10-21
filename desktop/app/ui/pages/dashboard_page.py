@@ -99,6 +99,11 @@ def _risk_number(value):
     return value if value is not None and 0 <= value <= 3 else None
 
 
+def _rula_number(value):
+    value = _finite_number(value)
+    return int(value) if value is not None and value.is_integer() and 1 <= value <= 7 else None
+
+
 def _nonnegative_number(value):
     value = _finite_number(value)
     return value if value is not None and value >= 0 else None
@@ -124,6 +129,11 @@ def summary_insights(summaries):
         for summary in summaries
         if (value := _nonnegative_number(summary.get("blink_rate"))) is not None
     ]
+    rula_scores = [
+        value
+        for summary in summaries
+        if (value := _rula_number(summary.get("rula_final_score"))) is not None
+    ]
     alert_counts = [
         value
         for summary in summaries
@@ -140,6 +150,8 @@ def summary_insights(summaries):
         ),
         "maximum_risk": max(maximum_risks) if maximum_risks else None,
         "risk_report_count": len(average_risks),
+        "maximum_rula": max(rula_scores) if rula_scores else None,
+        "rula_report_count": len(rula_scores),
         "average_blink_rate": (
             sum(blink_rates) / len(blink_rates) if blink_rates else None
         ),
@@ -244,9 +256,9 @@ class DashboardPage(QWidget):
             "Session ล่าสุดพร้อมผล Prototype Risk และ Alert ที่บันทึกจริง",
             "muted",
         ))
-        self.recent_table = QTableWidget(0, 6)
+        self.recent_table = QTableWidget(0, 7)
         self.recent_table.setHorizontalHeaderLabels(
-            ("Session", "Started", "Status", "Active Time", "Risk", "Alerts")
+            ("Session", "Started", "Status", "Active Time", "Risk", "RULA", "Alerts")
         )
         self.recent_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -280,6 +292,16 @@ class DashboardPage(QWidget):
         risk_layout.addWidget(self.risk_value)
         risk_layout.addWidget(self.risk_note)
         column.addWidget(risk)
+
+        rula, rula_layout = self._card()
+        rula_layout.addWidget(self._label("Full RULA", "heading"))
+        self.rula_value = self._label("N/A", "metric")
+        self.rula_note = self._label(
+            "รอผลประเมิน RULA ที่กรอกข้อมูลครบ", "muted"
+        )
+        rula_layout.addWidget(self.rula_value)
+        rula_layout.addWidget(self.rula_note)
+        column.addWidget(rula)
 
         blink, blink_layout = self._card()
         blink_layout.addWidget(self._label("Blink Rate", "heading"))
@@ -361,8 +383,10 @@ class DashboardPage(QWidget):
     def _reset_report_metrics(self, unavailable=False):
         self.alerts_value.setText("N/A" if unavailable else "0")
         self.risk_value.setText("N/A")
+        self.rula_value.setText("N/A")
         self.blink_value.setText("N/A")
         self.risk_note.setText("ยังไม่มี Prototype Risk ที่บันทึกใน Report")
+        self.rula_note.setText("ยังไม่มี Full RULA ที่บันทึกใน Report")
         self.blink_note.setText("ยังไม่มี Blink Rate ที่บันทึกใน Report")
 
     def _update_report_metrics(self, summaries):
@@ -385,6 +409,16 @@ class DashboardPage(QWidget):
             )
             self.risk_note.setText(
                 f"ค่าเฉลี่ยจาก {insights['risk_report_count']} Report{maximum_text}"
+            )
+
+        maximum_rula = insights["maximum_rula"]
+        if maximum_rula is None:
+            self.rula_value.setText("N/A")
+            self.rula_note.setText("ยังไม่มี Full RULA ที่บันทึกใน Report")
+        else:
+            self.rula_value.setText(f"{maximum_rula} / 7")
+            self.rula_note.setText(
+                f"คะแนนสูงสุดจาก {insights['rula_report_count']} Report"
             )
 
         average_blink = insights["average_blink_rate"]
@@ -465,12 +499,14 @@ class DashboardPage(QWidget):
 
             report = summary_by_session.get(session.get("session_id"))
             risk = _risk_number(report.get("average_risk_score")) if report else None
+            rula = _rula_number(report.get("rula_final_score")) if report else None
             alerts = report.get("total_alert_count") if report else None
             values = (
                 session.get("session_id", "N/A"), started,
                 session.get("status", "N/A"),
                 duration_text(active_seconds(session)),
                 f"{risk:.1f}/3" if risk is not None else "N/A",
+                f"{rula}/7" if rula is not None else "N/A",
                 alerts if type(alerts) is int and alerts >= 0 else "N/A",
             )
             for column, value in enumerate(values):

@@ -36,6 +36,8 @@ def build_summary_payload(summary: dict) -> dict:
     payload = {
         "average_risk_score": _optional_float(summary.get("average_risk_score")),
         "maximum_risk_score": _optional_float(summary.get("maximum_risk_score")),
+        "rula_final_score": summary.get("rula_final_score"),
+        "rula_action_level": summary.get("rula_action_level"),
         "blink_rate": _optional_float(summary.get("blink_rate")),
 
         "detection_count": _count(
@@ -58,6 +60,8 @@ def build_summary_payload(summary: dict) -> dict:
     average_risk = payload["average_risk_score"]
     maximum_risk = payload["maximum_risk_score"]
     blink_rate = payload["blink_rate"]
+    rula_score = payload["rula_final_score"]
+    rula_level = payload["rula_action_level"]
     if average_risk is not None and not 0 <= average_risk <= 3:
         raise ValueError("average_risk_score must be between 0 and 3")
     if maximum_risk is not None and not 0 <= maximum_risk <= 3:
@@ -70,6 +74,16 @@ def build_summary_payload(summary: dict) -> dict:
         raise ValueError("maximum_risk_score cannot be below average_risk_score")
     if blink_rate is not None and blink_rate < 0:
         raise ValueError("blink_rate cannot be negative")
+    if (rula_score is None) != (rula_level is None):
+        raise ValueError("RULA score and action level must be provided together")
+    if rula_score is not None:
+        if type(rula_score) is not int or not 1 <= rula_score <= 7:
+            raise ValueError("rula_final_score must be between 1 and 7")
+        if type(rula_level) is not int or not 1 <= rula_level <= 4:
+            raise ValueError("rula_action_level must be between 1 and 4")
+        expected_level = 1 if rula_score <= 2 else 2 if rula_score <= 4 else 3 if rula_score <= 6 else 4
+        if rula_level != expected_level:
+            raise ValueError("RULA action level does not match final score")
 
     if (
         max(payload["pose_detected_count"], payload["face_detected_count"])
