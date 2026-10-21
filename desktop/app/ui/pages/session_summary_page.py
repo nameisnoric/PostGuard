@@ -228,8 +228,9 @@ class SessionSummaryPage(QWidget):
         alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Risk score and blink rate remain N/A until their complete calculations "
-            "are connected. Alert duration is the time an alert record remained open."
+            "Prototype risk uses a 0-3 engineering scale and is not Full RULA or a "
+            "clinical diagnosis. Blink rate appears after a complete 60-second window. "
+            "Alert duration is the time an alert record remained open."
         )
         self.note_label.setWordWrap(True)
         self.note_label.setProperty("role", "muted")

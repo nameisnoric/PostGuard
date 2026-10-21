@@ -74,19 +74,19 @@ def create_session_summary(
 
     # 5. คำนวณ Risk Duration
     low_risk_duration = sum(
-        alert.duration
+        alert.duration or 0
         for alert in alert_events
         if alert.risk_level == "LOW"
     )
 
     medium_risk_duration = sum(
-        alert.duration
+        alert.duration or 0
         for alert in alert_events
         if alert.risk_level == "MEDIUM"
     )
 
     high_risk_duration = sum(
-        alert.duration
+        alert.duration or 0
         for alert in alert_events
         if alert.risk_level == "HIGH"
     )

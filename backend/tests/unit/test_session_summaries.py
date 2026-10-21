@@ -69,7 +69,16 @@ class SessionSummaryTests(unittest.TestCase):
         self.app.dependency_overrides[get_db] = lambda: self.db
         self.app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=1)
         self.client = TestClient(self.app)
-        self.payload = dict(detection_count=20, pose_detected_count=18, face_detected_count=15, average_shoulder=-1.25, average_neck=2.75)
+        self.payload = dict(
+            detection_count=20,
+            pose_detected_count=18,
+            face_detected_count=15,
+            average_shoulder=-1.25,
+            average_neck=2.75,
+            average_risk_score=1.25,
+            maximum_risk_score=3.0,
+            blink_rate=14.0,
+        )
 
     def tearDown(self):
         self.client.close()
@@ -86,8 +95,9 @@ class SessionSummaryTests(unittest.TestCase):
         saved = self.client.get("/sessions/1/summary").json()
         for key, value in self.payload.items():
             self.assertEqual(saved[key], value)
-        self.assertIsNone(saved["average_risk_score"])
-        self.assertIsNone(saved["maximum_risk_score"])
+        self.assertEqual(saved["average_risk_score"], 1.25)
+        self.assertEqual(saved["maximum_risk_score"], 3.0)
+        self.assertEqual(saved["blink_rate"], 14.0)
         self.assertEqual(saved["medium_risk_duration"], 12)
         self.assertEqual(saved["total_alert_count"], 1)
         self.assertEqual(self.client.get("/summaries").json(), [saved])
@@ -102,6 +112,23 @@ class SessionSummaryTests(unittest.TestCase):
             session.status = status
             self.db.commit()
             self.assertEqual(self.client.post("/sessions/1/summary", json=self.payload).status_code, 409)
+
+    def test_open_alert_has_zero_completed_duration(self):
+        self.db.add(AlertEvent(
+            session_id=1,
+            event_type="SHOULDER_TILT",
+            risk_level="HIGH",
+            started_at=datetime.now(timezone.utc),
+            ended_at=None,
+            duration=None,
+        ))
+        self.db.commit()
+
+        result = self.client.post("/sessions/1/summary", json=self.payload)
+
+        self.assertEqual(result.status_code, 201, result.text)
+        self.assertEqual(result.json()["high_risk_duration"], 0)
+        self.assertEqual(result.json()["high_risk_alert_count"], 1)
 
     def test_other_user_cannot_read_or_write(self):
         self.client.post("/sessions/1/summary", json=self.payload)

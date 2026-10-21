@@ -20,19 +20,39 @@ class PostureAlertPopupTests(unittest.TestCase):
 
     def test_created_alert_shows_one_non_blocking_popup(self):
         self.page.session_id = 12
-        self.page.baseline_data = {"lateral_tilt_baseline": 0.0}
-        self.page.posture_tracker.update = Mock(return_value=60.0)
-        self.page.alert_service.update = Mock(return_value="created")
-        self.page.alert_service.active_event_id = 44
+        self.page.alert_service = Mock()
+        self.page.alert_service.update.return_value = {
+            "created": [{
+                "event_type": "NECK_LATERAL_TILT",
+                "factor": "NECK_LATERAL_RIGHT",
+                "duration_seconds": 60.0,
+                "risk_level": "MEDIUM",
+                "event_id": 44,
+            }],
+            "ended": [],
+            "errors": [],
+        }
+        self.page.alert_service.has_active_alerts = True
         self.page.apply_notification_settings({"notifications_enabled": True})
 
-        with patch(
-            "app.ui.pages.monitoring_page.classify_neck_side_bending",
-            return_value=1,
-        ):
-            self.page.update_partial_risk(
-                {"neck_lateral_tilt": {"neck_tilt": 15.0}}
-            )
+        self.page.update_partial_risk({
+            "assessment": {
+                "status": "COMPLETE",
+                "factors": [{"factor": "NECK_LATERAL_RIGHT"}],
+            },
+            "temporal": {
+                "active_factors": [{
+                    "feature": "neck_lateral_tilt",
+                    "continuous_seconds": 60.0,
+                }],
+            },
+            "risk": {
+                "status": "EVALUATED",
+                "risk_level": "MODERATE",
+                "prototype_score": 2.0,
+            },
+            "measurement_change": {"features": {}},
+        })
 
         self.assertIsNotNone(self.page.alert_popup)
         self.assertTrue(self.page.alert_popup.isVisible())

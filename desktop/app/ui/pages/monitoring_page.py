@@ -8,11 +8,9 @@ from datetime import datetime
 import cv2
 import requests
 
-from PySide6.QtCore import QLocale, Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QDoubleSpinBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -27,13 +25,8 @@ from PySide6.QtWidgets import (
 
 from app.services.detection_service import DetectionService
 from app.services.api_client import APIClient
-from app.services.risk_engine import assess_posture
-from app.services.experimental_alert_service import ExperimentalAlertService
+from app.services.risk_alert_service import RiskAlertService
 from app.services.alert_sound import AlertSoundPlayer
-from app.services.posture_duration_tracker import (
-    PostureDurationTracker,
-    classify_neck_side_bending,
-)
 from app.services.session_summary_service import save_session_summary
 from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
 from app.ui.utils.preview_sizing import fit_preview_label
@@ -61,12 +54,12 @@ class MonitoringPage(QWidget):
         self.face_detected_count = 0
         self.shoulder_samples = []
         self.neck_samples = []
-        self.posture_tracker = PostureDurationTracker()
         self.latest_blink_rate = None
-        self.alert_service = ExperimentalAlertService()
+        self.risk_samples = []
+        self.latest_risk_result = None
+        self.alert_service = RiskAlertService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
-        self._alert_force_close = False
 
         self.timer = QTimer(self)
         self.timer.setInterval(30)
@@ -190,52 +183,21 @@ class MonitoringPage(QWidget):
         return detection_group
 
     def _create_risk_group(self) -> QGroupBox:
-        # This is a test control, NOT a validated clinical cutoff.
-        risk_group = QGroupBox("การประเมินความเสี่ยงบางส่วน (ทดลอง)")
+        risk_group = QGroupBox("Posture Assessment")
         risk_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
         risk_layout = QVBoxLayout(risk_group)
-        threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel('เกณฑ์ทดลองการเอียงคอด้านข้าง:'))
-        self._last_neck_threshold = 10.0
-        self.threshold_enabled = QCheckBox("เปิดใช้งาน")
-        self.threshold_enabled.setToolTip(
-            'เปิดใช้เกณฑ์ทดลองการเอียงคอด้านข้าง'
-        )
-        self.threshold_enabled.toggled.connect(self.set_threshold_enabled)
-        threshold_layout.addWidget(self.threshold_enabled)
-        self.neck_threshold_spin = QDoubleSpinBox()
-        # Keep numeric controls readable regardless of the Windows regional locale.
-        self.neck_threshold_spin.setLocale(QLocale.c())
-        self.neck_threshold_spin.setRange(0.0, 45.0)
-        self.neck_threshold_spin.setDecimals(1)
-        self.neck_threshold_spin.setSingleStep(0.5)
-        self.neck_threshold_spin.setSuffix("°")
-        self.neck_threshold_spin.setSpecialValueText("Disabled (0°)")
-        self.neck_threshold_spin.setValue(0.0)
-        self.neck_threshold_spin.setMinimumWidth(120)
-        self.neck_threshold_spin.setKeyboardTracking(False)
-        self.neck_threshold_spin.setEnabled(False)
-        self.neck_threshold_spin.setToolTip(
-            "For experimentation only. 0 disables classification; "
-            "no validated side-bending cutoff has been selected."
-        )
-        self.neck_threshold_spin.valueChanged.connect(self.reset_risk_tracking)
-        threshold_layout.addWidget(self.neck_threshold_spin)
-        threshold_layout.addStretch()
-        risk_layout.addLayout(threshold_layout)
-        self.side_bending_label = QLabel("Neck Side-bending: N/A")
-        self.duration_label = QLabel("Continuous Side-bending: N/A")
-        self.partial_factors_label = QLabel("Side-bending Score: N/A | Duration Score: N/A")
-        self.risk_label = QLabel("Risk Score: N/A (PARTIAL - missing factors)")
-        self.alert_label = QLabel("Experimental Alert: Waiting")
+        self.side_bending_label = QLabel("Assessment: Waiting")
+        self.duration_label = QLabel("Active posture duration: --")
+        self.partial_factors_label = QLabel("Baseline change: --")
+        self.risk_label = QLabel("Prototype Risk: N/A")
+        self.alert_label = QLabel("Alert: Waiting")
         self.alert_label.setWordWrap(True)
         self.risk_note_label = QLabel(
-            "Experimental neck alert after 60 s of continuous bending. "
-            "Backend MEDIUM is a provisional API label, NOT a calculated "
-            "Risk Score. Full Risk Score remains unavailable."
+            "Prototype posture levels use current posture, baseline change, "
+            "and continuous duration. This is not a clinical diagnosis or Full RULA."
         )
         self.risk_note_label.setWordWrap(True)
         for label in (
@@ -246,18 +208,6 @@ class MonitoringPage(QWidget):
             risk_layout.addWidget(label)
 
         return risk_group
-
-    def set_threshold_enabled(self, enabled: bool) -> None:
-        """Make the experimental cutoff an explicit opt-in control."""
-        if not enabled and self.neck_threshold_spin.value() > 0:
-            self._last_neck_threshold = self.neck_threshold_spin.value()
-        self.neck_threshold_spin.blockSignals(True)
-        self.neck_threshold_spin.setEnabled(enabled)
-        self.neck_threshold_spin.setValue(
-            self._last_neck_threshold if enabled else 0.0
-        )
-        self.neck_threshold_spin.blockSignals(False)
-        self.reset_risk_tracking()
 
     def _create_button_layout(self) -> QHBoxLayout:
         button_layout = QHBoxLayout()
@@ -410,7 +360,8 @@ class MonitoringPage(QWidget):
         self.neck_samples.clear()
         self.alert_service.reset()
         self.latest_blink_rate = None
-        self._alert_force_close = False
+        self.risk_samples.clear()
+        self.latest_risk_result = None
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
@@ -424,23 +375,15 @@ class MonitoringPage(QWidget):
         return True
 
     def reset_risk_tracking(self, *_args) -> None:
-        """Changing threshold resets duration and closes any active alert."""
-        if self.session_id is not None and self.alert_service.active_event_id is not None:
-            self._alert_force_close = not self.alert_service.close_if_active()
-            if self._alert_force_close:
-                self.alert_label.setText("Experimental Alert: End pending (API unavailable)")
-            else:
-                self.alert_label.setText("Experimental Alert: Cleared")
-
-        self.posture_tracker.reset()
-        self.side_bending_label.setText("Neck Side-bending: N/A")
-        self.duration_label.setText("Continuous Side-bending: N/A")
-        self.partial_factors_label.setText("Side-bending Score: N/A | Duration Score: N/A")
-        self.risk_label.setText("Risk Score: N/A (PARTIAL - missing factors)")
-        if self.session_id is None:
-            self.alert_label.setText("Experimental Alert: Waiting")
-        if self.alert_service.active_event_id is None:
-            self.sound_player.notify(False)
+        """Clear the displayed assessment and close locally tracked alerts."""
+        if self.alert_service.has_active_alerts:
+            self.alert_service.close_all()
+        self.side_bending_label.setText("Assessment: Waiting")
+        self.duration_label.setText("Active posture duration: --")
+        self.partial_factors_label.setText("Baseline change: --")
+        self.risk_label.setText("Prototype Risk: N/A")
+        self.alert_label.setText("Alert: Waiting")
+        self.sound_player.notify(False)
 
     def apply_notification_settings(self, settings: dict) -> None:
         self.sound_player.apply_settings(settings)
@@ -452,93 +395,95 @@ class MonitoringPage(QWidget):
             self.alert_popup = None
 
     def update_partial_risk(self, result: dict) -> None:
-        """Use existing neck_tilt only. Never change teammate's detector math."""
+        """Render integrated assessment, duration, risk, and alert state."""
+        assessment = result.get("assessment") or {}
+        temporal = result.get("temporal") or {}
+        risk = result.get("risk") or {}
+        gate = result.get("measurement_change") or {}
+        self.latest_risk_result = risk
 
-        neck_result = result.get("neck_lateral_tilt")
-        neck_angle = neck_result.get("neck_tilt") if isinstance(neck_result, dict) else None
-        baseline = self.baseline_data or {}
-        baseline_neck = baseline.get("lateral_tilt_baseline")
-        threshold = self.neck_threshold_spin.value()
-        direction = classify_neck_side_bending(neck_angle, baseline_neck, threshold)
-        seconds = self.posture_tracker.update(direction)
-
-        if direction is None:
-            self.side_bending_label.setText("Neck Side-bending: N/A (threshold off or pose missing)")
-            self.duration_label.setText("Continuous Side-bending: N/A")
-            side_bending = None
-        elif direction == 0:
-            self.side_bending_label.setText("Neck Side-bending: No (experimental)")
-            self.duration_label.setText("Continuous Side-bending: 0.0 s")
-            side_bending = False
-        else:
-            side_name = "+ direction" if direction > 0 else "- direction"
-            self.side_bending_label.setText(f"Neck Side-bending: Yes ({side_name}, experimental)")
-            self.duration_label.setText(f"Continuous Side-bending: {seconds:.1f} s")
-            side_bending = True
-
-        assessment = assess_posture(
-            neck_side_bending=side_bending,
-            sustained_seconds=seconds,
+        factors = assessment.get("factors") if isinstance(assessment, dict) else []
+        factor_names = [str(item.get("factor")) for item in factors if isinstance(item, dict)]
+        self.side_bending_label.setText(
+            "Assessment: " + (", ".join(factor_names) if factor_names else assessment.get("status", "N/A"))
         )
-        factors = assessment["factors"]
-        side_score = factors["neck_side_bending"]
-        duration_score = factors["muscle_use_duration"]
-        side_text = str(side_score) if side_score is not None else "N/A"
-        duration_text = str(duration_score) if duration_score is not None else "N/A"
+
+        active = temporal.get("active_factors") if isinstance(temporal, dict) else []
+        durations = [
+            f"{item.get('feature')}: {float(item.get('continuous_seconds', 0.0)):.1f}s"
+            for item in active
+            if isinstance(item, dict)
+        ]
+        self.duration_label.setText(
+            "Active posture duration: " + (" | ".join(durations) if durations else "0.0s")
+        )
+
+        changed = []
+        gate_features = gate.get("features") if isinstance(gate, dict) else None
+        if isinstance(gate_features, dict):
+            changed = [name for name, row in gate_features.items() if isinstance(row, dict) and row.get("status") == "CHANGED"]
         self.partial_factors_label.setText(
-            f"Side-bending Score: {side_text} | Duration Score: {duration_text}"
+            "Baseline change: " + (", ".join(changed) if changed else "Stable / unavailable")
         )
-        # Neck flexion, rotation and trunk are unavailable: never show full risk.
-        self.risk_label.setText("Risk Score: N/A (PARTIAL - missing factors)")
-        # Retry closing an old event before applying a new threshold.
-        if self._alert_force_close:
-            if self.alert_service.close_if_active():
-                self._alert_force_close = False
-                self.alert_label.setText("Experimental Alert: Cleared")
-            else:
-                self.alert_label.setText(
-                    "Experimental Alert: End pending - "
-                    + str(self.alert_service.last_error)
-                )
-                return
+
+        level = risk.get("risk_level") if isinstance(risk, dict) else None
+        score = risk.get("prototype_score") if isinstance(risk, dict) else None
+        status = risk.get("status", "NOT_EVALUATED") if isinstance(risk, dict) else "NOT_EVALUATED"
+        self.risk_label.setText(
+            f"Prototype Risk: {level} ({score:.0f}/3)" if level is not None and score is not None
+            else f"Prototype Risk: N/A ({status})"
+        )
+        if score is not None:
+            self.risk_samples.append(float(score))
 
         if self.session_id is None:
             return
-
-        action = self.alert_service.update(self.session_id, direction, seconds)
-        if action == "created":
+        actions = self.alert_service.update(self.session_id, risk)
+        created = actions["created"]
+        if created:
             self.alert_label.setText(
-                "Experimental Alert: Neck side-bending held >= 60 s. "
-                "Please adjust your posture. Event saved to PostgreSQL."
+                f"Alert: {len(created)} sustained posture event(s) saved"
             )
-            self.show_posture_alert(direction, seconds)
-        elif action == "ended":
-            self.alert_label.setText("Experimental Alert: Cleared (event ended)")
-        elif self.alert_service.last_error:
-            self.alert_label.setText(
-                "Experimental Alert: API error (will retry): "
-                + self.alert_service.last_error
-            )
-        elif direction == 0:
-            self.alert_label.setText("Experimental Alert: No sustained bending")
-        elif direction is None:
-            self.alert_label.setText("Experimental Alert: Detection unavailable / disabled")
-        elif self.alert_service.active_event_id is None:
-            self.alert_label.setText("Experimental Alert: Monitoring continuous bending")
+            self.show_posture_alert(created[0])
+        elif actions["errors"]:
+            self.alert_label.setText("Alert API error: " + actions["errors"][0])
+        elif self.alert_service.has_active_alerts:
+            self.alert_label.setText("Alert: Sustained posture active")
+        elif actions["ended"]:
+            self.alert_label.setText("Alert: Cleared")
+        else:
+            self.alert_label.setText("Alert: Monitoring")
         self.sound_player.notify(
-            self.alert_service.active_event_id is not None,
-            new_alert=action == "created",
+            self.alert_service.has_active_alerts,
+            new_alert=bool(created),
         )
 
-    def show_posture_alert(self, direction: int, seconds: float) -> bool:
+    def show_posture_alert(
+        self,
+        alert: dict | int | None = None,
+        seconds=None,
+        direction=None,
+    ) -> bool:
         """Show one non-modal popup for a newly stored alert event."""
         if not self.sound_player.settings.get("notifications_enabled", True):
             return False
+        if alert is None and direction is not None:
+            alert = direction
+        if not isinstance(alert, dict):
+            direction = alert
+            alert = {
+                "event_type": "NECK_LATERAL_TILT",
+                "factor": "TILT_RIGHT" if direction and direction > 0 else "TILT_LEFT",
+                "duration_seconds": seconds or 0.0,
+                "risk_level": "MEDIUM",
+            }
         if self.alert_popup is not None:
             self.alert_popup.close()
         self.alert_popup = PostureAlertDialog(
-            direction=direction,
-            duration_seconds=seconds,
+            event_type=alert.get("event_type"),
+            factor=alert.get("factor"),
+            duration_seconds=alert.get("duration_seconds", 0.0),
+            risk_level=alert.get("risk_level", "MEDIUM"),
             parent=self.window(),
         )
         self.alert_popup.show_alert()
@@ -726,18 +671,17 @@ class MonitoringPage(QWidget):
         self.shoulder_samples.clear()
         self.neck_samples.clear()
         self.latest_blink_rate = None
-
-        self.posture_tracker.reset()
-        self.side_bending_label.setText("Neck Side-bending: N/A")
-        self.duration_label.setText("Continuous Side-bending: N/A")
-        self.partial_factors_label.setText("Side-bending Score: N/A | Duration Score: N/A")
-        self.risk_label.setText("Risk Score: N/A (PARTIAL - missing factors)")
+        self.risk_samples.clear()
+        self.latest_risk_result = None
+        self.side_bending_label.setText("Assessment: Waiting")
+        self.duration_label.setText("Active posture duration: --")
+        self.partial_factors_label.setText("Baseline change: --")
+        self.risk_label.setText("Prototype Risk: N/A")
         # Successful session end automatically closes backend alert events.
         # Preserve IDs when session end fails, for a later retry.
         if self.session_id is None:
             self.alert_service.reset()
-            self._alert_force_close = False
-            self.alert_label.setText("Experimental Alert: Waiting")
+            self.alert_label.setText("Alert: Waiting")
 
     def stop_monitoring(self) -> bool:
         ended = True
@@ -791,6 +735,12 @@ class MonitoringPage(QWidget):
             "baseline_shoulder": baseline.get("shoulder_angle"),
             "baseline_neck": baseline.get("lateral_tilt_baseline"),
             "blink_rate": self.latest_blink_rate,
+            "average_risk_score": (
+                statistics.mean(self.risk_samples) if self.risk_samples else None
+            ),
+            "maximum_risk_score": (
+                max(self.risk_samples) if self.risk_samples else None
+            ),
         }
 
     def _change_remote_session_status(
@@ -910,18 +860,13 @@ class MonitoringPage(QWidget):
         # Backend closes active alerts when pausing.
         # Clear stale local alert state.
         self.alert_service.reset()
-        self._alert_force_close = False
-
-        # A continuous posture episode must not span a pause.
-
-        self.posture_tracker.reset()
 
         self.preview_label.clear()
         self.preview_label.setText('หยุดการตรวจจับชั่วคราว')
 
-        self.side_bending_label.setText("การเอียงคอด้านข้าง: หยุดชั่วคราว")
-        self.duration_label.setText("ระยะเวลาการเอียงต่อเนื่อง: หยุดชั่วคราว")
-        self.alert_label.setText("การแจ้งเตือนทดลอง: หยุดชั่วคราว")
+        self.side_bending_label.setText("Assessment: Paused")
+        self.duration_label.setText("Active posture duration: Paused")
+        self.alert_label.setText("Alert: Paused")
 
         self.status_label.setText(
             "สถานะ: หยุดชั่วคราว "
@@ -955,14 +900,14 @@ class MonitoringPage(QWidget):
         # Resume only after Backend confirms RUNNING.
         self.is_paused = False
 
-        self.posture_tracker.reset()
         self.alert_service.reset()
-        self._alert_force_close = False
+        if self.detector is not None:
+            self.detector.reset_runtime()
 
         self.preview_label.setText('กำลังตรวจจับต่อ...')
-        self.alert_label.setText("การแจ้งเตือนทดลอง: กำลังรอ")
-        self.side_bending_label.setText("การเอียงคอด้านข้าง: กำลังรอ")
-        self.duration_label.setText("ระยะเวลาการเอียงต่อเนื่อง: กำลังรอ")
+        self.alert_label.setText("Alert: Waiting")
+        self.side_bending_label.setText("Assessment: Waiting")
+        self.duration_label.setText("Active posture duration: --")
 
         self.status_label.setText(
             "สถานะ: กำลังตรวจจับ (RUNNING) "

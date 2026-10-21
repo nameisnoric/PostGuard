@@ -11,6 +11,7 @@ from app.vision.mediapipe_detection.eye.blink_statistics import BlinkStatistics
 from app.vision.posture_assessment.current_posture_assessment import (
     assess_current_posture,
 )
+from app.vision.risk_evaluation import evaluate_risk
 from app.vision.session_monitoring.measurement_change_gate import (
     evaluate_measurement_change,
     load_measurement_change_thresholds,
@@ -97,6 +98,7 @@ class DetectionService:
 
         assessment = assess_current_posture(detection)
         temporal = self.temporal_tracker.update(assessment, now=timestamp)
+        risk = evaluate_risk(assessment, temporal)
 
         monitoring_snapshot = None
         measurement_change = None
@@ -128,6 +130,7 @@ class DetectionService:
             "detection": detection,
             "assessment": assessment,
             "temporal": temporal,
+            "risk": risk,
             "monitoring_snapshot": monitoring_snapshot,
             "measurement_change": measurement_change,
             "blink_statistics": blink_statistics,

@@ -28,14 +28,14 @@ def _count(value):
 
 
 def build_summary_payload(summary: dict) -> dict:
-    """Use measured data only; do not fabricate risk scores."""
+    """Persist measured prototype risk, detection, and eye metrics."""
 
     if not isinstance(summary, dict):
         raise ValueError("Invalid summary")
 
     payload = {
-        "average_risk_score": None,
-        "maximum_risk_score": None,
+        "average_risk_score": _optional_float(summary.get("average_risk_score")),
+        "maximum_risk_score": _optional_float(summary.get("maximum_risk_score")),
         "blink_rate": _optional_float(summary.get("blink_rate")),
 
         "detection_count": _count(

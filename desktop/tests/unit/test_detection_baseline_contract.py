@@ -56,9 +56,19 @@ class DetectionBaselineContractTests(unittest.TestCase):
         }
         service = self.service_with_result(detection)
 
-        with patch(
-            "app.services.detection_service.assess_current_posture",
-            return_value={"status": "COMPLETE"},
+        with (
+            patch(
+                "app.services.detection_service.assess_current_posture",
+                return_value={"status": "COMPLETE"},
+            ),
+            patch(
+                "app.services.detection_service.evaluate_risk",
+                return_value={
+                    "status": "EVALUATED",
+                    "risk_level": "NONE",
+                    "prototype_score": 0.0,
+                },
+            ),
         ):
             result = service.process_frame(
                 np.zeros((360, 640, 3), dtype=np.uint8)
@@ -97,9 +107,19 @@ class DetectionBaselineContractTests(unittest.TestCase):
         }
         service = self.service_with_result(detection)
 
-        with patch(
-            "app.services.detection_service.assess_current_posture",
-            return_value={"status": "NOT_EVALUATED"},
+        with (
+            patch(
+                "app.services.detection_service.assess_current_posture",
+                return_value={"status": "NOT_EVALUATED"},
+            ),
+            patch(
+                "app.services.detection_service.evaluate_risk",
+                return_value={
+                    "status": "NOT_EVALUATED",
+                    "risk_level": None,
+                    "prototype_score": None,
+                },
+            ),
         ):
             result = service.process_frame(
                 np.zeros((360, 640, 3), dtype=np.uint8)

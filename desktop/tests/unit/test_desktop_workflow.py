@@ -84,6 +84,15 @@ class DesktopWorkflowTests(unittest.TestCase):
             neck_lateral_tilt={"neck_tilt": 2.0},
             neck_flexion=3.0,
             eye_distance=70.0,
+            assessment={"status": "COMPLETE", "factors": []},
+            temporal={"status": "COMPLETE", "active_factors": []},
+            risk={
+                "status": "EVALUATED",
+                "risk_level": "NONE",
+                "prototype_score": 0.0,
+            },
+            measurement_change={"features": {}},
+            blink_statistics={"blink_rate": None},
         )
         self.capture = Mock()
         self.capture.isOpened.return_value = True
@@ -357,24 +366,13 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(page.calibration_reference, self.camera_reference)
         information.assert_called_once()
 
-    def test_experimental_threshold_requires_explicit_enable(self):
+    def test_integrated_risk_panel_uses_pipeline_results(self):
         monitor = self.window.monitoring_page
-        self.assertEqual(monitor.neck_threshold_spin.locale().zeroDigit(), "0")
-        self.assertFalse(monitor.threshold_enabled.isChecked())
-        self.assertFalse(monitor.neck_threshold_spin.isEnabled())
-        self.assertEqual(monitor.neck_threshold_spin.value(), 0.0)
-
-        monitor.threshold_enabled.setChecked(True)
-        self.assertTrue(monitor.neck_threshold_spin.isEnabled())
-        self.assertEqual(monitor.neck_threshold_spin.value(), 10.0)
-        monitor.neck_threshold_spin.setValue(12.5)
-        self.assertEqual(monitor.neck_threshold_spin.value(), 12.5)
-
-        monitor.threshold_enabled.setChecked(False)
-        self.assertFalse(monitor.neck_threshold_spin.isEnabled())
-        self.assertEqual(monitor.neck_threshold_spin.value(), 0.0)
-        monitor.threshold_enabled.setChecked(True)
-        self.assertEqual(monitor.neck_threshold_spin.value(), 12.5)
+        self.assertFalse(hasattr(monitor, "neck_threshold_spin"))
+        self.assertFalse(hasattr(monitor, "threshold_enabled"))
+        monitor.update_partial_risk(self.result)
+        self.assertEqual(monitor.risk_label.text(), "Prototype Risk: NONE (0/3)")
+        self.assertIn("prototype", monitor.risk_note_label.text().lower())
 
     def test_failed_end_preserves_samples_for_retry(self):
         self.start_monitoring()

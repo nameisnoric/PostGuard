@@ -1,4 +1,4 @@
-"""Non-blocking in-app notification for a newly created posture alert."""
+"""Non-blocking in-app notification for a sustained posture alert."""
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -13,10 +13,26 @@ from PySide6.QtWidgets import (
 from app.ui.theme import APP_QSS
 
 
-class PostureAlertDialog(QDialog):
-    """Show one visible warning without pausing the monitoring timer."""
+EVENT_LABELS = {
+    "SHOULDER_TILT": "Shoulder asymmetry",
+    "NECK_LATERAL_TILT": "Neck side-bending",
+    "NECK_FLEXION": "Neck flexion/extension",
+}
 
-    def __init__(self, direction: int, duration_seconds: float, parent=None):
+
+class PostureAlertDialog(QDialog):
+    """Show a visible warning without pausing the monitoring timer."""
+
+    def __init__(
+        self,
+        direction=None,
+        duration_seconds=0.0,
+        parent=None,
+        *,
+        event_type="NECK_LATERAL_TILT",
+        factor=None,
+        risk_level="MEDIUM",
+    ):
         super().__init__(parent)
         self.setWindowTitle("PostGuard - Posture Alert")
         self.setWindowModality(Qt.WindowModality.NonModal)
@@ -28,6 +44,9 @@ class PostureAlertDialog(QDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setStyleSheet(APP_QSS)
         self.setFixedWidth(500)
+
+        if factor is None and direction in (-1, 1):
+            factor = "TILT_RIGHT" if direction > 0 else "TILT_LEFT"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(26, 24, 26, 22)
@@ -44,8 +63,7 @@ class PostureAlertDialog(QDialog):
         heading_row.addWidget(heading, 1)
 
         message = QLabel(
-            "ตรวจพบท่าทางเอียงคอด้านข้างต่อเนื่อง "
-            "กรุณาปรับศีรษะและลำตัวกลับสู่ท่าปกติ"
+            "ตรวจพบท่าทางที่ควรปรับต่อเนื่อง กรุณากลับสู่ท่าทางที่ผ่อนคลายและเหมาะสม"
         )
         message.setWordWrap(True)
 
@@ -53,16 +71,24 @@ class PostureAlertDialog(QDialog):
         details.setProperty("card", True)
         details_layout = QVBoxLayout(details)
         details_layout.setContentsMargins(18, 14, 18, 14)
-        direction_text = "ด้านขวา (+)" if direction > 0 else "ด้านซ้าย (-)"
-        self.direction_label = QLabel(f"ทิศทาง: {direction_text}")
+        self.event_label = QLabel(
+            "รายการ: " + EVENT_LABELS.get(event_type, str(event_type))
+        )
+        self.factor_label = QLabel(f"ปัจจัย: {factor or '--'}")
+        self.risk_label = QLabel(f"ระดับความเสี่ยง: {risk_level}")
         self.duration_label = QLabel(
             f"ระยะเวลาต่อเนื่อง: {max(0.0, float(duration_seconds)):.1f} วินาที"
         )
         saved_label = QLabel("บันทึกเหตุการณ์นี้ใน Alert Events แล้ว")
         saved_label.setProperty("role", "muted")
-        details_layout.addWidget(self.direction_label)
-        details_layout.addWidget(self.duration_label)
-        details_layout.addWidget(saved_label)
+        for widget in (
+            self.event_label,
+            self.factor_label,
+            self.risk_label,
+            self.duration_label,
+            saved_label,
+        ):
+            details_layout.addWidget(widget)
 
         actions = QHBoxLayout()
         actions.addStretch()

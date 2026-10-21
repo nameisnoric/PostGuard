@@ -25,6 +25,25 @@ class SummaryServiceTests(unittest.TestCase):
             self.assertIsNone(payload["average_risk_score"])
             self.assertIsNone(payload["average_neck"])
 
+    def test_save_measured_prototype_risk_and_blink_rate(self):
+        summary = {
+            **self.summary,
+            "average_risk_score": 1.25,
+            "maximum_risk_score": 3.0,
+            "blink_rate": 14.0,
+        }
+        with patch.object(
+            APIClient,
+            "post",
+            return_value=response(201, {"session_id": 7}),
+        ) as post:
+            save_session_summary(summary)
+
+        payload = post.call_args.args[1]
+        self.assertEqual(payload["average_risk_score"], 1.25)
+        self.assertEqual(payload["maximum_risk_score"], 3.0)
+        self.assertEqual(payload["blink_rate"], 14.0)
+
     def test_retry_after_lost_response_reads_existing_report(self):
         saved = {"session_id": 7, "detection_count": 10}
         with patch.object(APIClient, "post", side_effect=[requests.Timeout(), response(409, {})]), patch.object(APIClient, "get", return_value=response(200, saved)):
