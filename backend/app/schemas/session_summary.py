@@ -5,9 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class SessionSummaryCreate(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
 
-    average_risk_score: float | None = None
-    maximum_risk_score: float | None = None
-    blink_rate: float | None = None
+    average_risk_score: float | None = Field(default=None, ge=0, le=3)
+    maximum_risk_score: float | None = Field(default=None, ge=0, le=3)
+    blink_rate: float | None = Field(default=None, ge=0)
 
     detection_count: int = Field(default=0, ge=0, strict=True)
     pose_detected_count: int = Field(default=0, ge=0, strict=True)
@@ -20,6 +20,14 @@ class SessionSummaryCreate(BaseModel):
     def validate_detection_counts(self):
         if max(self.pose_detected_count, self.face_detected_count) > self.detection_count:
             raise ValueError("Detected counts cannot exceed detection_count")
+        if (
+            self.average_risk_score is not None
+            and self.maximum_risk_score is not None
+            and self.maximum_risk_score < self.average_risk_score
+        ):
+            raise ValueError(
+                "maximum_risk_score cannot be below average_risk_score"
+            )
         return self
 
 

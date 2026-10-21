@@ -53,7 +53,16 @@ class SummaryServiceTests(unittest.TestCase):
             self.assertEqual(result, {"status": "ALREADY_EXISTS", "summary": saved})
 
     def test_reject_unfinished_or_invalid_data(self):
-        for change in ({"database_status": "RUNNING"}, {"face_detected_count": 11}, {"average_neck": float("nan")}, {"detection_count": True}):
+        for change in (
+            {"database_status": "RUNNING"},
+            {"face_detected_count": 11},
+            {"average_neck": float("nan")},
+            {"detection_count": True},
+            {"average_risk_score": -0.1},
+            {"maximum_risk_score": 3.1},
+            {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
+            {"blink_rate": -1.0},
+        ):
             with self.subTest(change=change), patch.object(APIClient, "post") as post:
                 with self.assertRaises(ValueError):
                     save_session_summary({**self.summary, **change})

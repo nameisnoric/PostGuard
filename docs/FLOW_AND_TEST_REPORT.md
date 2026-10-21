@@ -1,5 +1,24 @@
 # PostGuard: flow และผลทดสอบ
 
+## Detection and Dashboard integration — 22 October 2026
+
+- The Desktop pipeline now connects MediaPipe Detection Contract 1.0,
+  Current Posture Assessment 1.1, temporal tracking, prototype risk mapping,
+  persisted Alert Events, popup/sound notifications and Session Summary.
+- Prototype Risk is an explicit 0-3 engineering scale. It is not Full RULA or
+  a clinical diagnosis.
+- Supported persisted alert types are shoulder tilt, neck lateral tilt and
+  neck flexion/extension after 60 seconds of continuous evidence.
+- Dashboard loads both `GET /sessions` and `GET /summaries` in a worker thread.
+  It displays real Active Time, Prototype Risk, Blink Rate and Alert totals;
+  absent or unavailable report values remain `N/A`.
+- Automated verification: Desktop 145 unit tests and Backend 37 unit tests
+  pass. MediaPipe DetectionPipeline and TemporalPostureTracker initialize with
+  the packaged model files.
+- Remaining acceptance work requires physical hardware: full webcam flow,
+  reference card, sustained posture alerts, long-session/minimize behavior,
+  production Supabase checks and Windows packaging.
+
 ## Privacy Notice and stored consent — 20 October 2026
 
 - The Desktop checks current consent before opening Camera Setup and shows a

@@ -1,4 +1,4 @@
-"""PostGuard Monitoring UI: Session API + experimental partial risk tracking."""
+"""PostGuard Monitoring UI for detection, risk, alerts, and session reports."""
 
 import math
 import statistics

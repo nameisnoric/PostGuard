@@ -9,9 +9,10 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 2. The proposal clarifies implementation details where the TOR is ambiguous.
 3. The current product is a Desktop Application. The proposal specifies
    Python, PySide6, FastAPI, JWT, Argon2, Resend and PostgreSQL/Supabase.
-4. Posture detection, posture scoring and blink analysis are deferred
-   temporarily. Camera preparation is implemented as a local reference-card
-   step before the personal posture baseline.
+4. Camera preparation, posture detection, temporal tracking, prototype risk,
+   blink analysis and alert persistence are connected in the local desktop
+   pipeline. The current 0-3 risk value is an engineering prototype, not a
+   Full RULA score or clinical diagnosis.
 5. Authentication uses the existing email/password flow and accepts only
    `@ku.th` email addresses. Google OAuth is not in the current scope.
 6. Existing email and password validation rules are frozen for the current
@@ -84,28 +85,29 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Implemented | Complete final live Desktop acceptance test |
 | Settings | Implemented with popup and optional sound alerts | Final live popup, sound and persistence acceptance test |
-| Dashboard, history and reports | Implemented for available data | Complete detection-derived TOR fields when their source calculations are available |
+| Dashboard, history and reports | Implemented with saved Session, Prototype Risk, Blink Rate and Alert data | Complete final live Supabase acceptance test |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
-| Camera preparation | Implemented | Run final acceptance test with the printed 85.60 x 53.98 mm reference card |
+| Camera preparation and detection pipeline | Implemented | Run final hardware acceptance with the reference card, webcam and sustained posture alerts |
 | Image/video privacy | Implemented by design | Add explicit user-facing notice and acceptance test |
 | Desktop packaging | Missing | Produce and test the Windows executable/installer |
 
 ## Implementation order for the current desktop phase
 
-1. Run the physical reference-card acceptance test for camera preparation.
-2. Run the Privacy Notice acceptance and withdrawal flow in the live Desktop app.
-3. Run final live acceptance tests for history, reports and account-specific data.
-4. Package and test the Windows application.
-
-Detection-related requirements remain part of the TOR and must be completed
-later, but they are outside the current desktop-system phase.
+1. Run the physical reference-card and full webcam acceptance flow.
+2. Hold each supported posture long enough to verify popup, sound, persisted
+   Alert Events and the resulting Dashboard/Report values.
+3. Run the Privacy Notice, profile and account-specific data acceptance flows
+   against the production Supabase configuration.
+4. Run a long-session/minimize/pause/resume performance test.
+5. Package and test the Windows application and its backend startup strategy.
 
 ## Camera preparation traceability
 
 The desktop flow is `Camera Setup -> Camera Preview -> Camera Preparation ->
 Personal Baseline -> Session`. Camera Preparation was adapted from the latest
-`feature/camera` reference-card implementation at commit `04211ba` without
-merging that branch or importing its posture-detection models.
+`feature/camera` reference-card implementation at commit `04211ba`. The
+posture-detection and camera-session modules were later integrated on
+`feature/detection` without merging or modifying their source branches.
 
 The preparation page uses the standard 85.60 x 53.98 mm card dimensions and
 requires ten consecutive valid frames. It checks card size, position, aspect

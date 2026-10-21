@@ -145,6 +145,17 @@ class SessionSummaryTests(unittest.TestCase):
         for value in (float("nan"), float("inf")):
             with self.assertRaises(ValueError):
                 SessionSummaryCreate(**{**self.payload, "average_neck": value})
+        for change in (
+            {"average_risk_score": -0.1},
+            {"maximum_risk_score": 3.1},
+            {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
+            {"blink_rate": -1.0},
+        ):
+            with self.subTest(change=change):
+                response = self.client.post(
+                    "/sessions/1/summary", json={**self.payload, **change}
+                )
+                self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

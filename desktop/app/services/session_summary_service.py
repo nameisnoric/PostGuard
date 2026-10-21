@@ -55,6 +55,22 @@ def build_summary_payload(summary: dict) -> dict:
         ),
     }
 
+    average_risk = payload["average_risk_score"]
+    maximum_risk = payload["maximum_risk_score"]
+    blink_rate = payload["blink_rate"]
+    if average_risk is not None and not 0 <= average_risk <= 3:
+        raise ValueError("average_risk_score must be between 0 and 3")
+    if maximum_risk is not None and not 0 <= maximum_risk <= 3:
+        raise ValueError("maximum_risk_score must be between 0 and 3")
+    if (
+        average_risk is not None
+        and maximum_risk is not None
+        and maximum_risk < average_risk
+    ):
+        raise ValueError("maximum_risk_score cannot be below average_risk_score")
+    if blink_rate is not None and blink_rate < 0:
+        raise ValueError("blink_rate cannot be negative")
+
     if (
         max(payload["pose_detected_count"], payload["face_detected_count"])
         > payload["detection_count"]
