@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from .risk_level_mapper import map_prototype_risk_level
-from .rula import camera_rula_partial
+from .rula import evaluate_front_camera_risk
 
 
 RISK_CONTRACT_VERSION = "1.2"
@@ -185,7 +185,7 @@ def evaluate_risk(
         evidence_groups=evidence_groups,
     )
     level = mapping["level"] if mapping["available"] else None
-    rula = camera_rula_partial(assessment_result, temporal_result)
+    rula = evaluate_front_camera_risk(assessment_result, temporal_result)
 
     return {
         "risk_contract_version": RISK_CONTRACT_VERSION,
@@ -208,8 +208,8 @@ def evaluate_risk(
         "risk_level_available": mapping["available"],
         "risk_level": level,
         "prototype_score": PROTOTYPE_RISK_VALUES.get(level),
-        "risk_score": None,
-        "rula": rula,
+        "risk_score": rula.get("score"),
+        "rula_adapted": rula,
         "risk_event": None,
         "alert": None,
     }

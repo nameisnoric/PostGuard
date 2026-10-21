@@ -1,40 +1,51 @@
-# PostGuard camera-supported RULA neck mapping
+# PostGuard RULA-adapted front-camera Risk Score
 
-PostGuard uses only the RULA neck criteria that the current camera contract
-can observe: neck flexion/extension and lateral side-bending. Neck twist is
-not measured, so the displayed value is a lower bound (`≥N`) and is stored as
-`rula_neck_score`. The application does not calculate a Full RULA score or an
-RULA action level.
+PostGuard applies selected RULA principles to measurements available from one
+front-facing camera. The result is an easy-to-read Risk Score from 1 to 7. It
+is an application-specific screening score and is not an official Full RULA
+calculation.
 
 Primary reference: McAtamney, L. and Corlett, E. N. (1993), *RULA: a survey
 method for the investigation of work-related upper limb disorders*, Applied
-Ergonomics 24(2), 91-99, DOI `10.1016/0003-6870(93)90080-S`. The neck criteria
-were cross-checked against the Cornell RULA Employee Assessment Worksheet.
+Ergonomics 24(2), 91-99, DOI `10.1016/0003-6870(93)90080-S`.
 
-## Implemented scoring
+## Score components
 
-| Camera observation | Base score | Adjustment | Displayed result |
-| --- | ---: | ---: | --- |
-| Neck extension below 0° | 4 | +1 if lateral side-bending is detected | ≥4–5 |
-| Neck flexion 0–10° | 1 | +1 if lateral side-bending is detected | ≥1–2 |
-| Neck flexion >10–20° | 2 | +1 if lateral side-bending is detected | ≥2–3 |
-| Neck flexion >20° | 3 | +1 if lateral side-bending is detected | ≥3–4 |
+| Front-camera evidence | Condition | Score contribution |
+| --- | --- | ---: |
+| Neck flexion/extension | 0–10° flexion | Base 1 |
+| Neck flexion/extension | >10–20° flexion | Base 2 |
+| Neck flexion/extension | >20° flexion | Base 3 |
+| Neck flexion/extension | Extension below 0° | Base 4 |
+| Lateral neck bending | Posture factor detected beyond measurement tolerance | +1 |
+| Shoulder asymmetry | Left/right shoulder tilt detected beyond baseline tolerance | +1 |
+| Sustained posture | Any supported posture factor remains active for more than 60 seconds | +1 |
 
-The maximum camera-derived value is 5. The RULA neck component can reach 6
-when both twist and side-bending adjustments apply, but neck twist is not
-available from the current Detection Contract.
+`Risk Score = neck base + neck side-bending + shoulder asymmetry + sustained posture`
 
-## Application flow
+The result is capped at 7.
 
-1. Detection provides `neck_flexion.current` and the evaluated state of
-   `neck_lateral_tilt`.
-2. The RULA mapper selects the flexion/extension base score.
-3. It adds one when lateral side-bending passes the PostGuard measurement
-   tolerance and is classified as a posture factor.
-4. Monitoring shows `RULA Neck (camera): ≥N/6 | Partial assessment`.
-5. The highest observed neck score in the session is stored in Session
-   Summary and displayed in History/Report and Dashboard.
+## User-facing risk levels
 
-The existing PostGuard Prototype Risk 0–3 remains separate. It uses supported
-posture factors and continuous duration for alerts; it is not a Full RULA
-score or a clinical diagnosis.
+| Score | Level | Meaning shown to the user |
+| ---: | --- | --- |
+| 1–2 | LOW | ท่าทางมีความเสี่ยงต่ำ |
+| 3–4 | MODERATE | ควรปรับท่าทางและติดตามต่อเนื่อง |
+| 5–6 | HIGH | ควรปรับท่าทางโดยเร็ว |
+| 7 | VERY HIGH | ควรหยุดพักและปรับท่าทางทันที |
+
+## Data flow
+
+1. Detection measures neck flexion, lateral neck tilt and shoulder tilt.
+2. Current Posture Assessment applies camera and personal-baseline tolerance.
+3. Temporal Tracking determines whether a posture remains active for more
+   than 60 seconds.
+4. The RULA-adapted mapper calculates a score from 1 to 7.
+5. Monitoring shows the current score and risk level.
+6. Session Summary stores the average and maximum scores with method
+   `RULA_ADAPTED_FRONT_V1`.
+7. Dashboard and History distinguish these scores from older Prototype Risk
+   reports.
+
+The score is designed for PostGuard's front-camera workflow and should not be
+presented as a clinical diagnosis or Full RULA assessment.

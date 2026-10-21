@@ -1,8 +1,8 @@
-"""Camera-supported subset of the RULA neck assessment.
+"""RULA-inspired risk score for PostGuard's front-camera measurements.
 
-PostGuard currently measures neck flexion and lateral side-bending. Neck
-twist and the other body groups are not inferred, so this module deliberately
-does not calculate a Full RULA score or action level.
+This adaptation uses neck flexion/extension, lateral neck bending, shoulder
+asymmetry and sustained posture. It is a simple 1-7 risk scale for users and
+must not be presented as an official Full RULA calculation.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import math
 from collections.abc import Mapping
 
 
-RULA_CONTRACT_VERSION = "1.1-camera-neck"
+RULA_CONTRACT_VERSION = "2.0-front-camera-adapted"
 
 
 class RulaInputError(ValueError):
@@ -43,8 +43,21 @@ def neck_score(flexion_deg, *, side_bent=False):
     return min(5, score + int(side_bent))
 
 
-def camera_rula_partial(assessment_result: Mapping, temporal_result: Mapping):
-    """Map only camera-observable evidence to the RULA neck criteria."""
+def _risk_level(score):
+    if score <= 2:
+        return "LOW"
+    if score <= 4:
+        return "MODERATE"
+    if score <= 6:
+        return "HIGH"
+    return "VERY_HIGH"
+
+
+def evaluate_front_camera_risk(
+    assessment_result: Mapping,
+    temporal_result: Mapping,
+):
+    """Calculate the PostGuard RULA-adapted 1-7 front-camera score."""
     if not isinstance(assessment_result, Mapping):
         raise RulaInputError("assessment_result must be a mapping")
     if not isinstance(temporal_result, Mapping):
@@ -54,6 +67,7 @@ def camera_rula_partial(assessment_result: Mapping, temporal_result: Mapping):
     temporal_features = temporal_result.get("features", {})
     neck_flexion = assessment_features.get("neck_flexion", {})
     neck_lateral = assessment_features.get("neck_lateral_tilt", {})
+    shoulder_tilt = assessment_features.get("shoulder_tilt", {})
     duration_rows = [
         row.get("continuous_seconds")
         for row in temporal_features.values()
@@ -70,6 +84,10 @@ def camera_rula_partial(assessment_result: Mapping, temporal_result: Mapping):
         isinstance(neck_lateral, Mapping)
         and neck_lateral.get("evaluated") is True
     )
+    shoulder_evaluated = (
+        isinstance(shoulder_tilt, Mapping)
+        and shoulder_tilt.get("evaluated") is True
+    )
     flexion_evaluated = (
         isinstance(neck_flexion, Mapping)
         and neck_flexion.get("evaluated") is True
@@ -80,28 +98,52 @@ def camera_rula_partial(assessment_result: Mapping, temporal_result: Mapping):
     side_bent = (
         lateral_evaluated and neck_lateral.get("is_posture_factor") is True
     )
-    observable_score = (
-        neck_score(float(flexion), side_bent=side_bent)
-        if flexion_evaluated and lateral_evaluated
-        else None
+    shoulder_asymmetric = (
+        shoulder_evaluated and shoulder_tilt.get("is_posture_factor") is True
     )
     static_seconds = max(duration_rows, default=0.0)
+    sustained = static_seconds > 60
+    neck_base = (
+        neck_score(float(flexion), side_bent=False)
+        if flexion_evaluated else None
+    )
+    score = (
+        min(
+            7,
+            neck_base
+            + int(side_bent)
+            + int(shoulder_asymmetric)
+            + int(sustained),
+        )
+        if neck_base is not None and lateral_evaluated and shoulder_evaluated
+        else None
+    )
 
     return {
         "contract_version": RULA_CONTRACT_VERSION,
-        "status": "PARTIAL" if observable_score is not None else "NOT_EVALUATED",
-        "source": "CAMERA_DERIVED",
-        "body_region": "NECK",
-        "neck_score_lower_bound": observable_score,
+        "status": "EVALUATED" if score is not None else "NOT_EVALUATED",
+        "method": "RULA_ADAPTED_FRONT_V1",
+        "source": "FRONT_CAMERA",
+        "score": score,
+        "risk_level": _risk_level(score) if score is not None else None,
+        "components": {
+            "neck_base": neck_base,
+            "neck_side_bending": int(side_bent) if lateral_evaluated else None,
+            "shoulder_asymmetry": (
+                int(shoulder_asymmetric) if shoulder_evaluated else None
+            ),
+            "sustained_posture": int(sustained),
+        },
         "neck_flexion_deg": float(flexion) if flexion_evaluated else None,
         "neck_side_bent": side_bent if lateral_evaluated else None,
+        "shoulder_asymmetric": (
+            shoulder_asymmetric if shoulder_evaluated else None
+        ),
         "static_over_60_seconds": static_seconds > 60,
         "static_seconds": static_seconds,
-        "missing": ["neck_twist"],
-        "full_rula_score": None,
-        "action_level": None,
         "limitations": [
-            "Neck twist is not measured by the current Detection Contract.",
-            "This is a partial neck score, not a Full RULA score.",
+            "Designed for a single front-facing camera.",
+            "Shoulder asymmetry is a PostGuard adjustment, not an official RULA item.",
+            "This is a RULA-adapted risk score, not Full RULA.",
         ],
     }

@@ -137,7 +137,6 @@ class SessionSummaryPage(QWidget):
         report_layout = QVBoxLayout(report_group)
         self.average_risk_label = QLabel('คะแนนความเสี่ยงเฉลี่ย: N/A')
         self.maximum_risk_label = QLabel('คะแนนความเสี่ยงสูงสุด: N/A')
-        self.rula_label = QLabel('RULA Neck (camera): N/A')
         self.blink_rate_label = QLabel('อัตราการกะพริบตา: N/A')
         self.report_alert_count_label = QLabel('จำนวนการแจ้งเตือนที่บันทึก: --')
         self.frequent_event_label = QLabel('การแจ้งเตือนที่พบบ่อยที่สุด: N/A')
@@ -146,7 +145,6 @@ class SessionSummaryPage(QWidget):
         for widget in (
             self.average_risk_label,
             self.maximum_risk_label,
-            self.rula_label,
             self.blink_rate_label,
             self.report_alert_count_label,
             self.frequent_event_label,
@@ -230,9 +228,10 @@ class SessionSummaryPage(QWidget):
         alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Prototype risk uses a 0-3 engineering scale and is not Full RULA or a "
-            "clinical diagnosis. RULA Neck is a camera-derived partial score; neck "
-            "twist and Full RULA are not calculated. Blink rate appears after a complete 60-second window. "
+            "Risk Score 1–7 is adapted from RULA for a single front-facing camera. "
+            "It uses neck angle, lateral neck bending, shoulder asymmetry and sustained "
+            "posture; it is not Full RULA or a clinical diagnosis. "
+            "Blink rate appears after a complete 60-second window. "
             "Alert duration is the time an alert record remained open."
         )
         self.note_label.setWordWrap(True)
@@ -350,19 +349,33 @@ class SessionSummaryPage(QWidget):
             )
         )
 
+        method = report_metrics.get("risk_score_method")
+        scale = "7" if method == "RULA_ADAPTED_FRONT_V1" else "3"
+        method_label = (
+            "RULA-adapted Front Camera" if method == "RULA_ADAPTED_FRONT_V1"
+            else "Legacy Prototype"
+        )
+        average_risk = self._number_or_na(report_metrics.get("average_risk_score"))
+        maximum_risk = self._number_or_na(report_metrics.get("maximum_risk_score"))
+        maximum_value = report_metrics.get("maximum_risk_score")
+        if method == "RULA_ADAPTED_FRONT_V1" and maximum_value is not None:
+            maximum_level = (
+                "ต่ำ" if maximum_value <= 2 else
+                "ปานกลาง" if maximum_value <= 4 else
+                "สูง" if maximum_value <= 6 else "สูงมาก"
+            )
+        else:
+            maximum_level = None
         self.average_risk_label.setText(
             "คะแนนความเสี่ยงเฉลี่ย: "
-            + self._number_or_na(report_metrics.get("average_risk_score"))
+            + (f"{average_risk}/{scale}" if average_risk != "N/A" else "N/A")
+            + f" ({method_label})"
         )
         self.maximum_risk_label.setText(
             "คะแนนความเสี่ยงสูงสุด: "
-            + self._number_or_na(report_metrics.get("maximum_risk_score"))
-        )
-        rula_score = report_metrics.get("rula_neck_score")
-        self.rula_label.setText(
-            f"RULA Neck (camera): ≥{rula_score}/6 | Partial assessment"
-            if rula_score is not None
-            else "RULA Neck (camera): N/A"
+            + (f"{maximum_risk}/{scale}" if maximum_risk != "N/A" else "N/A")
+            + (f" • ความเสี่ยง{maximum_level}" if maximum_level else "")
+            + f" ({method_label})"
         )
         self.blink_rate_label.setText(
             "อัตราการกะพริบตา: " + self._number_or_na(report_metrics.get("blink_rate"))

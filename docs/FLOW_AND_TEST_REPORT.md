@@ -1,27 +1,28 @@
 # PostGuard: flow และผลทดสอบ
 
-## Camera-supported RULA neck assessment — 22 October 2026
+## RULA-adapted front-camera Risk Score — 22 October 2026
 
-- RULA is limited to the neck observations available from the camera:
-  flexion/extension and lateral side-bending.
-- The result is displayed as a lower bound because neck twist is unavailable.
-  No Full RULA score or action level is calculated.
-- The highest camera-derived RULA Neck score is stored in Session Summary and
-  displayed in Session Report and Dashboard.
-- Prototype Risk 0–3 remains a separate PostGuard alert scale.
+- Added a 1–7 Risk Score adapted from RULA for a single front-facing camera.
+- The score uses neck flexion/extension, lateral neck bending, shoulder
+  asymmetry and sustained posture evidence available from the current system.
+- Monitoring, Session Report and Dashboard present the adapted score as the
+  user-facing Risk Score. Internal prototype levels continue to drive the
+  existing alert state machine.
+- Reports store `RULA_ADAPTED_FRONT_V1` so older Prototype Risk reports remain
+  distinguishable.
 - Automated verification: Desktop 149 unit tests and Backend 37 unit tests pass.
 
 ## Detection and Dashboard integration — 22 October 2026
 
 - The Desktop pipeline now connects MediaPipe Detection Contract 1.0,
-  Current Posture Assessment 1.1, temporal tracking, prototype risk mapping,
+  Current Posture Assessment 1.1, temporal tracking, risk mapping,
   persisted Alert Events, popup/sound notifications and Session Summary.
-- Prototype Risk is an explicit 0-3 engineering scale. It is not Full RULA or
-  a clinical diagnosis.
+- This section records the earlier Prototype Risk 0-3 integration; the current
+  user-facing score is the RULA-adapted 1-7 front-camera scale above.
 - Supported persisted alert types are shoulder tilt, neck lateral tilt and
   neck flexion/extension after 60 seconds of continuous evidence.
 - Dashboard loads both `GET /sessions` and `GET /summaries` in a worker thread.
-  It displays real Active Time, Prototype Risk, Blink Rate and Alert totals;
+  It displays real Active Time, Risk Score, Blink Rate and Alert totals;
   absent or unavailable report values remain `N/A`.
 - Automated verification before the RULA addition: Desktop 145 unit tests and Backend 37 unit tests
   pass. MediaPipe DetectionPipeline and TemporalPostureTracker initialize with

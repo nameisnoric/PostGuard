@@ -23,7 +23,7 @@ class SummaryServiceTests(unittest.TestCase):
             self.assertEqual(payload["detection_count"], 10)
             self.assertEqual(payload["average_shoulder"], -1.5)
             self.assertIsNone(payload["average_risk_score"])
-            self.assertIsNone(payload["rula_neck_score"])
+            self.assertIsNone(payload["risk_score_method"])
             self.assertIsNone(payload["average_neck"])
 
     def test_save_measured_prototype_risk_and_blink_rate(self):
@@ -32,7 +32,7 @@ class SummaryServiceTests(unittest.TestCase):
             "average_risk_score": 1.25,
             "maximum_risk_score": 3.0,
             "blink_rate": 14.0,
-            "rula_neck_score": 5,
+            "risk_score_method": "RULA_ADAPTED_FRONT_V1",
         }
         with patch.object(
             APIClient,
@@ -45,7 +45,7 @@ class SummaryServiceTests(unittest.TestCase):
         self.assertEqual(payload["average_risk_score"], 1.25)
         self.assertEqual(payload["maximum_risk_score"], 3.0)
         self.assertEqual(payload["blink_rate"], 14.0)
-        self.assertEqual(payload["rula_neck_score"], 5)
+        self.assertEqual(payload["risk_score_method"], "RULA_ADAPTED_FRONT_V1")
 
     def test_retry_after_lost_response_reads_existing_report(self):
         saved = {"session_id": 7, "detection_count": 10}
@@ -61,12 +61,12 @@ class SummaryServiceTests(unittest.TestCase):
             {"face_detected_count": 11},
             {"average_neck": float("nan")},
             {"detection_count": True},
-            {"average_risk_score": -0.1},
-            {"maximum_risk_score": 3.1},
+            {"average_risk_score": 0},
+            {"maximum_risk_score": 7.1},
             {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
             {"blink_rate": -1.0},
-            {"rula_neck_score": 0},
-            {"rula_neck_score": 7},
+            {"average_risk_score": 2.0, "maximum_risk_score": 3.0},
+            {"risk_score_method": "RULA_ADAPTED_FRONT_V1"},
         ):
             with self.subTest(change=change), patch.object(APIClient, "post") as post:
                 with self.assertRaises(ValueError):

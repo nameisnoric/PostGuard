@@ -36,7 +36,7 @@ def build_summary_payload(summary: dict) -> dict:
     payload = {
         "average_risk_score": _optional_float(summary.get("average_risk_score")),
         "maximum_risk_score": _optional_float(summary.get("maximum_risk_score")),
-        "rula_neck_score": summary.get("rula_neck_score"),
+        "risk_score_method": summary.get("risk_score_method"),
         "blink_rate": _optional_float(summary.get("blink_rate")),
 
         "detection_count": _count(
@@ -59,11 +59,11 @@ def build_summary_payload(summary: dict) -> dict:
     average_risk = payload["average_risk_score"]
     maximum_risk = payload["maximum_risk_score"]
     blink_rate = payload["blink_rate"]
-    rula_neck_score = payload["rula_neck_score"]
-    if average_risk is not None and not 0 <= average_risk <= 3:
-        raise ValueError("average_risk_score must be between 0 and 3")
-    if maximum_risk is not None and not 0 <= maximum_risk <= 3:
-        raise ValueError("maximum_risk_score must be between 0 and 3")
+    risk_method = payload["risk_score_method"]
+    if average_risk is not None and not 1 <= average_risk <= 7:
+        raise ValueError("average_risk_score must be between 1 and 7")
+    if maximum_risk is not None and not 1 <= maximum_risk <= 7:
+        raise ValueError("maximum_risk_score must be between 1 and 7")
     if (
         average_risk is not None
         and maximum_risk is not None
@@ -72,11 +72,11 @@ def build_summary_payload(summary: dict) -> dict:
         raise ValueError("maximum_risk_score cannot be below average_risk_score")
     if blink_rate is not None and blink_rate < 0:
         raise ValueError("blink_rate cannot be negative")
-    if (
-        rula_neck_score is not None
-        and (type(rula_neck_score) is not int or not 1 <= rula_neck_score <= 6)
-    ):
-        raise ValueError("rula_neck_score must be between 1 and 6")
+    has_scores = average_risk is not None or maximum_risk is not None
+    if has_scores and risk_method != "RULA_ADAPTED_FRONT_V1":
+        raise ValueError("RULA-adapted scores require risk_score_method")
+    if not has_scores and risk_method is not None:
+        raise ValueError("risk_score_method requires risk scores")
 
     if (
         max(payload["pose_detected_count"], payload["face_detected_count"])

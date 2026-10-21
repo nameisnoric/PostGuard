@@ -36,7 +36,7 @@ class SavedReportTests(unittest.TestCase):
             average_neck=None,
             average_risk_score=None,
             maximum_risk_score=None,
-            rula_neck_score=5,
+            risk_score_method="RULA_ADAPTED_FRONT_V1",
             blink_rate=None,
             total_alert_count=2,
             most_frequent_alert_event="NECK_LATERAL_TILT",
@@ -58,8 +58,10 @@ class SavedReportTests(unittest.TestCase):
             self.assertEqual(page.duration_label.text(), "ระยะเวลารวม: 00:02:00")
             self.assertEqual(page.paused_duration_label.text(), "เวลาหยุดชั่วคราว: 00:00:20")
             self.assertIn("Neck Lateral Tilt", page.frequent_event_label.text())
-            self.assertEqual(page.average_risk_label.text(), "คะแนนความเสี่ยงเฉลี่ย: N/A")
-            self.assertEqual(page.rula_label.text(), "RULA Neck (camera): ≥5/6 | Partial assessment")
+            self.assertEqual(
+                page.average_risk_label.text(),
+                "คะแนนความเสี่ยงเฉลี่ย: N/A (RULA-adapted Front Camera)",
+            )
             self.assertFalse(page.retry_button.isEnabled())
             self.assertIn("โหลดรายงาน", page.save_status_label.text())
             post.assert_not_called()

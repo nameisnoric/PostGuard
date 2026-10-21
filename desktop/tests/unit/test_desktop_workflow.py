@@ -90,6 +90,12 @@ class DesktopWorkflowTests(unittest.TestCase):
                 "status": "EVALUATED",
                 "risk_level": "NONE",
                 "prototype_score": 0.0,
+                "risk_score": 1,
+                "rula_adapted": {
+                    "status": "EVALUATED",
+                    "score": 1,
+                    "risk_level": "LOW",
+                },
             },
             measurement_change={"features": {}},
             blink_statistics={"blink_rate": None},
@@ -371,8 +377,11 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertFalse(hasattr(monitor, "neck_threshold_spin"))
         self.assertFalse(hasattr(monitor, "threshold_enabled"))
         monitor.update_partial_risk(self.result)
-        self.assertEqual(monitor.risk_label.text(), "Prototype Risk: NONE (0/3)")
-        self.assertIn("prototype", monitor.risk_note_label.text().lower())
+        self.assertEqual(
+            monitor.risk_label.text(),
+            "Risk Score (RULA-adapted): 1/7 • ความเสี่ยงต่ำ",
+        )
+        self.assertIn("rula", monitor.risk_note_label.text().lower())
 
     def test_failed_end_preserves_samples_for_retry(self):
         self.start_monitoring()

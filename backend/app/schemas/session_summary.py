@@ -5,9 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class SessionSummaryCreate(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
 
-    average_risk_score: float | None = Field(default=None, ge=0, le=3)
-    maximum_risk_score: float | None = Field(default=None, ge=0, le=3)
-    rula_neck_score: int | None = Field(default=None, ge=1, le=6, strict=True)
+    average_risk_score: float | None = Field(default=None, ge=1, le=7)
+    maximum_risk_score: float | None = Field(default=None, ge=1, le=7)
+    risk_score_method: str | None = Field(default=None, max_length=40)
     blink_rate: float | None = Field(default=None, ge=0)
 
     detection_count: int = Field(default=0, ge=0, strict=True)
@@ -29,6 +29,11 @@ class SessionSummaryCreate(BaseModel):
             raise ValueError(
                 "maximum_risk_score cannot be below average_risk_score"
             )
+        has_scores = self.average_risk_score is not None or self.maximum_risk_score is not None
+        if has_scores and self.risk_score_method != "RULA_ADAPTED_FRONT_V1":
+            raise ValueError("RULA-adapted scores require risk_score_method")
+        if not has_scores and self.risk_score_method is not None:
+            raise ValueError("risk_score_method requires risk scores")
         return self
 
 
@@ -38,7 +43,7 @@ class SessionSummaryResponse(BaseModel):
 
     average_risk_score: float | None
     maximum_risk_score: float | None
-    rula_neck_score: int | None
+    risk_score_method: str | None
 
     detection_count: int
     pose_detected_count: int

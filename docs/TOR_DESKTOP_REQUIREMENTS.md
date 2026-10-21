@@ -9,10 +9,10 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 2. The proposal clarifies implementation details where the TOR is ambiguous.
 3. The current product is a Desktop Application. The proposal specifies
    Python, PySide6, FastAPI, JWT, Argon2, Resend and PostgreSQL/Supabase.
-4. Camera preparation, posture detection, temporal tracking, prototype risk,
-   blink analysis and alert persistence are connected in the local desktop
-   pipeline. The current 0-3 risk value is an engineering prototype, not a
-   Full RULA score or clinical diagnosis.
+4. Camera preparation, posture detection, temporal tracking, RULA-adapted
+   front-camera Risk Score, blink analysis and alert persistence are connected
+   in the local desktop pipeline. The 1-7 score is a PostGuard screening scale,
+   not a Full RULA score or clinical diagnosis.
 5. Authentication uses the existing email/password flow and accepts only
    `@ku.th` email addresses. Google OAuth is not in the current scope.
 6. Existing email and password validation rules are frozen for the current
@@ -85,7 +85,7 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 | Account deletion and recovery | Implemented | Backend checks due accounts at startup and every 6 hours |
 | Privacy Notice and consent | Implemented | Complete final live Desktop acceptance test |
 | Settings | Implemented with popup and optional sound alerts | Final live popup, sound and persistence acceptance test |
-| Dashboard, history and reports | Implemented with saved Session, Prototype Risk, partial RULA Neck, Blink Rate and Alert data | Complete final live Supabase acceptance test |
+| Dashboard, history and reports | Implemented with saved Session, RULA-adapted front-camera Risk Score, Blink Rate and Alert data | Complete final live Supabase acceptance test |
 | Session controls and navigation | Implemented | Continue regression and minimize behavior testing |
 | Camera preparation and detection pipeline | Implemented | Run final hardware acceptance with the reference card, webcam and sustained posture alerts |
 | Image/video privacy | Implemented by design | Add explicit user-facing notice and acceptance test |

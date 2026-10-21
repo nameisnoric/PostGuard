@@ -27,8 +27,8 @@ class SessionSummary(Base):
     maximum_risk_score: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )
-    rula_neck_score: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
+    risk_score_method: Mapped[str | None] = mapped_column(
+        String(40), nullable=True
     )
 
     # ผลตรวจจับที่ Desktop เก็บระหว่าง Session

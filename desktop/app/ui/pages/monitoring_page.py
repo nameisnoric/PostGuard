@@ -57,7 +57,6 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples = []
         self.latest_risk_result = None
-        self.rula_neck_samples = []
         self.alert_service = RiskAlertService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
@@ -193,18 +192,20 @@ class MonitoringPage(QWidget):
         self.side_bending_label = QLabel("Assessment: Waiting")
         self.duration_label = QLabel("Active posture duration: --")
         self.partial_factors_label = QLabel("Baseline change: --")
-        self.risk_label = QLabel("Prototype Risk: N/A")
-        self.rula_label = QLabel("RULA: N/A")
+        self.risk_label = QLabel("Risk Score (RULA-adapted): N/A")
+        self.risk_breakdown_label = QLabel("องค์ประกอบคะแนน: --")
+        self.risk_breakdown_label.setWordWrap(True)
         self.alert_label = QLabel("Alert: Waiting")
         self.alert_label.setWordWrap(True)
         self.risk_note_label = QLabel(
-            "Prototype posture levels use current posture, baseline change, "
-            "and continuous duration. This is not a clinical diagnosis or Full RULA."
+            "คะแนน 1–7 ประยุกต์จาก RULA สำหรับกล้องด้านหน้า โดยใช้มุมคอ "
+            "การเอียงคอ ความไม่สมดุลของไหล่ และระยะเวลาค้างท่า ไม่ใช่ Full RULA"
         )
         self.risk_note_label.setWordWrap(True)
         for label in (
             self.side_bending_label, self.duration_label,
-            self.partial_factors_label, self.risk_label, self.rula_label,
+            self.partial_factors_label, self.risk_label,
+            self.risk_breakdown_label,
             self.alert_label, self.risk_note_label,
         ):
             risk_layout.addWidget(label)
@@ -364,7 +365,6 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
-        self.rula_neck_samples.clear()
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
@@ -384,8 +384,8 @@ class MonitoringPage(QWidget):
         self.side_bending_label.setText("Assessment: Waiting")
         self.duration_label.setText("Active posture duration: --")
         self.partial_factors_label.setText("Baseline change: --")
-        self.risk_label.setText("Prototype Risk: N/A")
-        self.rula_label.setText("RULA: N/A")
+        self.risk_label.setText("Risk Score (RULA-adapted): N/A")
+        self.risk_breakdown_label.setText("องค์ประกอบคะแนน: --")
         self.alert_label.setText("Alert: Waiting")
         self.sound_player.notify(False)
 
@@ -430,29 +430,33 @@ class MonitoringPage(QWidget):
             "Baseline change: " + (", ".join(changed) if changed else "Stable / unavailable")
         )
 
-        level = risk.get("risk_level") if isinstance(risk, dict) else None
-        score = risk.get("prototype_score") if isinstance(risk, dict) else None
+        adapted = risk.get("rula_adapted") if isinstance(risk, dict) else None
+        level = adapted.get("risk_level") if isinstance(adapted, dict) else None
+        score = adapted.get("score") if isinstance(adapted, dict) else None
+        level_text = {
+            "LOW": "ความเสี่ยงต่ำ",
+            "MODERATE": "ความเสี่ยงปานกลาง",
+            "HIGH": "ความเสี่ยงสูง",
+            "VERY_HIGH": "ความเสี่ยงสูงมาก",
+        }.get(level, level)
         status = risk.get("status", "NOT_EVALUATED") if isinstance(risk, dict) else "NOT_EVALUATED"
         self.risk_label.setText(
-            f"Prototype Risk: {level} ({score:.0f}/3)" if level is not None and score is not None
-            else f"Prototype Risk: N/A ({status})"
+            f"Risk Score (RULA-adapted): {score:.0f}/7 • {level_text}"
+            if level is not None and score is not None
+            else f"Risk Score (RULA-adapted): N/A ({status})"
         )
         if score is not None:
             self.risk_samples.append(float(score))
-
-        rula = risk.get("rula") if isinstance(risk, dict) else None
-        neck_rula = (
-            rula.get("neck_score_lower_bound")
-            if isinstance(rula, dict)
-            else None
-        )
-        if neck_rula is None:
-            self.rula_label.setText("RULA Neck: N/A (insufficient camera evidence)")
-        else:
-            self.rula_neck_samples.append(int(neck_rula))
-            self.rula_label.setText(
-                f"RULA Neck (camera): ≥{neck_rula}/6 | Partial assessment"
+            components = adapted.get("components") or {}
+            self.risk_breakdown_label.setText(
+                "องค์ประกอบคะแนน: "
+                f"คอ {components.get('neck_base', 0)} + "
+                f"เอียงคอ {components.get('neck_side_bending', 0)} + "
+                f"ไหล่ไม่สมดุล {components.get('shoulder_asymmetry', 0)} + "
+                f"ค้างท่า {components.get('sustained_posture', 0)}"
             )
+        else:
+            self.risk_breakdown_label.setText("องค์ประกอบคะแนน: --")
 
         if self.session_id is None:
             return
@@ -691,12 +695,11 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
-        self.rula_neck_samples.clear()
         self.side_bending_label.setText("Assessment: Waiting")
         self.duration_label.setText("Active posture duration: --")
         self.partial_factors_label.setText("Baseline change: --")
-        self.risk_label.setText("Prototype Risk: N/A")
-        self.rula_label.setText("RULA: N/A")
+        self.risk_label.setText("Risk Score (RULA-adapted): N/A")
+        self.risk_breakdown_label.setText("องค์ประกอบคะแนน: --")
         # Successful session end automatically closes backend alert events.
         # Preserve IDs when session end fails, for a later retry.
         if self.session_id is None:
@@ -761,8 +764,8 @@ class MonitoringPage(QWidget):
             "maximum_risk_score": (
                 max(self.risk_samples) if self.risk_samples else None
             ),
-            "rula_neck_score": (
-                max(self.rula_neck_samples) if self.rula_neck_samples else None
+            "risk_score_method": (
+                "RULA_ADAPTED_FRONT_V1" if self.risk_samples else None
             ),
         }
 

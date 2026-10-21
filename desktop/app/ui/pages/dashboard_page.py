@@ -96,12 +96,17 @@ def _finite_number(value):
 
 def _risk_number(value):
     value = _finite_number(value)
-    return value if value is not None and 0 <= value <= 3 else None
+    return value if value is not None and 1 <= value <= 7 else None
 
 
-def _rula_neck_number(value):
-    value = _finite_number(value)
-    return int(value) if value is not None and value.is_integer() and 1 <= value <= 6 else None
+def _adapted_risk_label(score):
+    if score <= 2:
+        return "ต่ำ"
+    if score <= 4:
+        return "ปานกลาง"
+    if score <= 6:
+        return "สูง"
+    return "สูงมาก"
 
 
 def _nonnegative_number(value):
@@ -117,22 +122,19 @@ def summary_insights(summaries):
     average_risks = [
         value
         for summary in summaries
-        if (value := _risk_number(summary.get("average_risk_score"))) is not None
+        if summary.get("risk_score_method") == "RULA_ADAPTED_FRONT_V1"
+        and (value := _risk_number(summary.get("average_risk_score"))) is not None
     ]
     maximum_risks = [
         value
         for summary in summaries
-        if (value := _risk_number(summary.get("maximum_risk_score"))) is not None
+        if summary.get("risk_score_method") == "RULA_ADAPTED_FRONT_V1"
+        and (value := _risk_number(summary.get("maximum_risk_score"))) is not None
     ]
     blink_rates = [
         value
         for summary in summaries
         if (value := _nonnegative_number(summary.get("blink_rate"))) is not None
-    ]
-    rula_neck_scores = [
-        value
-        for summary in summaries
-        if (value := _rula_neck_number(summary.get("rula_neck_score"))) is not None
     ]
     alert_counts = [
         value
@@ -150,8 +152,6 @@ def summary_insights(summaries):
         ),
         "maximum_risk": max(maximum_risks) if maximum_risks else None,
         "risk_report_count": len(average_risks),
-        "maximum_rula_neck": max(rula_neck_scores) if rula_neck_scores else None,
-        "rula_neck_report_count": len(rula_neck_scores),
         "average_blink_rate": (
             sum(blink_rates) / len(blink_rates) if blink_rates else None
         ),
@@ -253,12 +253,12 @@ class DashboardPage(QWidget):
         card, layout = self._card()
         layout.addWidget(self._label("Recent Sessions", "heading"))
         layout.addWidget(self._label(
-            "Session ล่าสุดพร้อมผล Prototype Risk และ Alert ที่บันทึกจริง",
+            "Session ล่าสุดพร้อม RULA-adapted Risk Score และ Alert ที่บันทึกจริง",
             "muted",
         ))
-        self.recent_table = QTableWidget(0, 7)
+        self.recent_table = QTableWidget(0, 6)
         self.recent_table.setHorizontalHeaderLabels(
-            ("Session", "Started", "Status", "Active Time", "Risk", "RULA", "Alerts")
+            ("Session", "Started", "Status", "Active Time", "Risk Score", "Alerts")
         )
         self.recent_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -284,24 +284,14 @@ class DashboardPage(QWidget):
         column = QVBoxLayout()
 
         risk, risk_layout = self._card()
-        risk_layout.addWidget(self._label("Prototype Risk", "heading"))
+        risk_layout.addWidget(self._label("RULA-adapted Risk Score", "heading"))
         self.risk_value = self._label("N/A", "metric")
         self.risk_note = self._label(
-            "รอข้อมูลจาก Session Report (คะแนนต้นแบบ 0–3)", "muted"
+            "คะแนน 1–7 สำหรับกล้องด้านหน้า", "muted"
         )
         risk_layout.addWidget(self.risk_value)
         risk_layout.addWidget(self.risk_note)
         column.addWidget(risk)
-
-        rula, rula_layout = self._card()
-        rula_layout.addWidget(self._label("RULA Neck", "heading"))
-        self.rula_value = self._label("N/A", "metric")
-        self.rula_note = self._label(
-            "Partial score จาก Neck Flexion และ Side-bending", "muted"
-        )
-        rula_layout.addWidget(self.rula_value)
-        rula_layout.addWidget(self.rula_note)
-        column.addWidget(rula)
 
         blink, blink_layout = self._card()
         blink_layout.addWidget(self._label("Blink Rate", "heading"))
@@ -383,10 +373,8 @@ class DashboardPage(QWidget):
     def _reset_report_metrics(self, unavailable=False):
         self.alerts_value.setText("N/A" if unavailable else "0")
         self.risk_value.setText("N/A")
-        self.rula_value.setText("N/A")
         self.blink_value.setText("N/A")
-        self.risk_note.setText("ยังไม่มี Prototype Risk ที่บันทึกใน Report")
-        self.rula_note.setText("ยังไม่มี RULA Neck ที่บันทึกใน Report")
+        self.risk_note.setText("ยังไม่มี RULA-adapted Risk Score ใน Report")
         self.blink_note.setText("ยังไม่มี Blink Rate ที่บันทึกใน Report")
 
     def _update_report_metrics(self, summaries):
@@ -400,25 +388,15 @@ class DashboardPage(QWidget):
         maximum_risk = insights["maximum_risk"]
         if average_risk is None:
             self.risk_value.setText("N/A")
-            self.risk_note.setText("ยังไม่มี Prototype Risk ที่บันทึกใน Report")
+            self.risk_note.setText("ยังไม่มี RULA-adapted Risk Score ใน Report")
         else:
-            self.risk_value.setText(f"{average_risk:.1f} / 3")
+            self.risk_value.setText(f"{average_risk:.1f} / 7")
             maximum_text = (
-                f" | สูงสุด {maximum_risk:.1f}/3"
+                f" | สูงสุด {maximum_risk:.1f}/7 ({_adapted_risk_label(maximum_risk)})"
                 if maximum_risk is not None else ""
             )
             self.risk_note.setText(
                 f"ค่าเฉลี่ยจาก {insights['risk_report_count']} Report{maximum_text}"
-            )
-
-        maximum_rula = insights["maximum_rula_neck"]
-        if maximum_rula is None:
-            self.rula_value.setText("N/A")
-            self.rula_note.setText("ยังไม่มี RULA Neck ที่บันทึกใน Report")
-        else:
-            self.rula_value.setText(f"≥{maximum_rula} / 6")
-            self.rula_note.setText(
-                f"Partial score สูงสุดจาก {insights['rula_neck_report_count']} Report"
             )
 
         average_blink = insights["average_blink_rate"]
@@ -498,15 +476,20 @@ class DashboardPage(QWidget):
                 started = "N/A"
 
             report = summary_by_session.get(session.get("session_id"))
-            risk = _risk_number(report.get("average_risk_score")) if report else None
-            rula = _rula_neck_number(report.get("rula_neck_score")) if report else None
+            method = report.get("risk_score_method") if report else None
+            raw_risk = report.get("average_risk_score") if report else None
+            risk = (
+                _risk_number(raw_risk)
+                if method == "RULA_ADAPTED_FRONT_V1"
+                else _finite_number(raw_risk)
+            )
+            risk_scale = 7 if method == "RULA_ADAPTED_FRONT_V1" else 3
             alerts = report.get("total_alert_count") if report else None
             values = (
                 session.get("session_id", "N/A"), started,
                 session.get("status", "N/A"),
                 duration_text(active_seconds(session)),
-                f"{risk:.1f}/3" if risk is not None else "N/A",
-                f"≥{rula}/6" if rula is not None else "N/A",
+                f"{risk:.1f}/{risk_scale}" if risk is not None else "N/A",
                 alerts if type(alerts) is int and alerts >= 0 else "N/A",
             )
             for column, value in enumerate(values):

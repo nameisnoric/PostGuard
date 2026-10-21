@@ -57,32 +57,30 @@ class DashboardTests(unittest.TestCase):
         summaries = [dict(
             session_id=7,
             average_risk_score=1.5,
-            maximum_risk_score=3.0,
-            rula_neck_score=5,
+            maximum_risk_score=5.0,
+            risk_score_method="RULA_ADAPTED_FRONT_V1",
             blink_rate=14.0,
             total_alert_count=4,
         )]
 
         self.page._loaded(payload(sessions, summaries), "")
 
-        self.assertEqual(self.page.risk_value.text(), "1.5 / 3")
+        self.assertEqual(self.page.risk_value.text(), "1.5 / 7")
         self.assertEqual(self.page.blink_value.text(), "14.0 / min")
-        self.assertEqual(self.page.rula_value.text(), "≥5 / 6")
         self.assertEqual(self.page.alerts_value.text(), "4")
-        self.assertEqual(self.page.recent_table.item(0, 4).text(), "1.5/3")
-        self.assertEqual(self.page.recent_table.item(0, 5).text(), "≥5/6")
-        self.assertEqual(self.page.recent_table.item(0, 6).text(), "4")
+        self.assertEqual(self.page.recent_table.item(0, 4).text(), "1.5/7")
+        self.assertEqual(self.page.recent_table.item(0, 5).text(), "4")
 
     def test_insights_ignore_missing_and_invalid_measurements(self):
         result = summary_insights([
-            dict(average_risk_score=1.0, maximum_risk_score=2.0, rula_neck_score=4, blink_rate=10.0, total_alert_count=2),
-            dict(average_risk_score=3.0, maximum_risk_score=3.0, rula_neck_score=6, blink_rate=20.0, total_alert_count=1),
-            dict(average_risk_score=4.0, maximum_risk_score=-1.0, rula_neck_score=7, blink_rate=-2.0, total_alert_count=-1),
+            dict(average_risk_score=2.0, maximum_risk_score=3.0, risk_score_method="RULA_ADAPTED_FRONT_V1", blink_rate=10.0, total_alert_count=2),
+            dict(average_risk_score=6.0, maximum_risk_score=7.0, risk_score_method="RULA_ADAPTED_FRONT_V1", blink_rate=20.0, total_alert_count=1),
+            dict(average_risk_score=8.0, maximum_risk_score=-1.0, risk_score_method="RULA_ADAPTED_FRONT_V1", blink_rate=-2.0, total_alert_count=-1),
+            dict(average_risk_score=2.0, maximum_risk_score=3.0, risk_score_method=None, blink_rate=None, total_alert_count=0),
         ])
 
-        self.assertEqual(result["average_risk"], 2.0)
-        self.assertEqual(result["maximum_risk"], 3.0)
-        self.assertEqual(result["maximum_rula_neck"], 6)
+        self.assertEqual(result["average_risk"], 4.0)
+        self.assertEqual(result["maximum_risk"], 7.0)
         self.assertEqual(result["average_blink_rate"], 15.0)
         self.assertEqual(result["total_alert_count"], 3)
 

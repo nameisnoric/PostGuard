@@ -16,6 +16,7 @@ def assessment(active=None):
                 "evaluated": True,
                 "is_posture_factor": name in active,
                 "status": active.get(name, "NEUTRAL"),
+                "current": 5.0 if name == "neck_flexion" else 0.0,
             }
             for name in FEATURES
         },
@@ -46,9 +47,9 @@ class RiskEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["status"], "EVALUATED")
         self.assertEqual(result["risk_level"], "NONE")
         self.assertEqual(result["prototype_score"], 0.0)
-        self.assertIsNone(result["risk_score"])
-        self.assertEqual(result["rula"]["status"], "NOT_EVALUATED")
-        self.assertIsNone(result["rula"]["full_rula_score"])
+        self.assertEqual(result["risk_score"], 1)
+        self.assertEqual(result["rula_adapted"]["status"], "EVALUATED")
+        self.assertEqual(result["risk_score"], 1)
 
     def test_single_active_group_progresses_with_duration(self):
         factors = {"neck_lateral_tilt": "NECK_LATERAL_RIGHT"}
