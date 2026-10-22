@@ -1,237 +1,533 @@
 from collections import Counter
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.models.alert_event import AlertEvent
+from app.models.alert_notification import AlertNotification
+from app.models.risk_event_record import RiskEventRecord
 from app.models.session import PostureSession
 from app.models.session_summary import SessionSummary
 from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.session_summary import (
     SessionSummaryCreate,
-    SessionSummaryResponse
+    SessionSummaryResponse,
 )
+
 
 router = APIRouter(
     tags=["Session Summaries"]
 )
 
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def _safe_duration(
+    value,
+) -> float:
+    """
+    Convert a persisted duration to a safe non-negative value.
+    """
+
+    if type(value) not in (
+        int,
+        float,
+    ):
+        return 0.0
+
+    return max(
+        0.0,
+        float(value),
+    )
+
+
+def _risk_event_duration(
+    event: RiskEventRecord,
+) -> float:
+    """
+    Return the persisted duration of one Risk Event.
+    """
+
+    return _safe_duration(
+        event.duration_seconds
+    )
+
+
+def _summary_request_values(
+    request: SessionSummaryCreate,
+) -> dict:
+    """
+    Preserve every Session Summary field currently supported
+    by SessionSummaryCreate, but only if the database model
+    actually has that column.
+
+    This is important because PostGuard already persists
+    Detection Summary fields such as:
+
+    - detection_count
+    - pose_detected_count
+    - face_detected_count
+    - average_shoulder
+    - average_neck
+
+    We must not lose those fields while migrating AlertEvent
+    to RiskEventRecord + AlertNotification.
+    """
+
+    request_data = request.model_dump()
+
+    database_columns = {
+        column.name
+        for column
+        in SessionSummary.__table__.columns
+    }
+
+    protected_fields = {
+        "summary_id",
+        "session_id",
+        "low_risk_duration",
+        "medium_risk_duration",
+        "high_risk_duration",
+        "low_risk_alert_count",
+        "medium_risk_alert_count",
+        "high_risk_alert_count",
+        "total_alert_count",
+        "most_frequent_alert_event",
+    }
+
+    return {
+        key: value
+        for key, value
+        in request_data.items()
+        if (
+            key in database_columns
+            and
+            key not in protected_fields
+        )
+    }
+
+
+# ============================================================
+# CREATE SESSION SUMMARY
+# ============================================================
+
 @router.post(
     "/sessions/{session_id}/summary",
     response_model=SessionSummaryResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 def create_session_summary(
     session_id: int,
     request: SessionSummaryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    # 1. ตรวจสอบว่า Session มีอยู่และเป็นของ User คนนี้
-    session_statement = select(PostureSession).where(
-        PostureSession.session_id == session_id,
-        PostureSession.user_id == current_user.id
+    # --------------------------------------------------------
+    # 1. Verify Session ownership
+    # --------------------------------------------------------
+
+    session_statement = (
+        select(PostureSession)
+        .where(
+            PostureSession.session_id
+            == session_id,
+
+            PostureSession.user_id
+            == current_user.id,
+        )
     )
 
-    posture_session = db.scalar(session_statement)
+    posture_session = db.scalar(
+        session_statement
+    )
 
     if posture_session is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail="Session not found",
         )
 
-    # 2. ต้องจบ Session ก่อนจึงจะสร้าง Summary ได้
-    if posture_session.status != "COMPLETED":
+    # --------------------------------------------------------
+    # 2. Only completed Session can have final Summary
+    # --------------------------------------------------------
+
+    if (
+        posture_session.status
+        != "COMPLETED"
+    ):
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session must be completed before creating a summary"
+            status_code=(
+                status.HTTP_409_CONFLICT
+            ),
+            detail=(
+                "Session must be completed "
+                "before creating a summary"
+            ),
         )
 
-    # 3. ตรวจสอบว่า Session นี้มี Summary อยู่แล้วหรือไม่
-    existing_summary_statement = select(SessionSummary).where(
-        SessionSummary.session_id == session_id
+    # --------------------------------------------------------
+    # 3. Prevent duplicate Summary
+    # --------------------------------------------------------
+
+    existing_statement = (
+        select(SessionSummary)
+        .where(
+            SessionSummary.session_id
+            == session_id
+        )
     )
 
-    existing_summary = db.scalar(existing_summary_statement)
+    existing_summary = db.scalar(
+        existing_statement
+    )
 
     if existing_summary is not None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session summary already exists"
+            status_code=(
+                status.HTTP_409_CONFLICT
+            ),
+            detail=(
+                "Session summary already exists"
+            ),
         )
 
-    # 4. ดึง Alert Events ทั้งหมดของ Session
-    alert_statement = select(AlertEvent).where(
-        AlertEvent.session_id == session_id
+    # --------------------------------------------------------
+    # 4. Load persisted Risk Events
+    # --------------------------------------------------------
+
+    risk_event_statement = (
+        select(RiskEventRecord)
+        .where(
+            RiskEventRecord.session_id
+            == session_id
+        )
+        .order_by(
+            RiskEventRecord.started_at.asc()
+        )
     )
 
-    alert_events = db.scalars(alert_statement).all()
+    risk_events = list(
+        db.scalars(
+            risk_event_statement
+        ).all()
+    )
 
-    # 5. คำนวณ Risk Duration
+    # --------------------------------------------------------
+    # 5. Load persisted Alert Notifications
+    # --------------------------------------------------------
+
+    notification_statement = (
+        select(AlertNotification)
+        .where(
+            AlertNotification.session_id
+            == session_id
+        )
+        .order_by(
+            AlertNotification.emitted_at.asc()
+        )
+    )
+
+    notifications = list(
+        db.scalars(
+            notification_statement
+        ).all()
+    )
+
+    # --------------------------------------------------------
+    # 6. Risk Event duration
+    #
+    # Existing DB schema still uses "medium",
+    # but the validated Risk Pipeline calls it MODERATE.
+    #
+    # medium_risk_* therefore currently means MODERATE.
+    # --------------------------------------------------------
+
     low_risk_duration = sum(
-        alert.duration
-        for alert in alert_events
-        if alert.risk_level == "LOW"
+        _risk_event_duration(
+            event
+        )
+        for event
+        in risk_events
+        if (
+            event.current_risk_level
+            == "LOW"
+        )
     )
 
     medium_risk_duration = sum(
-        alert.duration
-        for alert in alert_events
-        if alert.risk_level == "MEDIUM"
+        _risk_event_duration(
+            event
+        )
+        for event
+        in risk_events
+        if (
+            event.current_risk_level
+            == "MODERATE"
+        )
     )
 
     high_risk_duration = sum(
-        alert.duration
-        for alert in alert_events
-        if alert.risk_level == "HIGH"
+        _risk_event_duration(
+            event
+        )
+        for event
+        in risk_events
+        if (
+            event.current_risk_level
+            == "HIGH"
+        )
     )
 
-    # 6. นับจำนวน Alert แยกตาม Risk Level
+    # --------------------------------------------------------
+    # 7. Notification count by risk level
+    #
+    # Important:
+    # These are notifications, NOT risk episodes.
+    # --------------------------------------------------------
+
     low_risk_alert_count = sum(
         1
-        for alert in alert_events
-        if alert.risk_level == "LOW"
+        for notification
+        in notifications
+        if (
+            notification.risk_level
+            == "LOW"
+        )
     )
 
     medium_risk_alert_count = sum(
         1
-        for alert in alert_events
-        if alert.risk_level == "MEDIUM"
+        for notification
+        in notifications
+        if (
+            notification.risk_level
+            == "MODERATE"
+        )
     )
 
     high_risk_alert_count = sum(
         1
-        for alert in alert_events
-        if alert.risk_level == "HIGH"
+        for notification
+        in notifications
+        if (
+            notification.risk_level
+            == "HIGH"
+        )
     )
 
-    # 7. จำนวน Alert ทั้งหมด
-    total_alert_count = len(alert_events)
+    total_alert_count = len(
+        notifications
+    )
 
-    # 8. หา Event Type ที่เกิดบ่อยที่สุด
+    # --------------------------------------------------------
+    # 8. Most frequent notification type
+    #
+    # FIRST / REPEAT / ESCALATION
+    # --------------------------------------------------------
+
     most_frequent_alert_event = None
 
-    if alert_events:
-        event_counter = Counter(
-            alert.event_type
-            for alert in alert_events
+    if notifications:
+        counter = Counter(
+            notification.alert_type
+            for notification
+            in notifications
         )
 
         most_frequent_alert_event = (
-            event_counter.most_common(1)[0][0]
+            counter.most_common(
+                1
+            )[0][0]
         )
 
-    # 9. สร้าง Session Summary
+    # --------------------------------------------------------
+    # 9. Preserve existing Detection Summary fields
+    #
+    # This fixes the regression where detection_count became 0.
+    # --------------------------------------------------------
+
+    summary_values = (
+        _summary_request_values(
+            request
+        )
+    )
+
+    # --------------------------------------------------------
+    # 10. Create final Session Summary
+    # --------------------------------------------------------
+
     session_summary = SessionSummary(
         session_id=session_id,
 
-        average_risk_score=request.average_risk_score,
-        maximum_risk_score=request.maximum_risk_score,
+        **summary_values,
 
-        detection_count=request.detection_count,
-        pose_detected_count=request.pose_detected_count,
-        face_detected_count=request.face_detected_count,
-        average_shoulder=request.average_shoulder,
-        average_neck=request.average_neck,
+        low_risk_duration=int(
+            round(
+                low_risk_duration
+            )
+        ),
 
-        low_risk_duration=low_risk_duration,
-        medium_risk_duration=medium_risk_duration,
-        high_risk_duration=high_risk_duration,
+        medium_risk_duration=int(
+            round(
+                medium_risk_duration
+            )
+        ),
 
-        low_risk_alert_count=low_risk_alert_count,
-        medium_risk_alert_count=medium_risk_alert_count,
-        high_risk_alert_count=high_risk_alert_count,
+        high_risk_duration=int(
+            round(
+                high_risk_duration
+            )
+        ),
 
-        total_alert_count=total_alert_count,
+        low_risk_alert_count=(
+            low_risk_alert_count
+        ),
 
-        most_frequent_alert_event=most_frequent_alert_event,
+        medium_risk_alert_count=(
+            medium_risk_alert_count
+        ),
 
-        blink_rate=request.blink_rate
+        high_risk_alert_count=(
+            high_risk_alert_count
+        ),
+
+        total_alert_count=(
+            total_alert_count
+        ),
+
+        most_frequent_alert_event=(
+            most_frequent_alert_event
+        ),
     )
 
-    db.add(session_summary)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        # Another request may have saved the same session during our insert.
-        if db.scalar(existing_summary_statement) is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Session summary already exists",
-            )
-        raise
-    db.refresh(session_summary)
+    db.add(
+        session_summary
+    )
+
+    db.commit()
+
+    db.refresh(
+        session_summary
+    )
 
     return session_summary
+
+
+# ============================================================
+# GET ONE SESSION SUMMARY
+# ============================================================
 
 @router.get(
     "/sessions/{session_id}/summary",
     response_model=SessionSummaryResponse,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 def get_session_summary(
     session_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    # ตรวจสอบว่า Session มีอยู่และเป็นของ User คนนี้
-    session_statement = select(PostureSession).where(
-        PostureSession.session_id == session_id,
-        PostureSession.user_id == current_user.id
+    session_statement = (
+        select(PostureSession)
+        .where(
+            PostureSession.session_id
+            == session_id,
+
+            PostureSession.user_id
+            == current_user.id,
+        )
     )
 
-    posture_session = db.scalar(session_statement)
+    posture_session = db.scalar(
+        session_statement
+    )
 
     if posture_session is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail="Session not found",
         )
 
-    # หา Summary ของ Session
-    summary_statement = select(SessionSummary).where(
-        SessionSummary.session_id == session_id
+    summary_statement = (
+        select(SessionSummary)
+        .where(
+            SessionSummary.session_id
+            == session_id
+        )
     )
 
-    session_summary = db.scalar(summary_statement)
+    session_summary = db.scalar(
+        summary_statement
+    )
 
     if session_summary is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session summary not found"
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=(
+                "Session summary not found"
+            ),
         )
 
     return session_summary
 
+
+# ============================================================
+# GET ALL SUMMARIES
+# ============================================================
+
 @router.get(
     "/summaries",
-    response_model=list[SessionSummaryResponse],
-    status_code=status.HTTP_200_OK
+    response_model=list[
+        SessionSummaryResponse
+    ],
+    status_code=status.HTTP_200_OK,
 )
 def get_summaries(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     statement = (
         select(SessionSummary)
         .join(
             PostureSession,
-            SessionSummary.session_id == PostureSession.session_id
+            (
+                SessionSummary.session_id
+                ==
+                PostureSession.session_id
+            ),
         )
         .where(
-            PostureSession.user_id == current_user.id
+            PostureSession.user_id
+            == current_user.id
         )
         .order_by(
             PostureSession.started_at.desc()
         )
     )
 
-    session_summaries = db.scalars(statement).all()
-
-    return session_summaries
+    return list(
+        db.scalars(
+            statement
+        ).all()
+    )

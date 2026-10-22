@@ -176,7 +176,7 @@ class SessionSummaryPage(QWidget):
 
         # Alert overview
         alert_group = QGroupBox(
-            "เหตุการณ์แจ้งเตือน (ทดลอง)"
+            "เหตุการณ์ความเสี่ยงและการแจ้งเตือน"
         )
         alert_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
@@ -228,10 +228,15 @@ class SessionSummaryPage(QWidget):
         alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Risk score and blink rate remain N/A until their complete calculations "
-            "are connected. Alert duration is the time an alert record remained open."
+            "ข้อมูลเหตุการณ์ความเสี่ยงและการแจ้งเตือน "
+            "อ่านจาก Validated Risk Pipeline และฐานข้อมูลของ Session นี้ "
+            "คะแนน Modified RULA และอัตราการกระพริบตา "
+            "ยังไม่เปิดใช้งานในเวอร์ชันปัจจุบัน"
         )
-        self.note_label.setWordWrap(True)
+
+        self.note_label.setWordWrap(
+            True
+        )
         self.note_label.setProperty("role", "muted")
 
         self.back_button = QPushButton(
@@ -455,59 +460,286 @@ class SessionSummaryPage(QWidget):
 
         self.update_save_status()
 
-    def refresh_alerts(self):
-        for label in (
-            self.alert_total_label,
-            self.alert_closed_label,
-            self.alert_active_label,
-            self.alert_duration_label,
+    def refresh_alerts(
+    self,
+) -> None:
+        """
+        Load the validated Risk Event + Alert Notification
+        persistence for the completed Session.
+
+        Important:
+        Risk Event count and Notification count are different
+        concepts and must not be merged.
+        """
+
+        self.alert_total_label.setText(
+            "การแจ้งเตือนทั้งหมด: --"
+        )
+
+        self.alert_closed_label.setText(
+            "เหตุการณ์ความเสี่ยงที่สิ้นสุดแล้ว: --"
+        )
+
+        self.alert_active_label.setText(
+            "เหตุการณ์ความเสี่ยงที่ยังทำงานอยู่: --"
+        )
+
+        self.alert_duration_label.setText(
+            "ระยะเวลาความเสี่ยงรวม: --"
+        )
+
+        self.alert_error_label.setText(
+            ""
+        )
+
+        session_id = (
+            self.current_session_id
+        )
+
+        if (
+            type(session_id)
+            is not int
+            or
+            session_id <= 0
         ):
-            label.setText("--")
+            self.alert_error_label.setText(
+                "ไม่พบ Session ID ที่ถูกต้อง"
+            )
 
-        self.alert_error_label.setText("")
-
-        session_id = self.current_session_id
-
-        if type(session_id) is not int or session_id <= 0:
             return
 
         try:
-            response = APIClient.get_session_alerts(
-                session_id
+            # -----------------------------------------------
+            # Risk Events
+            # -----------------------------------------------
+
+            risk_response = (
+                APIClient
+                .get_session_risk_events(
+                    session_id
+                )
             )
 
-            if not response.ok:
+            if not risk_response.ok:
                 raise RuntimeError(
-                    f"Alert API HTTP {response.status_code}"
+                    "GET risk-events returned "
+                    f"HTTP "
+                    f"{risk_response.status_code}"
                 )
 
-            stats = summarize_alerts(
-                response.json()
+            risk_events = (
+                risk_response.json()
             )
 
-            self.alert_total_label.setText(
-                f"การแจ้งเตือนทั้งหมด: {stats['total_alerts']}"
+            if not isinstance(
+                risk_events,
+                list,
+            ):
+                raise ValueError(
+                    "Invalid Risk Event response."
+                )
+
+            # -----------------------------------------------
+            # Alert Notifications
+            # -----------------------------------------------
+
+            notification_response = (
+                APIClient
+                .get_session_alert_notifications(
+                    session_id
+                )
             )
-            self.alert_closed_label.setText(
-                f"การแจ้งเตือนที่จบแล้ว: {stats['closed_alerts']}"
+
+            if not notification_response.ok:
+                raise RuntimeError(
+                    "GET alert-notifications returned "
+                    f"HTTP "
+                    f"{notification_response.status_code}"
+                )
+
+            notifications = (
+                notification_response.json()
             )
-            self.alert_active_label.setText(
-                f"การแจ้งเตือนที่ยังทำงาน: {stats['active_alerts']}"
-            )
-            self.alert_duration_label.setText(
-                "ระยะเวลาการแจ้งเตือนที่จบแล้ว: "
-                f"{stats['closed_alert_seconds']} seconds"
-            )
+
+            if not isinstance(
+                notifications,
+                list,
+            ):
+                raise ValueError(
+                    "Invalid Alert Notification response."
+                )
 
         except (
             requests.RequestException,
             RuntimeError,
             ValueError,
+            TypeError,
         ) as error:
             self.alert_error_label.setText(
-                f"Alert data unavailable: {error}"
+                "ไม่สามารถโหลดข้อมูล "
+                "Risk Event / Alert Notification ได้: "
+                f"{error}"
             )
 
+            return
+
+        # ====================================================
+        # Risk Event statistics
+        # ====================================================
+
+        resolved_events = [
+            event
+            for event in risk_events
+            if (
+                isinstance(
+                    event,
+                    dict,
+                )
+                and
+                event.get(
+                    "status"
+                )
+                == "RESOLVED"
+            )
+        ]
+
+        active_events = [
+            event
+            for event in risk_events
+            if (
+                isinstance(
+                    event,
+                    dict,
+                )
+                and
+                event.get(
+                    "status"
+                )
+                == "ACTIVE"
+            )
+        ]
+
+        total_risk_seconds = 0.0
+
+        for event in risk_events:
+            if not isinstance(
+                event,
+                dict,
+            ):
+                continue
+
+            duration = event.get(
+                "duration_seconds"
+            )
+
+            if (
+                type(duration)
+                in (int, float)
+            ):
+                total_risk_seconds += max(
+                    0.0,
+                    float(duration),
+                )
+
+        # ====================================================
+        # Notification statistics
+        # ====================================================
+
+        notification_count = len(
+            notifications
+        )
+
+        first_count = sum(
+            1
+            for notification
+            in notifications
+            if (
+                isinstance(
+                    notification,
+                    dict,
+                )
+                and
+                notification.get(
+                    "alert_type"
+                )
+                == "FIRST"
+            )
+        )
+
+        repeat_count = sum(
+            1
+            for notification
+            in notifications
+            if (
+                isinstance(
+                    notification,
+                    dict,
+                )
+                and
+                notification.get(
+                    "alert_type"
+                )
+                == "REPEAT"
+            )
+        )
+
+        escalation_count = sum(
+            1
+            for notification
+            in notifications
+            if (
+                isinstance(
+                    notification,
+                    dict,
+                )
+                and
+                notification.get(
+                    "alert_type"
+                )
+                == "ESCALATION"
+            )
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
+
+        self.alert_total_label.setText(
+            "การแจ้งเตือนทั้งหมด: "
+            f"{notification_count} ครั้ง"
+            " "
+            f"(ครั้งแรก {first_count}, "
+            f"ซ้ำ {repeat_count}, "
+            f"ระดับความเสี่ยงเพิ่มขึ้น "
+            f"{escalation_count})"
+        )
+
+        self.alert_closed_label.setText(
+            "เหตุการณ์ความเสี่ยงที่สิ้นสุดแล้ว: "
+            f"{len(resolved_events)} ครั้ง"
+        )
+
+        self.alert_active_label.setText(
+            "เหตุการณ์ความเสี่ยงที่ยังทำงานอยู่: "
+            f"{len(active_events)} ครั้ง"
+        )
+
+        minutes = int(
+            total_risk_seconds
+            //
+            60
+        )
+
+        seconds = int(
+            total_risk_seconds
+            %
+            60
+        )
+
+        self.alert_duration_label.setText(
+            "ระยะเวลาความเสี่ยงรวม: "
+            f"{minutes:02d}:{seconds:02d}"
+        )
     def open_alert_history(self):
         dialog = AlertHistoryDialog(
             self,

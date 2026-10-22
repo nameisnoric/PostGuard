@@ -7,3 +7,5 @@ from app.models.alert_event import AlertEvent
 from app.models.session_summary import SessionSummary
 from app.models.register_otp import RegistrationOTP
 from app.models.user_settings import UserSettings
+from app.models.risk_event_record import RiskEventRecord
+from app.models.alert_notification import AlertNotification

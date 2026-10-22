@@ -107,3 +107,8 @@ class PersonalBaseline(Base):
         server_default=func.now(),
         nullable=False
     )
+
+    eye_distance_baseline_px: Mapped[float | None] = mapped_column(
+    Float,
+    nullable=True,
+    )
