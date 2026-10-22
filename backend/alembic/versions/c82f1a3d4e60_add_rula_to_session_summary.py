@@ -1,7 +1,7 @@
 """add RULA result to session summaries
 
 Revision ID: c82f1a3d4e60
-Revises: a91f4c2d7e30
+Revises: 689804df2e36
 Create Date: 2026-10-22
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = "c82f1a3d4e60"
-down_revision: Union[str, Sequence[str], None] = "a91f4c2d7e30"
+down_revision: Union[str, Sequence[str], None] = "689804df2e36"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
