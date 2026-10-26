@@ -1,11 +1,28 @@
 from app.models.user import User
-from app.models.password_reset import PasswordResetOTP
+from app.models.password_reset import (
+    PasswordResetOTP,
+)
 from app.models.camera import Camera
-from app.models.personal_baseline import PersonalBaseline
+from app.models.personal_baseline import (
+    PersonalBaseline,
+)
 from app.models.session import PostureSession
 from app.models.alert_event import AlertEvent
-from app.models.session_summary import SessionSummary
-from app.models.register_otp import RegistrationOTP
-from app.models.user_settings import UserSettings
-from app.models.risk_event_record import RiskEventRecord
-from app.models.alert_notification import AlertNotification
+from app.models.session_summary import (
+    SessionSummary,
+)
+from app.models.session_risk_score_bucket import (
+    SessionRiskScoreBucket,
+)
+from app.models.register_otp import (
+    RegistrationOTP,
+)
+from app.models.user_settings import (
+    UserSettings,
+)
+from app.models.risk_event_record import (
+    RiskEventRecord,
+)
+from app.models.alert_notification import (
+    AlertNotification,
+)

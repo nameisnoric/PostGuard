@@ -42,6 +42,9 @@ from app.services.detection_service import DetectionService
 from app.services.session_summary_service import (
     save_session_summary,
 )
+from app.services.session_risk_score_collector import (
+    SessionRiskScoreCollector,
+)
 from app.services.validated_risk_pipeline_service import (
     ValidatedRiskPipelineService,
 )
@@ -51,7 +54,9 @@ from app.ui.dialogs.posture_alert_dialog import (
 from app.ui.utils.preview_sizing import (
     fit_preview_label,
 )
-
+from app.services.blink_detection_service import (
+    BlinkDetectionService,
+)
 
 RISK_LEVELS = (
     "NONE",
@@ -86,6 +91,12 @@ class MonitoringPage(QWidget):
         self.capture = None
         self.detector = None
 
+        self.blink_detector = (
+            BlinkDetectionService()
+        )
+
+        self.last_blink_result = None
+        
         self.frame_count = 0
 
         self.session_id = None
@@ -110,6 +121,19 @@ class MonitoringPage(QWidget):
 
         self.risk_persistence = (
             RiskPersistenceService()
+        )
+
+        # ====================================================
+        # SESSION-LEVEL RISK SCORE ANALYTICS
+        #
+        # Collector นี้อยู่ตลอดทั้ง Session
+        # Pause/Resume ห้าม reset
+        # ====================================================
+
+        self.risk_score_collector = (
+            SessionRiskScoreCollector(
+                bucket_seconds=10.0
+            )
         )
 
         self.last_pipeline_result = None
@@ -1146,6 +1170,11 @@ class MonitoringPage(QWidget):
         self.session_started_monotonic = (
             time.monotonic()
         )
+        self.risk_score_collector.reset(
+            session_started_at_monotonic=(
+                self.session_started_monotonic
+            )
+        )
 
         self.detection_count = 0
         self.pose_detected_count = 0
@@ -1362,6 +1391,16 @@ class MonitoringPage(QWidget):
         self.last_pipeline_result = (
             pipeline_result
         )
+        try:
+            self.risk_score_collector.add_pipeline_result(
+                pipeline_result
+            )
+
+        except Exception as error:
+            print(
+                "RISK SCORE COLLECTOR ERROR:",
+                error,
+            )
 
         if self.session_id is not None:
             try:
@@ -2374,6 +2413,10 @@ class MonitoringPage(QWidget):
             or {}
         )
 
+        risk_score_summary = (
+            self.risk_score_collector.get_summary()
+        )
+
         return {
             "session_id": (
                 self.session_id
@@ -2467,6 +2510,62 @@ class MonitoringPage(QWidget):
 
             "alert_notification_count": (
                 self.alert_notification_count
+            ),
+            "average_risk_score": (
+                risk_score_summary.get(
+                    "average_risk_score"
+                )
+            ),
+
+            "minimum_risk_score": (
+                risk_score_summary.get(
+                    "minimum_risk_score"
+                )
+            ),
+
+            "maximum_risk_score": (
+                risk_score_summary.get(
+                    "maximum_risk_score"
+                )
+            ),
+            "risk_score_method": (
+                "POSTGUARD_MODIFIED_RULA_FRONT_VIEW_V1"
+                if (
+                    risk_score_summary.get(
+                        "status"
+                    )
+                    ==
+                    "AVAILABLE"
+                )
+                else None
+            ),
+
+            "risk_score_sample_count": (
+                risk_score_summary.get(
+                    "accepted_score_samples",
+                    0,
+                )
+            ),
+
+            "risk_score_skipped_count": (
+                risk_score_summary.get(
+                    "skipped_score_samples",
+                    0,
+                )
+            ),
+
+            "risk_score_buckets": (
+                risk_score_summary.get(
+                    "buckets",
+                    [],
+                )
+            ),
+
+            "modified_rula_distribution": (
+                risk_score_summary.get(
+                    "modified_rula_distribution",
+                    {},
+                )
             ),
         }
 

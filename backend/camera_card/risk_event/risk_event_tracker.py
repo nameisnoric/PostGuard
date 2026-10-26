@@ -11,19 +11,17 @@ from typing import Any, Mapping
 # ============================================================
 
 RISK_EVENT_CONTRACT_VERSION = "1.0"
-
 EXPECTED_RISK_CONTRACT_VERSION = "1.2"
 
 
 # ============================================================
-# SUPPORTED RISK LEVELS
+# RISK LEVELS
 # ============================================================
 
 RISK_LEVEL_NONE = "NONE"
 RISK_LEVEL_LOW = "LOW"
 RISK_LEVEL_MODERATE = "MODERATE"
 RISK_LEVEL_HIGH = "HIGH"
-
 
 RISK_LEVEL_RANK = {
     RISK_LEVEL_NONE: 0,
@@ -32,20 +30,11 @@ RISK_LEVEL_RANK = {
     RISK_LEVEL_HIGH: 3,
 }
 
+EVENT_TRIGGER_MINIMUM_LEVEL = RISK_LEVEL_MODERATE
 
-# ============================================================
-# EVENT POLICY
-# ============================================================
-
-EVENT_TRIGGER_MINIMUM_LEVEL = (
-    RISK_LEVEL_MODERATE
-)
-
-EVENT_TRIGGER_MINIMUM_RANK = (
-    RISK_LEVEL_RANK[
-        EVENT_TRIGGER_MINIMUM_LEVEL
-    ]
-)
+EVENT_TRIGGER_MINIMUM_RANK = RISK_LEVEL_RANK[
+    EVENT_TRIGGER_MINIMUM_LEVEL
+]
 
 
 # ============================================================
@@ -70,6 +59,13 @@ EVENT_STATUS_PARTIAL = "PARTIAL"
 
 
 # ============================================================
+# DEFAULT PROTOTYPE UX POLICY
+# ============================================================
+
+DEFAULT_RECOVERY_GRACE_SECONDS = 5.0
+
+
+# ============================================================
 # ERROR
 # ============================================================
 
@@ -78,17 +74,14 @@ class RiskEventError(ValueError):
 
 
 # ============================================================
-# NUMERIC VALIDATION
+# NUMERIC HELPERS
 # ============================================================
 
 def _finite_number(
     value: Any,
 ) -> float | None:
 
-    if value is None:
-        return None
-
-    if isinstance(value, bool):
+    if value is None or isinstance(value, bool):
         return None
 
     try:
@@ -106,6 +99,21 @@ def _finite_number(
     return number
 
 
+def _finite_non_negative_number(
+    value: Any,
+) -> float | None:
+
+    number = _finite_number(value)
+
+    if number is None:
+        return None
+
+    if number < 0.0:
+        return None
+
+    return number
+
+
 # ============================================================
 # TRACKER
 # ============================================================
@@ -114,31 +122,58 @@ class RiskEventTracker:
     """
     Track meaningful PostGuard Risk Events over time.
 
-    Input
-    -----
-    Risk Evaluation v1.2
+    Risk Event starts at:
+        MODERATE / HIGH
 
-    Responsibilities
-    ----------------
-    - Start event at MODERATE / HIGH
-    - Continue same event while risk remains meaningful
-    - Escalate MODERATE -> HIGH
-    - De-escalate HIGH -> MODERATE
-    - Resolve on LOW / NONE
-    - Preserve event during temporary data gaps
+    Risk Event does NOT immediately resolve when one LOW/NONE
+    sample appears.
 
-    Does NOT
-    --------
+    Instead:
+
+        MODERATE/HIGH
+            ↓
+        LOW/NONE
+            ↓
+        recovery grace
+            ↓
+        still LOW/NONE after grace
+            ↓
+        RESOLVED
+
+    If MODERATE/HIGH returns before grace expires,
+    the same Risk Event continues.
+
+    This prevents small posture movements / measurement noise
+    from creating many new Risk Events and FIRST alerts.
+
+    This module does NOT:
     - calculate posture
-    - calculate Temporal duration
     - calculate Risk Level
-    - calculate Full RULA
-    - decide Alert
-    - send Notification
+    - decide notification
+    - show popup
     - persist database records
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        recovery_grace_seconds: float = (
+            DEFAULT_RECOVERY_GRACE_SECONDS
+        ),
+    ) -> None:
+
+        grace = _finite_non_negative_number(
+            recovery_grace_seconds
+        )
+
+        if grace is None:
+            raise RiskEventError(
+                "recovery_grace_seconds must be "
+                "a finite non-negative number"
+            )
+
+        self.recovery_grace_seconds = grace
+
         self.reset()
 
     # ========================================================
@@ -159,8 +194,14 @@ class RiskEventTracker:
             | None
         ) = None
 
+        # Time at which continuous LOW/NONE recovery started.
+        self._recovery_started_at: (
+            float
+            | None
+        ) = None
+
     # ========================================================
-    # ACTIVE EVENT COPY
+    # STATE
     # ========================================================
 
     def get_active_event(
@@ -191,10 +232,8 @@ class RiskEventTracker:
         )
 
         if timestamp is None:
-
             raise RiskEventError(
-                "now must be a finite "
-                "monotonic timestamp"
+                "now must be a finite monotonic timestamp"
             )
 
         if (
@@ -202,7 +241,6 @@ class RiskEventTracker:
             and
             timestamp < self._last_now
         ):
-
             raise RiskEventError(
                 "now must not move backwards"
             )
@@ -212,56 +250,38 @@ class RiskEventTracker:
         return timestamp
 
     # ========================================================
-    # RISK CONTRACT VALIDATION
+    # RISK CONTRACT
     # ========================================================
 
     def _validate_risk_result(
         self,
         risk_result: Mapping[str, Any],
-    ) -> tuple[
-        str,
-        str | None,
-    ]:
+    ) -> tuple[str, str | None]:
 
         if not isinstance(
             risk_result,
             Mapping,
         ):
-
             raise RiskEventError(
                 "risk_result must be a mapping"
             )
 
-        # ----------------------------------------------------
-        # Contract version
-        # ----------------------------------------------------
-
-        contract_version = (
-            risk_result.get(
-                "risk_contract_version"
-            )
+        contract_version = risk_result.get(
+            "risk_contract_version"
         )
 
         if (
             contract_version
-            !=
-            EXPECTED_RISK_CONTRACT_VERSION
+            != EXPECTED_RISK_CONTRACT_VERSION
         ):
-
             raise RiskEventError(
                 "Unsupported Risk Evaluation "
                 "contract_version: "
                 f"{contract_version!r}"
             )
 
-        # ----------------------------------------------------
-        # Evaluation status
-        # ----------------------------------------------------
-
-        status = (
-            risk_result.get(
-                "status"
-            )
+        status = risk_result.get(
+            "status"
         )
 
         if status not in (
@@ -269,51 +289,28 @@ class RiskEventTracker:
             "PARTIAL",
             "NOT_EVALUATED",
         ):
-
             raise RiskEventError(
                 "Unsupported Risk Evaluation "
                 f"status: {status!r}"
             )
 
-        risk_level = (
-            risk_result.get(
-                "risk_level"
-            )
+        risk_level = risk_result.get(
+            "risk_level"
         )
 
-        risk_level_available = (
-            risk_result.get(
-                "risk_level_available"
-            )
+        risk_level_available = risk_result.get(
+            "risk_level_available"
         )
-
-        # ====================================================
-        # EVALUATED
-        #
-        # Must have:
-        #
-        # risk_level_available = True
-        # risk_level = valid level
-        # ====================================================
 
         if status == "EVALUATED":
 
-            if (
-                risk_level_available
-                is not True
-            ):
-
+            if risk_level_available is not True:
                 raise RiskEventError(
-                    "EVALUATED risk result must "
-                    "have risk_level_available=True"
+                    "EVALUATED risk result must have "
+                    "risk_level_available=True"
                 )
 
-            if (
-                risk_level
-                not in
-                RISK_LEVEL_RANK
-            ):
-
+            if risk_level not in RISK_LEVEL_RANK:
                 raise RiskEventError(
                     "EVALUATED risk result has "
                     "invalid risk_level: "
@@ -325,34 +322,16 @@ class RiskEventTracker:
                 str(risk_level),
             )
 
-        # ====================================================
-        # PARTIAL / NOT_EVALUATED
-        #
-        # Must have:
-        #
-        # risk_level_available = False
-        # risk_level = None
-        #
-        # This prevents contradictory contracts such as:
-        #
-        # PARTIAL + risk_level_available=True
-        # ====================================================
-
-        if (
-            risk_level_available
-            is not False
-        ):
-
+        if risk_level_available is not False:
             raise RiskEventError(
-                "Incomplete Risk Evaluation must "
-                "have risk_level_available=False"
+                "Incomplete Risk Evaluation must have "
+                "risk_level_available=False"
             )
 
         if risk_level is not None:
-
             raise RiskEventError(
-                "Incomplete Risk Evaluation must "
-                "not provide risk_level"
+                "Incomplete Risk Evaluation must not "
+                "provide risk_level"
             )
 
         return (
@@ -378,7 +357,7 @@ class RiskEventTracker:
         return event_id
 
     # ========================================================
-    # START EVENT
+    # START
     # ========================================================
 
     def _start_event(
@@ -395,22 +374,22 @@ class RiskEventTracker:
 
             "started_at_monotonic": now,
 
-            "last_evaluated_at_monotonic": (
-                now
-            ),
+            "last_evaluated_at_monotonic": now,
 
-            "current_risk_level": (
-                risk_level
-            ),
+            "current_risk_level": risk_level,
 
-            "peak_risk_level": (
-                risk_level
-            ),
+            "peak_risk_level": risk_level,
 
             "active": True,
+
+            "recovery_pending": False,
+
+            "recovery_started_at_monotonic": None,
         }
 
         self._active_event = event
+
+        self._recovery_started_at = None
 
         return event
 
@@ -429,20 +408,17 @@ class RiskEventTracker:
         previous_risk_level: str | None,
         event: Mapping[str, Any] | None,
         resolved_event: Mapping[str, Any] | None = None,
+        observed_risk_level: str | None = None,
     ) -> dict[str, Any]:
 
         event_copy = (
-            deepcopy(
-                dict(event)
-            )
+            deepcopy(dict(event))
             if event is not None
             else None
         )
 
         resolved_copy = (
-            deepcopy(
-                dict(resolved_event)
-            )
+            deepcopy(dict(resolved_event))
             if resolved_event is not None
             else None
         )
@@ -456,9 +432,7 @@ class RiskEventTracker:
                 EXPECTED_RISK_CONTRACT_VERSION
             ),
 
-            "status": (
-                processing_status
-            ),
+            "status": processing_status,
 
             "reason": reason,
 
@@ -468,8 +442,14 @@ class RiskEventTracker:
                 risk_status
             ),
 
+            # Risk Level represented by the active Event.
             "current_risk_level": (
                 current_risk_level
+            ),
+
+            # Actual evaluated Risk Level for this sample.
+            "observed_risk_level": (
+                observed_risk_level
             ),
 
             "previous_risk_level": (
@@ -486,7 +466,7 @@ class RiskEventTracker:
                 resolved_copy
             ),
 
-            # Risk Event never decides alert.
+            # This layer never decides notifications.
             "alert": None,
 
             "policy": {
@@ -507,6 +487,10 @@ class RiskEventTracker:
                     RISK_LEVEL_NONE,
                     RISK_LEVEL_LOW,
                 ],
+
+                "recovery_grace_seconds": (
+                    self.recovery_grace_seconds
+                ),
 
                 "partial_data_resolves_event": False,
 
@@ -543,26 +527,19 @@ class RiskEventTracker:
         )
 
         # ====================================================
-        # DATA GAP
+        # PARTIAL / NOT_EVALUATED
         #
-        # PARTIAL / NOT_EVALUATED does NOT mean posture
-        # returned to safe state.
+        # Missing data is NOT evidence of recovery.
         #
-        # Therefore active event is preserved.
+        # Cancel recovery countdown because safe posture was
+        # not continuously observed.
         # ====================================================
 
-        if (
-            risk_status
-            !=
-            "EVALUATED"
-        ):
+        if risk_status != "EVALUATED":
 
             previous_level = None
 
-            if (
-                self._active_event
-                is not None
-            ):
+            if self._active_event is not None:
 
                 previous_level = (
                     self._active_event[
@@ -570,45 +547,42 @@ class RiskEventTracker:
                     ]
                 )
 
+                self._recovery_started_at = None
+
+                self._active_event[
+                    "recovery_pending"
+                ] = False
+
+                self._active_event[
+                    "recovery_started_at_monotonic"
+                ] = None
+
             return self._build_output(
                 processing_status=(
                     EVENT_STATUS_PARTIAL
                 ),
-
                 reason=(
                     "RISK_EVALUATION_UNAVAILABLE"
                 ),
-
                 action=(
                     EVENT_ACTION_DATA_GAP
                 ),
-
-                risk_status=(
-                    risk_status
+                risk_status=risk_status,
+                current_risk_level=(
+                    previous_level
                 ),
-
-                current_risk_level=None,
-
                 previous_risk_level=(
                     previous_level
                 ),
-
-                event=(
-                    self._active_event
-                ),
+                event=self._active_event,
+                observed_risk_level=None,
             )
-
-        # ====================================================
-        # EVALUATED guarantees a real risk level
-        # ====================================================
 
         assert risk_level is not None
 
-        risk_rank = (
-            RISK_LEVEL_RANK[
-                risk_level
-            ]
-        )
+        risk_rank = RISK_LEVEL_RANK[
+            risk_level
+        ]
 
         # ====================================================
         # NO ACTIVE EVENT
@@ -616,45 +590,32 @@ class RiskEventTracker:
 
         if self._active_event is None:
 
-            # ------------------------------------------------
-            # NONE / LOW
-            # ------------------------------------------------
+            self._recovery_started_at = None
 
             if (
                 risk_rank
-                <
-                EVENT_TRIGGER_MINIMUM_RANK
+                < EVENT_TRIGGER_MINIMUM_RANK
             ):
-
                 return self._build_output(
                     processing_status=(
                         EVENT_STATUS_EVALUATED
                     ),
-
                     reason=(
                         "RISK_BELOW_EVENT_THRESHOLD"
                     ),
-
                     action=(
                         EVENT_ACTION_NONE
                     ),
-
-                    risk_status=(
-                        risk_status
-                    ),
-
+                    risk_status=risk_status,
                     current_risk_level=(
                         risk_level
                     ),
-
                     previous_risk_level=None,
-
                     event=None,
+                    observed_risk_level=(
+                        risk_level
+                    ),
                 )
-
-            # ------------------------------------------------
-            # MODERATE / HIGH
-            # ------------------------------------------------
 
             event = self._start_event(
                 risk_level=risk_level,
@@ -665,26 +626,21 @@ class RiskEventTracker:
                 processing_status=(
                     EVENT_STATUS_EVALUATED
                 ),
-
                 reason=(
                     "RISK_EVENT_STARTED"
                 ),
-
                 action=(
                     EVENT_ACTION_STARTED
                 ),
-
-                risk_status=(
-                    risk_status
-                ),
-
+                risk_status=risk_status,
                 current_risk_level=(
                     risk_level
                 ),
-
                 previous_risk_level=None,
-
                 event=event,
+                observed_risk_level=(
+                    risk_level
+                ),
             )
 
         # ====================================================
@@ -704,16 +660,93 @@ class RiskEventTracker:
         )
 
         # ====================================================
-        # RESOLVE EVENT
+        # LOW / NONE
         #
-        # MODERATE/HIGH -> LOW/NONE
+        # Do NOT immediately resolve.
+        # Require continuous recovery for grace period.
         # ====================================================
 
         if (
             risk_rank
-            <
-            EVENT_TRIGGER_MINIMUM_RANK
+            < EVENT_TRIGGER_MINIMUM_RANK
         ):
+
+            if (
+                self._recovery_started_at
+                is None
+            ):
+                self._recovery_started_at = (
+                    now_value
+                )
+
+            recovery_elapsed = (
+                now_value
+                -
+                self._recovery_started_at
+            )
+
+            self._active_event[
+                "recovery_pending"
+            ] = True
+
+            self._active_event[
+                "recovery_started_at_monotonic"
+            ] = (
+                self._recovery_started_at
+            )
+
+            self._active_event[
+                "last_evaluated_at_monotonic"
+            ] = now_value
+
+            # ------------------------------------------------
+            # Still inside recovery grace.
+            #
+            # DATA_GAP action is intentionally used here as a
+            # notification-suppression transition compatible
+            # with Alert Policy v1.0.
+            #
+            # Data collection continues normally.
+            # ------------------------------------------------
+
+            if (
+                recovery_elapsed
+                <
+                self.recovery_grace_seconds
+            ):
+                return self._build_output(
+                    processing_status=(
+                        EVENT_STATUS_EVALUATED
+                    ),
+                    reason=(
+                        "RISK_EVENT_RECOVERY_GRACE"
+                    ),
+                    action=(
+                        EVENT_ACTION_DATA_GAP
+                    ),
+                    risk_status=risk_status,
+
+                    # Keep Event's meaningful risk level.
+                    current_risk_level=(
+                        previous_level
+                    ),
+
+                    previous_risk_level=(
+                        previous_level
+                    ),
+
+                    event=self._active_event,
+
+                    # Actual sample is still exposed.
+                    observed_risk_level=(
+                        risk_level
+                    ),
+                )
+
+            # ------------------------------------------------
+            # Continuous safe/lower-risk posture lasted long
+            # enough -> resolve.
+            # ------------------------------------------------
 
             resolved_event = deepcopy(
                 self._active_event
@@ -721,6 +754,10 @@ class RiskEventTracker:
 
             resolved_event[
                 "active"
+            ] = False
+
+            resolved_event[
+                "recovery_pending"
             ] = False
 
             resolved_event[
@@ -734,46 +771,59 @@ class RiskEventTracker:
             resolved_event[
                 "resolution_reason"
             ] = (
-                "RISK_BELOW_EVENT_THRESHOLD"
+                "RISK_BELOW_EVENT_THRESHOLD_"
+                "FOR_RECOVERY_GRACE"
             )
 
+            resolved_event[
+                "recovery_duration_seconds"
+            ] = recovery_elapsed
+
             self._active_event = None
+            self._recovery_started_at = None
 
             return self._build_output(
                 processing_status=(
                     EVENT_STATUS_EVALUATED
                 ),
-
                 reason=(
                     "RISK_EVENT_RESOLVED"
                 ),
-
                 action=(
                     EVENT_ACTION_RESOLVED
                 ),
-
-                risk_status=(
-                    risk_status
-                ),
-
+                risk_status=risk_status,
                 current_risk_level=(
                     risk_level
                 ),
-
                 previous_risk_level=(
                     previous_level
                 ),
-
                 event=None,
-
                 resolved_event=(
                     resolved_event
+                ),
+                observed_risk_level=(
+                    risk_level
                 ),
             )
 
         # ====================================================
-        # EVENT REMAINS ACTIVE
+        # MODERATE / HIGH RETURNED
+        #
+        # Recovery attempt is cancelled.
+        # Same Event continues.
         # ====================================================
+
+        self._recovery_started_at = None
+
+        self._active_event[
+            "recovery_pending"
+        ] = False
+
+        self._active_event[
+            "recovery_started_at_monotonic"
+        ] = None
 
         self._active_event[
             "current_risk_level"
@@ -787,11 +837,7 @@ class RiskEventTracker:
         # ESCALATION
         # ====================================================
 
-        if (
-            risk_rank
-            >
-            previous_rank
-        ):
+        if risk_rank > previous_rank:
 
             peak_level = (
                 self._active_event[
@@ -805,12 +851,7 @@ class RiskEventTracker:
                 ]
             )
 
-            if (
-                risk_rank
-                >
-                peak_rank
-            ):
-
+            if risk_rank > peak_rank:
                 self._active_event[
                     "peak_risk_level"
                 ] = risk_level
@@ -819,69 +860,52 @@ class RiskEventTracker:
                 processing_status=(
                     EVENT_STATUS_EVALUATED
                 ),
-
                 reason=(
                     "RISK_EVENT_ESCALATED"
                 ),
-
                 action=(
                     EVENT_ACTION_ESCALATED
                 ),
-
-                risk_status=(
-                    risk_status
-                ),
-
+                risk_status=risk_status,
                 current_risk_level=(
                     risk_level
                 ),
-
                 previous_risk_level=(
                     previous_level
                 ),
-
-                event=(
-                    self._active_event
+                event=self._active_event,
+                observed_risk_level=(
+                    risk_level
                 ),
             )
 
         # ====================================================
         # DE-ESCALATION
+        # HIGH -> MODERATE
         # ====================================================
 
-        if (
-            risk_rank
-            <
-            previous_rank
-        ):
+        if risk_rank < previous_rank:
 
             return self._build_output(
                 processing_status=(
                     EVENT_STATUS_EVALUATED
                 ),
-
                 reason=(
                     "RISK_EVENT_DEESCALATED"
                 ),
-
                 action=(
                     EVENT_ACTION_DEESCALATED
                 ),
-
-                risk_status=(
-                    risk_status
-                ),
-
+                risk_status=risk_status,
                 current_risk_level=(
                     risk_level
                 ),
-
                 previous_risk_level=(
                     previous_level
                 ),
-
-                event=(
-                    self._active_event
+                event=self._active_event,
+                observed_risk_level=(
+                    risk_level
                 ),
             )
 
@@ -893,28 +917,21 @@ class RiskEventTracker:
             processing_status=(
                 EVENT_STATUS_EVALUATED
             ),
-
             reason=(
                 "RISK_EVENT_CONTINUES"
             ),
-
             action=(
                 EVENT_ACTION_UPDATED
             ),
-
-            risk_status=(
-                risk_status
-            ),
-
+            risk_status=risk_status,
             current_risk_level=(
                 risk_level
             ),
-
             previous_risk_level=(
                 previous_level
             ),
-
-            event=(
-                self._active_event
+            event=self._active_event,
+            observed_risk_level=(
+                risk_level
             ),
         )

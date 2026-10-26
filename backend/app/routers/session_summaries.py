@@ -10,13 +10,30 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.models.alert_notification import AlertNotification
-from app.models.risk_event_record import RiskEventRecord
-from app.models.session import PostureSession
-from app.models.session_summary import SessionSummary
+
+from app.models.alert_notification import (
+    AlertNotification,
+)
+from app.models.risk_event_record import (
+    RiskEventRecord,
+)
+from app.models.session import (
+    PostureSession,
+)
+from app.models.session_summary import (
+    SessionSummary,
+)
+from app.models.session_risk_score_bucket import (
+    SessionRiskScoreBucket,
+)
 from app.models.user import User
-from app.routers.auth import get_current_user
+
+from app.routers.auth import (
+    get_current_user,
+)
+
 from app.schemas.session_summary import (
+    SessionRiskScoreBucketResponse,
     SessionSummaryCreate,
     SessionSummaryResponse,
 )
@@ -34,10 +51,6 @@ router = APIRouter(
 def _safe_duration(
     value,
 ) -> float:
-    """
-    Convert a persisted duration to a safe non-negative value.
-    """
-
     if type(value) not in (
         int,
         float,
@@ -53,12 +66,34 @@ def _safe_duration(
 def _risk_event_duration(
     event: RiskEventRecord,
 ) -> float:
-    """
-    Return the persisted duration of one Risk Event.
-    """
-
     return _safe_duration(
         event.duration_seconds
+    )
+
+
+def _get_owned_session(
+    *,
+    db: Session,
+    session_id: int,
+    user_id: int,
+) -> PostureSession | None:
+    statement = (
+        select(
+            PostureSession
+        )
+        .where(
+            PostureSession.session_id
+            ==
+            session_id,
+
+            PostureSession.user_id
+            ==
+            user_id,
+        )
+    )
+
+    return db.scalar(
+        statement
     )
 
 
@@ -66,24 +101,19 @@ def _summary_request_values(
     request: SessionSummaryCreate,
 ) -> dict:
     """
-    Preserve every Session Summary field currently supported
-    by SessionSummaryCreate, but only if the database model
-    actually has that column.
+    Persist only fields that belong to SessionSummary.
 
-    This is important because PostGuard already persists
-    Detection Summary fields such as:
-
-    - detection_count
-    - pose_detected_count
-    - face_detected_count
-    - average_shoulder
-    - average_neck
-
-    We must not lose those fields while migrating AlertEvent
-    to RiskEventRecord + AlertNotification.
+    risk_score_buckets is intentionally excluded because
+    those records belong to a separate table.
     """
 
-    request_data = request.model_dump()
+    request_data = (
+        request.model_dump(
+            exclude={
+                "risk_score_buckets"
+            }
+        )
+    )
 
     database_columns = {
         column.name
@@ -94,12 +124,15 @@ def _summary_request_values(
     protected_fields = {
         "summary_id",
         "session_id",
+
         "low_risk_duration",
         "medium_risk_duration",
         "high_risk_duration",
+
         "low_risk_alert_count",
         "medium_risk_alert_count",
         "high_risk_alert_count",
+
         "total_alert_count",
         "most_frequent_alert_event",
     }
@@ -128,28 +161,23 @@ def _summary_request_values(
 def create_session_summary(
     session_id: int,
     request: SessionSummaryCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
     current_user: User = Depends(
         get_current_user
     ),
 ):
     # --------------------------------------------------------
-    # 1. Verify Session ownership
+    # 1. Session ownership
     # --------------------------------------------------------
 
-    session_statement = (
-        select(PostureSession)
-        .where(
-            PostureSession.session_id
-            == session_id,
-
-            PostureSession.user_id
-            == current_user.id,
+    posture_session = (
+        _get_owned_session(
+            db=db,
+            session_id=session_id,
+            user_id=current_user.id,
         )
-    )
-
-    posture_session = db.scalar(
-        session_statement
     )
 
     if posture_session is None:
@@ -161,12 +189,13 @@ def create_session_summary(
         )
 
     # --------------------------------------------------------
-    # 2. Only completed Session can have final Summary
+    # 2. Final Summary only for completed Session
     # --------------------------------------------------------
 
     if (
         posture_session.status
-        != "COMPLETED"
+        !=
+        "COMPLETED"
     ):
         raise HTTPException(
             status_code=(
@@ -179,19 +208,18 @@ def create_session_summary(
         )
 
     # --------------------------------------------------------
-    # 3. Prevent duplicate Summary
+    # 3. No duplicate Summary
     # --------------------------------------------------------
 
-    existing_statement = (
-        select(SessionSummary)
+    existing_summary = db.scalar(
+        select(
+            SessionSummary
+        )
         .where(
             SessionSummary.session_id
-            == session_id
+            ==
+            session_id
         )
-    )
-
-    existing_summary = db.scalar(
-        existing_statement
     )
 
     if existing_summary is not None:
@@ -205,54 +233,51 @@ def create_session_summary(
         )
 
     # --------------------------------------------------------
-    # 4. Load persisted Risk Events
+    # 4. Load Risk Events
     # --------------------------------------------------------
-
-    risk_event_statement = (
-        select(RiskEventRecord)
-        .where(
-            RiskEventRecord.session_id
-            == session_id
-        )
-        .order_by(
-            RiskEventRecord.started_at.asc()
-        )
-    )
 
     risk_events = list(
         db.scalars(
-            risk_event_statement
+            select(
+                RiskEventRecord
+            )
+            .where(
+                RiskEventRecord.session_id
+                ==
+                session_id
+            )
+            .order_by(
+                RiskEventRecord
+                .started_at
+                .asc()
+            )
         ).all()
     )
 
     # --------------------------------------------------------
-    # 5. Load persisted Alert Notifications
+    # 5. Load Alert Notifications
     # --------------------------------------------------------
-
-    notification_statement = (
-        select(AlertNotification)
-        .where(
-            AlertNotification.session_id
-            == session_id
-        )
-        .order_by(
-            AlertNotification.emitted_at.asc()
-        )
-    )
 
     notifications = list(
         db.scalars(
-            notification_statement
+            select(
+                AlertNotification
+            )
+            .where(
+                AlertNotification.session_id
+                ==
+                session_id
+            )
+            .order_by(
+                AlertNotification
+                .emitted_at
+                .asc()
+            )
         ).all()
     )
 
     # --------------------------------------------------------
-    # 6. Risk Event duration
-    #
-    # Existing DB schema still uses "medium",
-    # but the validated Risk Pipeline calls it MODERATE.
-    #
-    # medium_risk_* therefore currently means MODERATE.
+    # 6. Risk Event durations
     # --------------------------------------------------------
 
     low_risk_duration = sum(
@@ -263,7 +288,8 @@ def create_session_summary(
         in risk_events
         if (
             event.current_risk_level
-            == "LOW"
+            ==
+            "LOW"
         )
     )
 
@@ -275,7 +301,8 @@ def create_session_summary(
         in risk_events
         if (
             event.current_risk_level
-            == "MODERATE"
+            ==
+            "MODERATE"
         )
     )
 
@@ -287,15 +314,13 @@ def create_session_summary(
         in risk_events
         if (
             event.current_risk_level
-            == "HIGH"
+            ==
+            "HIGH"
         )
     )
 
     # --------------------------------------------------------
-    # 7. Notification count by risk level
-    #
-    # Important:
-    # These are notifications, NOT risk episodes.
+    # 7. Notification counts
     # --------------------------------------------------------
 
     low_risk_alert_count = sum(
@@ -304,7 +329,8 @@ def create_session_summary(
         in notifications
         if (
             notification.risk_level
-            == "LOW"
+            ==
+            "LOW"
         )
     )
 
@@ -314,7 +340,8 @@ def create_session_summary(
         in notifications
         if (
             notification.risk_level
-            == "MODERATE"
+            ==
+            "MODERATE"
         )
     )
 
@@ -324,7 +351,8 @@ def create_session_summary(
         in notifications
         if (
             notification.risk_level
-            == "HIGH"
+            ==
+            "HIGH"
         )
     )
 
@@ -334,8 +362,6 @@ def create_session_summary(
 
     # --------------------------------------------------------
     # 8. Most frequent notification type
-    #
-    # FIRST / REPEAT / ESCALATION
     # --------------------------------------------------------
 
     most_frequent_alert_event = None
@@ -354,9 +380,7 @@ def create_session_summary(
         )
 
     # --------------------------------------------------------
-    # 9. Preserve existing Detection Summary fields
-    #
-    # This fixes the regression where detection_count became 0.
+    # 9. User-provided measured values
     # --------------------------------------------------------
 
     summary_values = (
@@ -366,58 +390,123 @@ def create_session_summary(
     )
 
     # --------------------------------------------------------
-    # 10. Create final Session Summary
+    # 10. Build Summary
     # --------------------------------------------------------
 
-    session_summary = SessionSummary(
-        session_id=session_id,
+    session_summary = (
+        SessionSummary(
+            session_id=session_id,
 
-        **summary_values,
+            **summary_values,
 
-        low_risk_duration=int(
-            round(
-                low_risk_duration
-            )
-        ),
+            low_risk_duration=int(
+                round(
+                    low_risk_duration
+                )
+            ),
 
-        medium_risk_duration=int(
-            round(
-                medium_risk_duration
-            )
-        ),
+            medium_risk_duration=int(
+                round(
+                    medium_risk_duration
+                )
+            ),
 
-        high_risk_duration=int(
-            round(
-                high_risk_duration
-            )
-        ),
+            high_risk_duration=int(
+                round(
+                    high_risk_duration
+                )
+            ),
 
-        low_risk_alert_count=(
-            low_risk_alert_count
-        ),
+            low_risk_alert_count=(
+                low_risk_alert_count
+            ),
 
-        medium_risk_alert_count=(
-            medium_risk_alert_count
-        ),
+            medium_risk_alert_count=(
+                medium_risk_alert_count
+            ),
 
-        high_risk_alert_count=(
-            high_risk_alert_count
-        ),
+            high_risk_alert_count=(
+                high_risk_alert_count
+            ),
 
-        total_alert_count=(
-            total_alert_count
-        ),
+            total_alert_count=(
+                total_alert_count
+            ),
 
-        most_frequent_alert_event=(
-            most_frequent_alert_event
-        ),
+            most_frequent_alert_event=(
+                most_frequent_alert_event
+            ),
+        )
     )
 
     db.add(
         session_summary
     )
 
-    db.commit()
+    # --------------------------------------------------------
+    # 11. Persist graph buckets
+    #
+    # Do not trust client-side session_id.
+    # session_id always comes from URL.
+    # --------------------------------------------------------
+
+    for bucket in (
+        request.risk_score_buckets
+    ):
+        db.add(
+            SessionRiskScoreBucket(
+                session_id=session_id,
+
+                bucket_index=(
+                    bucket.bucket_index
+                ),
+
+                start_second=(
+                    bucket.start_second
+                ),
+
+                end_second=(
+                    bucket.end_second
+                ),
+
+                sample_count=(
+                    bucket.sample_count
+                ),
+
+                average_risk_score=(
+                    bucket.average_risk_score
+                ),
+
+                minimum_risk_score=(
+                    bucket.minimum_risk_score
+                ),
+
+                maximum_risk_score=(
+                    bucket.maximum_risk_score
+                ),
+
+                minimum_modified_rula_score=(
+                    bucket
+                    .minimum_modified_rula_score
+                ),
+
+                maximum_modified_rula_score=(
+                    bucket
+                    .maximum_modified_rula_score
+                ),
+            )
+        )
+
+    # --------------------------------------------------------
+    # 12. One atomic transaction
+    # --------------------------------------------------------
+
+    try:
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
 
     db.refresh(
         session_summary
@@ -437,24 +526,19 @@ def create_session_summary(
 )
 def get_session_summary(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
     current_user: User = Depends(
         get_current_user
     ),
 ):
-    session_statement = (
-        select(PostureSession)
-        .where(
-            PostureSession.session_id
-            == session_id,
-
-            PostureSession.user_id
-            == current_user.id,
+    posture_session = (
+        _get_owned_session(
+            db=db,
+            session_id=session_id,
+            user_id=current_user.id,
         )
-    )
-
-    posture_session = db.scalar(
-        session_statement
     )
 
     if posture_session is None:
@@ -465,16 +549,15 @@ def get_session_summary(
             detail="Session not found",
         )
 
-    summary_statement = (
-        select(SessionSummary)
+    session_summary = db.scalar(
+        select(
+            SessionSummary
+        )
         .where(
             SessionSummary.session_id
-            == session_id
+            ==
+            session_id
         )
-    )
-
-    session_summary = db.scalar(
-        summary_statement
     )
 
     if session_summary is None:
@@ -491,6 +574,68 @@ def get_session_summary(
 
 
 # ============================================================
+# GET SESSION RISK SCORE BUCKETS
+# ============================================================
+
+@router.get(
+    (
+        "/sessions/{session_id}"
+        "/risk-score-buckets"
+    ),
+    response_model=list[
+        SessionRiskScoreBucketResponse
+    ],
+    status_code=status.HTTP_200_OK,
+)
+def get_session_risk_score_buckets(
+    session_id: int,
+    db: Session = Depends(
+        get_db
+    ),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    posture_session = (
+        _get_owned_session(
+            db=db,
+            session_id=session_id,
+            user_id=current_user.id,
+        )
+    )
+
+    if posture_session is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail="Session not found",
+        )
+
+    statement = (
+        select(
+            SessionRiskScoreBucket
+        )
+        .where(
+            SessionRiskScoreBucket.session_id
+            ==
+            session_id
+        )
+        .order_by(
+            SessionRiskScoreBucket
+            .bucket_index
+            .asc()
+        )
+    )
+
+    return list(
+        db.scalars(
+            statement
+        ).all()
+    )
+
+
+# ============================================================
 # GET ALL SUMMARIES
 # ============================================================
 
@@ -502,13 +647,17 @@ def get_session_summary(
     status_code=status.HTTP_200_OK,
 )
 def get_summaries(
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
     current_user: User = Depends(
         get_current_user
     ),
 ):
     statement = (
-        select(SessionSummary)
+        select(
+            SessionSummary
+        )
         .join(
             PostureSession,
             (
@@ -519,10 +668,13 @@ def get_summaries(
         )
         .where(
             PostureSession.user_id
-            == current_user.id
+            ==
+            current_user.id
         )
         .order_by(
-            PostureSession.started_at.desc()
+            PostureSession
+            .started_at
+            .desc()
         )
     )
 

@@ -318,16 +318,19 @@ class ValidatedRiskPipelineServiceTests(
             "COMPLETE",
         )
 
-    def test_single_factor_becomes_moderate_after_60_seconds(
+    def test_single_factor_moderate_requires_first_alert_confirmation(
         self,
     ):
         """
-        One continuously active posture factor starts as LOW.
+        One factor:
+            < 60 seconds -> LOW
 
-        After 60 seconds:
-        LOW -> MODERATE
-        Risk Event -> STARTED
-        Alert Policy -> FIRST
+        At 60 seconds:
+            MODERATE
+            Risk Event starts
+
+        User-facing FIRST notification:
+            waits another 5 seconds by UX policy.
         """
 
         service = (
@@ -349,31 +352,27 @@ class ValidatedRiskPipelineServiceTests(
         )
 
         self.assertEqual(
-            first[
-                "risk"
-            ][
-                "risk_level"
-            ],
+            first["risk"]["risk_level"],
             "LOW",
         )
 
         self.assertEqual(
-            first[
-                "risk_event"
-            ][
+            first["risk_event"][
                 "event_action"
             ],
             "NONE",
         )
 
-        second = service.process_detection(
-            detection,
-            baseline,
-            now=160.0,
+        moderate_start = (
+            service.process_detection(
+                detection,
+                baseline,
+                now=160.0,
+            )
         )
 
         self.assertEqual(
-            second[
+            moderate_start[
                 "risk"
             ][
                 "risk_level"
@@ -381,10 +380,8 @@ class ValidatedRiskPipelineServiceTests(
             "MODERATE",
         )
 
-        # Risk Event Contract 1.0 uses event_action,
-        # not action.
         self.assertEqual(
-            second[
+            moderate_start[
                 "risk_event"
             ][
                 "event_action"
@@ -392,24 +389,34 @@ class ValidatedRiskPipelineServiceTests(
             "STARTED",
         )
 
-        self.assertTrue(
-            second[
-                "risk_event"
+        # MODERATE first alert is intentionally delayed.
+        self.assertFalse(
+            moderate_start[
+                "alert_policy"
             ][
-                "event_active"
+                "should_notify"
             ]
         )
 
-        self.assertIsNotNone(
-            second[
-                "risk_event"
+        confirmed = (
+            service.process_detection(
+                detection,
+                baseline,
+                now=165.0,
+            )
+        )
+
+        self.assertEqual(
+            confirmed[
+                "risk"
             ][
-                "event"
-            ]
+                "risk_level"
+            ],
+            "MODERATE",
         )
 
         self.assertTrue(
-            second[
+            confirmed[
                 "alert_policy"
             ][
                 "should_notify"
@@ -417,7 +424,7 @@ class ValidatedRiskPipelineServiceTests(
         )
 
         self.assertEqual(
-            second[
+            confirmed[
                 "alert_policy"
             ][
                 "alert_type"
@@ -509,42 +516,156 @@ class ValidatedRiskPipelineServiceTests(
             ]
         )
 
-    def test_score_is_explicitly_not_implemented_yet(
+    def test_neutral_posture_exposes_modified_rula_score(
         self,
     ):
-        """
-        The integration contract reserves a place for the future
-        PostGuard Modified RULA score.
-
-        It must remain explicitly unavailable until that score
-        module is designed and validated.
-        """
-
         service = (
             ValidatedRiskPipelineService()
         )
 
         result = service.process_detection(
-            build_detection(),
+            build_detection(
+                shoulder_tilt=0.0,
+                neck_lateral_tilt=0.0,
+                neck_flexion=0.0,
+            ),
             build_baseline(),
             now=0.0,
         )
 
-        self.assertEqual(
+        score = (
             result[
                 "posture_score"
-            ][
-                "status"
-            ],
-            "NOT_IMPLEMENTED",
+            ]
         )
 
-        self.assertIsNone(
+        self.assertEqual(
+            score[
+                "status"
+            ],
+            "COMPLETE",
+        )
+
+        self.assertEqual(
+            score[
+                "modified_rula_score"
+            ],
+            1,
+        )
+
+        self.assertEqual(
+            score[
+                "postguard_risk_score"
+            ],
+            0,
+        )
+
+
+    def test_posture_score_changes_with_detected_posture(
+        self,
+    ):
+        service = (
+            ValidatedRiskPipelineService()
+        )
+
+        result = service.process_detection(
+            build_detection(
+                shoulder_tilt=6.0,
+                neck_lateral_tilt=8.0,
+                neck_flexion=25.0,
+            ),
+            build_baseline(),
+            now=0.0,
+        )
+
+        score = (
             result[
+                "posture_score"
+            ]
+        )
+
+        # Neck >20° = 3
+        # neck side bending = +1
+        # shoulder asymmetry = +1
+        # duration at first frame = +0
+        #
+        # total = 5
+        self.assertEqual(
+            score[
+                "modified_rula_score"
+            ],
+            5,
+        )
+
+        self.assertEqual(
+            score[
+                "postguard_risk_score"
+            ],
+            67,
+        )
+
+
+    def test_sustained_posture_increases_modified_rula(
+        self,
+    ):
+        service = (
+            ValidatedRiskPipelineService()
+        )
+
+        detection = build_detection(
+            shoulder_tilt=6.0,
+            neck_lateral_tilt=0.0,
+            neck_flexion=0.0,
+        )
+
+        baseline = build_baseline()
+
+        first = (
+            service.process_detection(
+                detection,
+                baseline,
+                now=100.0,
+            )
+        )
+
+        self.assertEqual(
+            first[
                 "posture_score"
             ][
                 "modified_rula_score"
-            ]
+            ],
+            2,
+        )
+
+        after_sixty = (
+            service.process_detection(
+                detection,
+                baseline,
+                now=160.0,
+            )
+        )
+
+        # Neck base 1
+        # Shoulder asymmetry +1
+        # Sustained >=60 sec +1
+        #
+        # total = 3
+        self.assertEqual(
+            after_sixty[
+                "posture_score"
+            ][
+                "modified_rula_score"
+            ],
+            3,
+        )
+
+        self.assertEqual(
+            after_sixty[
+                "posture_score"
+            ][
+                "postguard_risk_score"
+            ],
+            33,
         )
 
 

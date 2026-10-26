@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
-import sys
 from typing import Any, Mapping
 
 
@@ -57,6 +57,9 @@ from camera_card.temporal_tracking.temporal_posture_tracker import (  # noqa: E4
     TemporalPostureTracker,
 )
 
+from camera_card.posture_score import (  # noqa: E402
+    calculate_modified_rula_score,
+)
 
 from app.services.baseline_comparison_service import (  # noqa: E402
     compare_detection_to_baseline,
@@ -67,71 +70,96 @@ from app.services.baseline_comparison_service import (  # noqa: E402
 # Integration contract
 # ============================================================
 
-VALIDATED_RISK_PIPELINE_SERVICE_VERSION = "1.1"
+VALIDATED_RISK_PIPELINE_SERVICE_VERSION = "1.2"
 
 
 # ============================================================
-# Alert Policy configuration
+# Risk Event UX stability
 #
-# These remain prototype UX timings.
-# They are NOT clinical standards.
+# Prototype UX timing, not a clinical standard.
+# ============================================================
+
+DEFAULT_RISK_EVENT_RECOVERY_GRACE_SECONDS = 5.0
+
+
+# ============================================================
+# Alert Policy
+#
+# Prototype UX timings, not clinical standards.
+#
+# MODERATE:
+#     Must remain an active Risk Event for 5 seconds before
+#     the first user-facing notification.
+#
+# HIGH:
+#     First alert is immediate.
+#
+# REPEAT:
+#     MODERATE = 5 minutes
+#     HIGH     = 3 minutes
+#
+# Escalation:
+#     MODERATE -> HIGH bypasses cooldown.
 # ============================================================
 
 DEFAULT_ALERT_POLICY_CONFIG = AlertPolicyConfig(
-    moderate_first_alert_delay_seconds=0.0,
+    moderate_first_alert_delay_seconds=5.0,
     high_first_alert_delay_seconds=0.0,
-    moderate_repeat_cooldown_seconds=600.0,
-    high_repeat_cooldown_seconds=300.0,
+
+    moderate_repeat_cooldown_seconds=300.0,
+    high_repeat_cooldown_seconds=180.0,
+
     escalation_bypasses_cooldown=True,
+
     notify_on_resolution=False,
 )
 
 
 class ValidatedRiskPipelineService:
     """
-    Desktop adapter for the validated PostGuard posture-risk pipeline.
+    Desktop adapter for the PostGuard posture-risk pipeline.
 
-    Runtime authority:
+    Runtime flow:
 
-        Detection Contract 1.0
-              │
-              ├──> Baseline Comparison / Measurement-Change Gate
-              │
-              └──> Current Posture Assessment
-                          ↓
-                   Temporal Tracking
-                          ↓
-                    Risk Evaluation
-                          ↓
-                      Risk Event
-                          ↓
-                     Alert Policy
+        Detection
+             │
+             ├── Baseline Comparison
+             │
+             └── Current Posture Assessment
+                        ↓
+                 Temporal Tracking
+                        ↓
+                  Risk Evaluation
+                        ↓
+                    Risk Event
+                        ↓
+                   Alert Policy
 
-    Important design rules:
+    Important:
 
-    1. Baseline Comparison does not overwrite Detection values.
-
-    2. Measurement-Change Gate is not a risk classifier.
-
-    3. Current Posture Assessment always receives the original
-       Detection Contract.
-
-    4. Risk Event does not send notifications.
-
-    5. Alert Policy only decides whether a notification should occur.
-
-    6. This service does not persist database records.
-
-    7. Modified RULA / PostGuard posture score is not implemented
-       in this service yet. A future score module must be separately
-       designed and validated.
+    - Detection continues every processing cycle.
+    - Cooldown only suppresses user-facing notification.
+    - Risk Event recovery grace prevents short LOW/NONE
+      fluctuations from splitting one real-world event into
+      many events.
+    - Baseline comparison does not rewrite Detection values.
+    - Modified RULA is still intentionally not implemented.
     """
 
     def __init__(
         self,
         *,
-        alert_policy_config: AlertPolicyConfig | None = None,
-        baseline_gate_rules: Mapping[str, Any] | None = None,
+        alert_policy_config: (
+            AlertPolicyConfig
+            | None
+        ) = None,
+        baseline_gate_rules: (
+            Mapping[str, Any]
+            | None
+        ) = None,
+        risk_event_recovery_grace_seconds: float = (
+            DEFAULT_RISK_EVENT_RECOVERY_GRACE_SECONDS
+        ),
     ) -> None:
 
         self.alert_policy_config = (
@@ -139,54 +167,70 @@ class ValidatedRiskPipelineService:
             or DEFAULT_ALERT_POLICY_CONFIG
         )
 
-        # No production gate thresholds are currently assumed.
         self.baseline_gate_rules = (
             baseline_gate_rules
         )
+
+        self.risk_event_recovery_grace_seconds = (
+            float(
+                risk_event_recovery_grace_seconds
+            )
+        )
+
+        self._create_runtime_components()
+
+        self.last_result: (
+            dict[str, Any]
+            | None
+        ) = None
+
+    # ========================================================
+    # Runtime components
+    # ========================================================
+
+    def _create_runtime_components(
+        self,
+    ) -> None:
 
         self.temporal_tracker = (
             TemporalPostureTracker()
         )
 
         self.risk_event_tracker = (
-            RiskEventTracker()
+            RiskEventTracker(
+                recovery_grace_seconds=(
+                    self.risk_event_recovery_grace_seconds
+                )
+            )
         )
 
         self.alert_policy = (
             AlertPolicy(
-                config=self.alert_policy_config
+                config=(
+                    self.alert_policy_config
+                )
             )
         )
-
-        self.last_result: dict[str, Any] | None = None
 
     # ========================================================
     # Reset
     # ========================================================
 
-    def reset(self) -> None:
+    def reset(
+        self,
+    ) -> None:
         """
-        Reset all stateful temporal/risk/alert layers.
+        Reset stateful pipeline components.
 
-        Used when:
-        - starting a new Session
-        - Pause / Resume boundary
-        - stopping Monitoring
+        Used for a new Session or an intentional lifecycle
+        boundary.
+
+        IMPORTANT:
+        Persist/resolve any active Risk Event before calling
+        reset when ending a real Session.
         """
 
-        self.temporal_tracker = (
-            TemporalPostureTracker()
-        )
-
-        self.risk_event_tracker = (
-            RiskEventTracker()
-        )
-
-        self.alert_policy = (
-            AlertPolicy(
-                config=self.alert_policy_config
-            )
-        )
+        self._create_runtime_components()
 
         self.last_result = None
 
@@ -197,7 +241,10 @@ class ValidatedRiskPipelineService:
     def process_detection(
         self,
         detection_result: Mapping[str, Any],
-        baseline_data: Mapping[str, Any] | None,
+        baseline_data: (
+            Mapping[str, Any]
+            | None
+        ),
         *,
         now: float | None = None,
     ) -> dict[str, Any]:
@@ -217,12 +264,10 @@ class ValidatedRiskPipelineService:
         )
 
         # ====================================================
-        # 1. Personal Baseline comparison
+        # 1. Baseline Comparison
         #
-        # IMPORTANT:
-        #
-        # This is parallel evidence.
-        # It does NOT modify detection_result.
+        # Parallel evidence only.
+        # It never overwrites current Detection.
         # ====================================================
 
         baseline_comparison = (
@@ -237,8 +282,6 @@ class ValidatedRiskPipelineService:
 
         # ====================================================
         # 2. Current Posture Assessment
-        #
-        # ORIGINAL Detection values are used.
         # ====================================================
 
         assessment_result = (
@@ -259,7 +302,22 @@ class ValidatedRiskPipelineService:
         )
 
         # ====================================================
-        # 4. Risk Evaluation
+        # 4. PostGuard Modified RULA
+        #
+        # Current posture score.
+        #
+        # Does NOT decide Risk Event.
+        # ====================================================
+
+        posture_score_result = (
+            calculate_modified_rula_score(
+                assessment_result,
+                temporal_result,
+            )
+        )
+
+        # ====================================================
+        # 5. Risk Evaluation
         # ====================================================
 
         risk_result = (
@@ -270,7 +328,7 @@ class ValidatedRiskPipelineService:
         )
 
         # ====================================================
-        # 5. Risk Event
+        # 6. Risk Event
         # ====================================================
 
         risk_event_result = (
@@ -281,7 +339,7 @@ class ValidatedRiskPipelineService:
         )
 
         # ====================================================
-        # 6. Alert Policy
+        # 7. Alert Policy
         # ====================================================
 
         alert_policy_result = (
@@ -291,49 +349,48 @@ class ValidatedRiskPipelineService:
             )
         )
 
-        # ====================================================
-        # 7. Modified RULA / posture score
-        #
-        # Intentionally NOT fabricated.
-        #
-        # This placeholder makes the integration contract ready
-        # for the dedicated score module that we will build next.
-        # ====================================================
 
-        posture_score_result = {
-            "status": "NOT_IMPLEMENTED",
-            "modified_rula_score": None,
-            "reason": (
-                "POSTGUARD_MODIFIED_RULA_SCORE_NOT_YET_VALIDATED"
-            ),
-        }
+        # ====================================================
+        # Result
+        # ====================================================
 
         result = {
             "service_version": (
                 VALIDATED_RISK_PIPELINE_SERVICE_VERSION
             ),
+
             "timestamp_monotonic": (
                 now_value
             ),
-            "detection": detection_result,
+
+            "detection": (
+                detection_result
+            ),
+
             "baseline_comparison": (
                 baseline_comparison
             ),
+
             "assessment": (
                 assessment_result
             ),
+
             "posture_score": (
                 posture_score_result
             ),
+
             "temporal": (
                 temporal_result
             ),
+
             "risk": (
                 risk_result
             ),
+
             "risk_event": (
                 risk_event_result
             ),
+
             "alert_policy": (
                 alert_policy_result
             ),

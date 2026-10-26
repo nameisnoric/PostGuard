@@ -303,9 +303,13 @@ class TestRiskEventTracker(
             "HIGH",
         )
 
-    def test_moderate_to_low_resolves(self):
+    def test_moderate_to_low_resolves_after_recovery_grace(
+        self,
+    ):
 
-        tracker = RiskEventTracker()
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
 
         first = tracker.update(
             make_risk("MODERATE"),
@@ -318,9 +322,19 @@ class TestRiskEventTracker(
             ]
         )
 
-        result = tracker.update(
+        recovering = tracker.update(
             make_risk("LOW"),
             now=120.0,
+        )
+
+        self.assertEqual(
+            recovering["event_action"],
+            "DATA_GAP",
+        )
+
+        result = tracker.update(
+            make_risk("LOW"),
+            now=125.0,
         )
 
         self.assertEqual(
@@ -350,18 +364,32 @@ class TestRiskEventTracker(
             "LOW",
         )
 
-    def test_high_to_none_resolves(self):
+    def test_high_to_none_resolves_after_recovery_grace(
+        self,
+    ):
 
-        tracker = RiskEventTracker()
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
 
         tracker.update(
             make_risk("HIGH"),
             now=100.0,
         )
 
-        result = tracker.update(
+        recovering = tracker.update(
             make_risk("NONE"),
             now=120.0,
+        )
+
+        self.assertEqual(
+            recovering["event_action"],
+            "DATA_GAP",
+        )
+
+        result = tracker.update(
+            make_risk("NONE"),
+            now=125.0,
         )
 
         self.assertEqual(
@@ -376,9 +404,13 @@ class TestRiskEventTracker(
             "NONE",
         )
 
-    def test_new_event_after_resolution_gets_new_id(self):
+    def test_new_event_after_resolution_gets_new_id(
+        self,
+    ):
 
-        tracker = RiskEventTracker()
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
 
         first = tracker.update(
             make_risk("MODERATE"),
@@ -394,6 +426,11 @@ class TestRiskEventTracker(
         tracker.update(
             make_risk("NONE"),
             now=110.0,
+        )
+
+        tracker.update(
+            make_risk("NONE"),
+            now=115.0,
         )
 
         second = tracker.update(
@@ -808,6 +845,202 @@ class TestRiskEventTracker(
                 "runtime_event_id"
             ],
             "risk-event-000001",
+        )
+    
+    def test_low_inside_recovery_grace_keeps_same_event(
+        self,
+    ):
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
+
+        started = tracker.update(
+            make_risk("MODERATE"),
+            now=100.0,
+        )
+
+        event_id = (
+            started["event"][
+                "runtime_event_id"
+            ]
+        )
+
+        recovering = tracker.update(
+            make_risk("LOW"),
+            now=102.0,
+        )
+
+        self.assertEqual(
+            recovering["event_action"],
+            "DATA_GAP",
+        )
+
+        self.assertTrue(
+            recovering["event_active"]
+        )
+
+        self.assertEqual(
+            recovering["event"][
+                "runtime_event_id"
+            ],
+            event_id,
+        )
+
+        self.assertEqual(
+            recovering[
+                "observed_risk_level"
+            ],
+            "LOW",
+        )
+
+        self.assertEqual(
+            recovering[
+                "current_risk_level"
+            ],
+            "MODERATE",
+        )
+
+
+    def test_risk_return_inside_grace_continues_same_event(
+        self,
+    ):
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
+
+        started = tracker.update(
+            make_risk("MODERATE"),
+            now=100.0,
+        )
+
+        event_id = (
+            started["event"][
+                "runtime_event_id"
+            ]
+        )
+
+        tracker.update(
+            make_risk("LOW"),
+            now=102.0,
+        )
+
+        recovered = tracker.update(
+            make_risk("MODERATE"),
+            now=104.0,
+        )
+
+        self.assertEqual(
+            recovered["event_action"],
+            "UPDATED",
+        )
+
+        self.assertEqual(
+            recovered["event"][
+                "runtime_event_id"
+            ],
+            event_id,
+        )
+
+        self.assertFalse(
+            recovered["event"][
+                "recovery_pending"
+            ]
+        )
+
+
+    def test_continuous_low_resolves_after_grace(
+        self,
+    ):
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
+
+        started = tracker.update(
+            make_risk("MODERATE"),
+            now=100.0,
+        )
+
+        event_id = (
+            started["event"][
+                "runtime_event_id"
+            ]
+        )
+
+        first_low = tracker.update(
+            make_risk("LOW"),
+            now=110.0,
+        )
+
+        self.assertTrue(
+            first_low["event_active"]
+        )
+
+        before_grace = tracker.update(
+            make_risk("LOW"),
+            now=114.999,
+        )
+
+        self.assertTrue(
+            before_grace["event_active"]
+        )
+
+        resolved = tracker.update(
+            make_risk("LOW"),
+            now=115.0,
+        )
+
+        self.assertEqual(
+            resolved["event_action"],
+            "RESOLVED",
+        )
+
+        self.assertFalse(
+            resolved["event_active"]
+        )
+
+        self.assertEqual(
+            resolved["resolved_event"][
+                "runtime_event_id"
+            ],
+            event_id,
+        )
+
+
+    def test_data_gap_does_not_count_as_safe_recovery(
+        self,
+    ):
+        tracker = RiskEventTracker(
+            recovery_grace_seconds=5.0
+        )
+
+        tracker.update(
+            make_risk("MODERATE"),
+            now=100.0,
+        )
+
+        tracker.update(
+            make_risk("LOW"),
+            now=102.0,
+        )
+
+        tracker.update(
+            make_partial_risk(),
+            now=105.0,
+        )
+
+        # Safe evidence must start again after the data gap.
+        result = tracker.update(
+            make_risk("LOW"),
+            now=108.0,
+        )
+
+        self.assertTrue(
+            result["event_active"]
+        )
+
+        self.assertEqual(
+            result["event_action"],
+            "DATA_GAP",
         )
 
 
