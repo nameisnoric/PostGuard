@@ -58,12 +58,14 @@ from app.services.blink_detection_service import (
     BlinkDetectionService,
 )
 
+
 RISK_LEVELS = (
     "NONE",
     "LOW",
     "MODERATE",
     "HIGH",
 )
+
 
 FACTOR_THAI = {
     "LEFT_SHOULDER_HIGH": "ไหล่ซ้ายสูง",
@@ -91,12 +93,20 @@ class MonitoringPage(QWidget):
         self.capture = None
         self.detector = None
 
+        # ====================================================
+        # BLINK DETECTION
+        # ====================================================
+
         self.blink_detector = (
             BlinkDetectionService()
         )
 
         self.last_blink_result = None
-        
+
+        # ====================================================
+        # SESSION
+        # ====================================================
+
         self.frame_count = 0
 
         self.session_id = None
@@ -104,6 +114,10 @@ class MonitoringPage(QWidget):
 
         self.session_started_at = None
         self.session_started_monotonic = None
+
+        # ====================================================
+        # DETECTION STATISTICS
+        # ====================================================
 
         self.detection_count = 0
         self.pose_detected_count = 0
@@ -115,6 +129,7 @@ class MonitoringPage(QWidget):
         # ====================================================
         # VALIDATED POSTGUARD PIPELINE
         # ====================================================
+
         self.risk_pipeline = (
             ValidatedRiskPipelineService()
         )
@@ -157,16 +172,6 @@ class MonitoringPage(QWidget):
 
         # ====================================================
         # LEGACY TEST-COMPATIBILITY CONTROLS
-        #
-        # These controls are NOT displayed and are NOT consumed
-        # by the validated runtime pipeline.
-        #
-        # They are kept temporarily so the teammate's existing
-        # desktop_workflow test does not fail only because an
-        # obsolete experimental threshold widget disappeared.
-        #
-        # Remove these together with the old threshold test once
-        # the new integration suite is adopted.
         # ====================================================
 
         self._setup_legacy_test_controls()
@@ -188,7 +193,10 @@ class MonitoringPage(QWidget):
     # TEMPORARY OLD TEST COMPATIBILITY
     # ========================================================
 
-    def _setup_legacy_test_controls(self) -> None:
+    def _setup_legacy_test_controls(
+        self,
+    ) -> None:
+
         self._last_neck_threshold = 10.0
 
         self.threshold_enabled = QCheckBox(
@@ -239,7 +247,9 @@ class MonitoringPage(QWidget):
         self,
         value: float,
     ) -> None:
+
         if value > 0:
+
             self._last_neck_threshold = (
                 float(value)
             )
@@ -248,11 +258,13 @@ class MonitoringPage(QWidget):
         self,
         enabled: bool,
     ) -> None:
+
         if (
             not enabled
             and
             self.neck_threshold_spin.value() > 0
         ):
+
             self._last_neck_threshold = (
                 self.neck_threshold_spin.value()
             )
@@ -279,7 +291,10 @@ class MonitoringPage(QWidget):
     # UI
     # ========================================================
 
-    def _setup_ui(self) -> None:
+    def _setup_ui(
+        self,
+    ) -> None:
+
         self.setProperty(
             "page",
             True,
@@ -297,13 +312,16 @@ class MonitoringPage(QWidget):
         )
 
         scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
+        scroll.setWidgetResizable(
+            True
+        )
 
         page_layout.addWidget(
             scroll
         )
 
         content = QWidget()
+
         content.setProperty(
             "page",
             True,
@@ -320,9 +338,13 @@ class MonitoringPage(QWidget):
             24,
         )
 
-        layout.setSpacing(12)
+        layout.setSpacing(
+            12
+        )
 
-        scroll.setWidget(content)
+        scroll.setWidget(
+            content
+        )
 
         self.title_label = QLabel(
             "Real-time Monitoring"
@@ -370,9 +392,17 @@ class MonitoringPage(QWidget):
         )
 
         columns = QHBoxLayout()
-        columns.setSpacing(16)
+
+        columns.setSpacing(
+            16
+        )
+
+        # ====================================================
+        # LEFT PANEL
+        # ====================================================
 
         camera_panel = QFrame()
+
         camera_panel.setProperty(
             "card",
             True,
@@ -389,7 +419,9 @@ class MonitoringPage(QWidget):
             14,
         )
 
-        camera_layout.setSpacing(10)
+        camera_layout.setSpacing(
+            10
+        )
 
         camera_layout.addWidget(
             info_group
@@ -405,7 +437,12 @@ class MonitoringPage(QWidget):
             button_layout
         )
 
+        # ====================================================
+        # RIGHT PANEL
+        # ====================================================
+
         metrics_panel = QFrame()
+
         metrics_panel.setProperty(
             "card",
             True,
@@ -422,7 +459,9 @@ class MonitoringPage(QWidget):
             14,
         )
 
-        metrics_layout.setSpacing(10)
+        metrics_layout.setSpacing(
+            10
+        )
 
         metrics_layout.addWidget(
             detection_group
@@ -449,9 +488,14 @@ class MonitoringPage(QWidget):
             1,
         )
 
+    # ========================================================
+    # INFORMATION GROUP
+    # ========================================================
+
     def _create_information_group(
         self,
     ) -> QGroupBox:
+
         info_group = QGroupBox(
             "Monitoring Information"
         )
@@ -502,13 +546,21 @@ class MonitoringPage(QWidget):
             self.baseline_flexion_label,
             self.status_label,
         ):
+
             info_layout.addWidget(
                 label
             )
 
         return info_group
 
-    def _setup_preview(self) -> None:
+    # ========================================================
+    # CAMERA PREVIEW
+    # ========================================================
+
+    def _setup_preview(
+        self,
+    ) -> None:
+
         self.preview_label = QLabel(
             "ภาพการตรวจจับจะแสดงที่นี่"
         )
@@ -532,9 +584,14 @@ class MonitoringPage(QWidget):
             True,
         )
 
+    # ========================================================
+    # DETECTION GROUP
+    # ========================================================
+
     def _create_detection_group(
         self,
     ) -> QGroupBox:
+
         detection_group = QGroupBox(
             "Live Detection"
         )
@@ -564,6 +621,38 @@ class MonitoringPage(QWidget):
             "มุมก้ม/เงยคอ: --"
         )
 
+        # ========================================================
+        # EYE / BLINK
+        # ========================================================
+
+        self.right_eye_state_label = QLabel(
+            "ตาขวา: --"
+        )
+
+        self.left_eye_state_label = QLabel(
+            "ตาซ้าย: --"
+        )
+
+        self.eye_state_label = QLabel(
+            "สถานะตารวม: --"
+        )
+
+        self.eye_pattern_label = QLabel(
+            "รูปแบบตา: --"
+        )
+
+        self.eye_openness_label = QLabel(
+            "Eye Openness: --"
+        )
+
+        self.blink_count_label = QLabel(
+            "จำนวนการกระพริบตา: 0"
+        )
+
+        # ========================================================
+        # BASELINE DIFFERENCE
+        # ========================================================
+
         self.shoulder_difference_label = QLabel(
             "ผลต่างจาก Baseline ไหล่: --"
         )
@@ -581,19 +670,33 @@ class MonitoringPage(QWidget):
             self.shoulder_label,
             self.neck_label,
             self.flexion_label,
+
+            self.right_eye_state_label,
+            self.left_eye_state_label,
+            self.eye_state_label,
+            self.eye_pattern_label,
+            self.eye_openness_label,
+            self.blink_count_label,
+
             self.shoulder_difference_label,
             self.neck_difference_label,
             self.flexion_difference_label,
         ):
+
             detection_layout.addWidget(
                 label
             )
 
         return detection_group
 
+    # ========================================================
+    # RISK GROUP
+    # ========================================================
+
     def _create_risk_group(
         self,
     ) -> QGroupBox:
+
         risk_group = QGroupBox(
             "PostGuard Risk Pipeline"
         )
@@ -663,15 +766,21 @@ class MonitoringPage(QWidget):
             self.alert_label,
             self.risk_note_label,
         ):
+
             risk_layout.addWidget(
                 label
             )
 
         return risk_group
 
+    # ========================================================
+    # BUTTONS
+    # ========================================================
+
     def _create_button_layout(
         self,
     ) -> QHBoxLayout:
+
         button_layout = QHBoxLayout()
 
         self.pause_button = QPushButton(
@@ -731,8 +840,12 @@ class MonitoringPage(QWidget):
     def _response_error(
         response,
     ) -> str:
+
         try:
-            payload = response.json()
+
+            payload = (
+                response.json()
+            )
 
             detail = (
                 payload.get(
@@ -743,11 +856,15 @@ class MonitoringPage(QWidget):
                     payload,
                     dict,
                 )
-                else response.text
+                else
+                response.text
             )
 
         except ValueError:
-            detail = response.text
+
+            detail = (
+                response.text
+            )
 
         return (
             f"HTTP {response.status_code}: "
@@ -757,18 +874,27 @@ class MonitoringPage(QWidget):
     def _end_remote_session(
         self,
     ) -> dict | None:
+
         if self.session_id is None:
+
             return None
 
         try:
-            response = APIClient.end_session(
-                self.session_id
+
+            response = (
+                APIClient.end_session(
+                    self.session_id
+                )
             )
 
         except requests.RequestException as error:
+
             try:
-                check = APIClient.get_session(
-                    self.session_id
+
+                check = (
+                    APIClient.get_session(
+                        self.session_id
+                    )
                 )
 
                 if (
@@ -780,9 +906,13 @@ class MonitoringPage(QWidget):
                     ==
                     "COMPLETED"
                 ):
-                    response = check
+
+                    response = (
+                        check
+                    )
 
                 else:
+
                     raise error
 
             except (
@@ -790,12 +920,21 @@ class MonitoringPage(QWidget):
                 ValueError,
                 AttributeError,
             ):
+
                 raise error
 
         if not response.ok:
-            if response.status_code == 409:
-                check = APIClient.get_session(
-                    self.session_id
+
+            if (
+                response.status_code
+                ==
+                409
+            ):
+
+                check = (
+                    APIClient.get_session(
+                        self.session_id
+                    )
                 )
 
                 if (
@@ -807,9 +946,13 @@ class MonitoringPage(QWidget):
                     ==
                     "COMPLETED"
                 ):
-                    response = check
+
+                    response = (
+                        check
+                    )
 
                 else:
+
                     raise RuntimeError(
                         self._response_error(
                             response
@@ -817,13 +960,16 @@ class MonitoringPage(QWidget):
                     )
 
             else:
+
                 raise RuntimeError(
                     self._response_error(
                         response
                     )
                 )
 
-        data = response.json()
+        data = (
+            response.json()
+        )
 
         if (
             not isinstance(
@@ -837,6 +983,7 @@ class MonitoringPage(QWidget):
             !=
             "COMPLETED"
         ):
+
             raise ValueError(
                 "Backend did not confirm "
                 "COMPLETED session status."
@@ -849,11 +996,15 @@ class MonitoringPage(QWidget):
             !=
             self.session_id
         ):
+
             raise ValueError(
                 "Backend returned an "
                 "unexpected session_id."
             )
 
+        # สำคัญ:
+        # Backend ยืนยันว่า session จบแล้ว
+        # จึง clear local session id
         self.session_id = None
 
         return data
@@ -867,11 +1018,15 @@ class MonitoringPage(QWidget):
         baseline_id: int,
         camera_id: int,
     ) -> dict:
-        response = APIClient.get(
-            f"/personal-baselines/{baseline_id}"
+
+        response = (
+            APIClient.get(
+                f"/personal-baselines/{baseline_id}"
+            )
         )
 
         if not response.ok:
+
             raise RuntimeError(
                 "Cannot load baseline: "
                 +
@@ -880,12 +1035,15 @@ class MonitoringPage(QWidget):
                 )
             )
 
-        baseline = response.json()
+        baseline = (
+            response.json()
+        )
 
         if not isinstance(
             baseline,
             dict,
         ):
+
             raise ValueError(
                 "Invalid baseline response."
             )
@@ -897,6 +1055,7 @@ class MonitoringPage(QWidget):
             !=
             baseline_id
         ):
+
             raise ValueError(
                 "Baseline ID does not match."
             )
@@ -908,33 +1067,50 @@ class MonitoringPage(QWidget):
             !=
             camera_id
         ):
+
             raise ValueError(
                 "Baseline belongs to another camera."
             )
 
-        shoulder = baseline.get(
-            "shoulder_angle"
+        shoulder = (
+            baseline.get(
+                "shoulder_angle"
+            )
         )
 
-        neck = baseline.get(
-            "lateral_tilt_baseline"
+        neck = (
+            baseline.get(
+                "lateral_tilt_baseline"
+            )
         )
 
-        flexion = baseline.get(
-            "neck_flexion_baseline"
+        flexion = (
+            baseline.get(
+                "neck_flexion_baseline"
+            )
         )
 
         for name, value in (
-            ("Shoulder", shoulder),
-            ("Neck lateral", neck),
+            (
+                "Shoulder",
+                shoulder,
+            ),
+            (
+                "Neck lateral",
+                neck,
+            ),
         ):
+
             if (
                 type(value)
                 not in
                 (int, float)
                 or
-                not math.isfinite(value)
+                not math.isfinite(
+                    value
+                )
             ):
+
                 raise ValueError(
                     f"Invalid {name} baseline value."
                 )
@@ -954,24 +1130,31 @@ class MonitoringPage(QWidget):
             in
             (int, float)
             and
-            math.isfinite(flexion)
+            math.isfinite(
+                flexion
+            )
         ):
+
             self.baseline_flexion_label.setText(
                 "Baseline Neck Flexion: "
                 f"{flexion:+.2f}°"
             )
+
         else:
+
             self.baseline_flexion_label.setText(
                 "Baseline Neck Flexion: N/A "
                 "(Risk Evaluation may be PARTIAL)"
             )
 
-        self.baseline_data = baseline
+        self.baseline_data = (
+            baseline
+        )
 
         return baseline
 
     # ========================================================
-    # START
+    # START MONITORING
     # ========================================================
 
     def start_monitoring(
@@ -979,7 +1162,10 @@ class MonitoringPage(QWidget):
         camera: dict,
         baseline_id: int,
     ) -> bool:
+
+        # ปิด session เก่าก่อน
         if not self.stop_monitoring():
+
             QMessageBox.warning(
                 self,
                 "ข้อผิดพลาดของเซสชัน",
@@ -994,17 +1180,24 @@ class MonitoringPage(QWidget):
             camera.copy()
         )
 
-        self.baseline_id = baseline_id
-
-        device_index = camera.get(
-            "device_index"
+        self.baseline_id = (
+            baseline_id
         )
 
-        camera_id = camera.get(
-            "camera_id"
+        device_index = (
+            camera.get(
+                "device_index"
+            )
+        )
+
+        camera_id = (
+            camera.get(
+                "camera_id"
+            )
         )
 
         if device_index is None:
+
             QMessageBox.warning(
                 self,
                 "การตรวจจับ",
@@ -1019,6 +1212,7 @@ class MonitoringPage(QWidget):
             or
             baseline_id <= 0
         ):
+
             QMessageBox.warning(
                 self,
                 "การตรวจจับ",
@@ -1027,13 +1221,19 @@ class MonitoringPage(QWidget):
 
             return False
 
+        # ====================================================
+        # LOAD BASELINE
+        # ====================================================
+
         try:
+
             if (
                 type(camera_id)
                 is not int
                 or
                 camera_id <= 0
             ):
+
                 raise ValueError(
                     "Camera ID ไม่ถูกต้อง"
                 )
@@ -1049,6 +1249,7 @@ class MonitoringPage(QWidget):
             ValueError,
             TypeError,
         ) as error:
+
             QMessageBox.warning(
                 self,
                 "ข้อผิดพลาดของค่าอ้างอิง",
@@ -1070,12 +1271,22 @@ class MonitoringPage(QWidget):
             f"Baseline ID: {baseline_id}"
         )
 
+        # ====================================================
+        # CAMERA + DETECTOR + BACKEND SESSION
+        # ====================================================
+
         try:
-            self.capture = cv2.VideoCapture(
-                int(device_index)
+
+            self.capture = (
+                cv2.VideoCapture(
+                    int(
+                        device_index
+                    )
+                )
             )
 
             if not self.capture.isOpened():
+
                 raise RuntimeError(
                     "Unable to open camera."
                 )
@@ -1084,12 +1295,15 @@ class MonitoringPage(QWidget):
                 DetectionService()
             )
 
-            response = APIClient.start_session(
-                camera_id,
-                baseline_id,
+            response = (
+                APIClient.start_session(
+                    camera_id,
+                    baseline_id,
+                )
             )
 
             if not response.ok:
+
                 raise RuntimeError(
                     "Cannot start session: "
                     +
@@ -1098,7 +1312,9 @@ class MonitoringPage(QWidget):
                     )
                 )
 
-            session = response.json()
+            session = (
+                response.json()
+            )
 
             session_id = (
                 session.get(
@@ -1108,7 +1324,8 @@ class MonitoringPage(QWidget):
                     session,
                     dict,
                 )
-                else None
+                else
+                None
             )
 
             if (
@@ -1117,6 +1334,7 @@ class MonitoringPage(QWidget):
                 or
                 session_id <= 0
             ):
+
                 raise ValueError(
                     "Backend returned an "
                     "invalid session_id."
@@ -1129,12 +1347,15 @@ class MonitoringPage(QWidget):
                 !=
                 "RUNNING"
             ):
+
                 raise ValueError(
                     "Backend did not confirm "
                     "RUNNING status."
                 )
 
-            self.session_id = session_id
+            self.session_id = (
+                session_id
+            )
 
         except (
             requests.RequestException,
@@ -1143,6 +1364,7 @@ class MonitoringPage(QWidget):
             TypeError,
             OSError,
         ) as error:
+
             self.stop_monitoring()
 
             QMessageBox.warning(
@@ -1152,6 +1374,10 @@ class MonitoringPage(QWidget):
             )
 
             return False
+
+        # ====================================================
+        # RESET SESSION STATE
+        # ====================================================
 
         self.frame_count = 0
 
@@ -1170,11 +1396,20 @@ class MonitoringPage(QWidget):
         self.session_started_monotonic = (
             time.monotonic()
         )
+
+        # ====================================================
+        # SESSION RISK SCORE
+        # ====================================================
+
         self.risk_score_collector.reset(
             session_started_at_monotonic=(
                 self.session_started_monotonic
             )
         )
+
+        # ====================================================
+        # DETECTION STATISTICS
+        # ====================================================
 
         self.detection_count = 0
         self.pose_detected_count = 0
@@ -1182,6 +1417,10 @@ class MonitoringPage(QWidget):
 
         self.shoulder_samples.clear()
         self.neck_samples.clear()
+
+        # ====================================================
+        # RISK
+        # ====================================================
 
         self.risk_sample_counts = {
             level: 0
@@ -1192,7 +1431,30 @@ class MonitoringPage(QWidget):
 
         self.risk_persistence.reset()
 
-        self.reset_risk_tracking()  
+        self.reset_risk_tracking()
+
+        # ====================================================
+        # BLINK
+        # ====================================================
+
+        self.blink_detector.reset(
+            preserve_count=False,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = None
+
+        self.eye_state_label.setText(
+            "สถานะตา: กำลัง Calibration"
+        )
+
+        self.blink_count_label.setText(
+            "จำนวนการกระพริบตา: 0"
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
 
         self.session_label.setText(
             f"Session ID: {self.session_id}"
@@ -1235,6 +1497,7 @@ class MonitoringPage(QWidget):
         self,
         *_args,
     ) -> None:
+
         self.close_posture_alert()
 
         self.sound_player.notify(
@@ -1277,15 +1540,18 @@ class MonitoringPage(QWidget):
         self,
         settings: dict,
     ) -> None:
+
         self.sound_player.apply_settings(
             settings
         )
 
         if (
-            not self.sound_player.settings[
+            not
+            self.sound_player.settings[
                 "notifications_enabled"
             ]
         ):
+
             self.close_posture_alert()
 
     # ========================================================
@@ -1296,20 +1562,27 @@ class MonitoringPage(QWidget):
     def _factor_text(
         factors: list[dict],
     ) -> str:
+
         if not factors:
+
             return "ไม่มี"
 
         names = []
 
         for factor in factors:
-            factor_name = factor.get(
-                "factor"
+
+            factor_name = (
+                factor.get(
+                    "factor"
+                )
             )
 
             names.append(
                 FACTOR_THAI.get(
                     factor_name,
-                    str(factor_name),
+                    str(
+                        factor_name
+                    ),
                 )
             )
 
@@ -1321,17 +1594,22 @@ class MonitoringPage(QWidget):
     def _factor_names(
         factors: list[dict],
     ) -> list[str]:
+
         output = []
 
         for factor in factors:
-            name = factor.get(
-                "factor"
+
+            name = (
+                factor.get(
+                    "factor"
+                )
             )
 
             if isinstance(
                 name,
                 str,
             ):
+
                 output.append(
                     name
                 )
@@ -1342,18 +1620,23 @@ class MonitoringPage(QWidget):
     def _longest_continuous_seconds(
         temporal_result: dict,
     ) -> float:
+
         active_factors = (
             temporal_result.get(
                 "active_factors"
             )
-            or []
+            or
+            []
         )
 
         values = []
 
         for factor in active_factors:
-            value = factor.get(
-                "continuous_seconds"
+
+            value = (
+                factor.get(
+                    "continuous_seconds"
+                )
             )
 
             if (
@@ -1361,16 +1644,24 @@ class MonitoringPage(QWidget):
                 in
                 (int, float)
                 and
-                math.isfinite(value)
+                math.isfinite(
+                    value
+                )
             ):
+
                 values.append(
-                    float(value)
+                    float(
+                        value
+                    )
                 )
 
         return (
-            max(values)
+            max(
+                values
+            )
             if values
-            else 0.0
+            else
+            0.0
         )
 
     # ========================================================
@@ -1381,6 +1672,11 @@ class MonitoringPage(QWidget):
         self,
         detection_result: dict,
     ) -> dict:
+
+        # ====================================================
+        # DETECTION -> COMPLETE PIPELINE
+        # ====================================================
+
         pipeline_result = (
             self.risk_pipeline.process_detection(
                 detection_result,
@@ -1391,19 +1687,32 @@ class MonitoringPage(QWidget):
         self.last_pipeline_result = (
             pipeline_result
         )
+
+        # ====================================================
+        # SESSION RISK SCORE COLLECTOR
+        # ====================================================
+
         try:
+
             self.risk_score_collector.add_pipeline_result(
                 pipeline_result
             )
 
         except Exception as error:
+
             print(
                 "RISK SCORE COLLECTOR ERROR:",
                 error,
             )
 
+        # ====================================================
+        # DATABASE PERSISTENCE
+        # ====================================================
+
         if self.session_id is not None:
+
             try:
+
                 self.risk_persistence.process_pipeline_result(
                     session_id=(
                         self.session_id
@@ -1414,34 +1723,45 @@ class MonitoringPage(QWidget):
                 )
 
             except Exception as error:
+
                 print(
                     "RISK PERSISTENCE ERROR:",
                     error,
                 )
 
-        assessment = pipeline_result[
-            "assessment"
-        ]
+        assessment = (
+            pipeline_result[
+                "assessment"
+            ]
+        )
 
-        temporal = pipeline_result[
-            "temporal"
-        ]
+        temporal = (
+            pipeline_result[
+                "temporal"
+            ]
+        )
 
-        risk = pipeline_result[
-            "risk"
-        ]
+        risk = (
+            pipeline_result[
+                "risk"
+            ]
+        )
 
-        risk_event = pipeline_result[
-            "risk_event"
-        ]
+        risk_event = (
+            pipeline_result[
+                "risk_event"
+            ]
+        )
 
-        alert = pipeline_result[
-            "alert_policy"
-        ]
+        alert = (
+            pipeline_result[
+                "alert_policy"
+            ]
+        )
 
-        # ----------------------------------------------------
-        # Assessment
-        # ----------------------------------------------------
+        # ====================================================
+        # ASSESSMENT
+        # ====================================================
 
         self.assessment_label.setText(
             "Assessment: "
@@ -1453,7 +1773,8 @@ class MonitoringPage(QWidget):
             assessment.get(
                 "factors"
             )
-            or []
+            or
+            []
         )
 
         self.factor_label.setText(
@@ -1464,9 +1785,9 @@ class MonitoringPage(QWidget):
             )
         )
 
-        # ----------------------------------------------------
-        # Temporal
-        # ----------------------------------------------------
+        # ====================================================
+        # TEMPORAL
+        # ====================================================
 
         longest_seconds = (
             self._longest_continuous_seconds(
@@ -1479,12 +1800,14 @@ class MonitoringPage(QWidget):
             f"{longest_seconds:.1f} s"
         )
 
-        # ----------------------------------------------------
-        # Risk
-        # ----------------------------------------------------
+        # ====================================================
+        # RISK
+        # ====================================================
 
-        risk_level = risk.get(
-            "risk_level"
+        risk_level = (
+            risk.get(
+                "risk_level"
+            )
         )
 
         if (
@@ -1497,6 +1820,7 @@ class MonitoringPage(QWidget):
             in
             RISK_LEVELS
         ):
+
             self.risk_label.setText(
                 "Risk Level: "
                 f"{risk_level} "
@@ -1508,21 +1832,26 @@ class MonitoringPage(QWidget):
             ] += 1
 
         else:
+
             self.risk_label.setText(
                 "Risk Level: N/A "
                 f"({risk.get('status')})"
             )
 
-        # ----------------------------------------------------
-        # Risk Event
-        # ----------------------------------------------------
+        # ====================================================
+        # RISK EVENT
+        # ====================================================
 
-        event_action = risk_event.get(
-            "event_action"
+        event_action = (
+            risk_event.get(
+                "event_action"
+            )
         )
 
-        event = risk_event.get(
-            "event"
+        event = (
+            risk_event.get(
+                "event"
+            )
         )
 
         event_id = (
@@ -1533,10 +1862,12 @@ class MonitoringPage(QWidget):
                 event,
                 dict,
             )
-            else None
+            else
+            None
         )
 
         if event_id is not None:
+
             self.event_label.setText(
                 "Risk Event: "
                 f"{event_action} | "
@@ -1544,32 +1875,42 @@ class MonitoringPage(QWidget):
             )
 
         else:
+
             self.event_label.setText(
                 "Risk Event: "
                 f"{event_action}"
             )
 
-        # ----------------------------------------------------
-        # Risk Event lifecycle -> presentation lifecycle
-        # ----------------------------------------------------
+        # ====================================================
+        # EVENT RESOLVED
+        # ====================================================
 
-        if event_action == "RESOLVED":
+        if (
+            event_action
+            ==
+            "RESOLVED"
+        ):
+
             self.close_posture_alert()
 
             self.sound_player.notify(
                 False
             )
 
-        # ----------------------------------------------------
-        # Alert Policy
-        # ----------------------------------------------------
+        # ====================================================
+        # ALERT POLICY
+        # ====================================================
 
-        decision = alert.get(
-            "decision"
+        decision = (
+            alert.get(
+                "decision"
+            )
         )
 
-        alert_type = alert.get(
-            "alert_type"
+        alert_type = (
+            alert.get(
+                "alert_type"
+            )
         )
 
         should_notify = (
@@ -1580,6 +1921,7 @@ class MonitoringPage(QWidget):
         )
 
         if should_notify:
+
             self.alert_label.setText(
                 "Alert Policy: "
                 f"{decision} | "
@@ -1595,7 +1937,9 @@ class MonitoringPage(QWidget):
                         "current_risk_level"
                     )
                 ),
-                alert_type=alert_type,
+                alert_type=(
+                    alert_type
+                ),
                 factors=(
                     self._factor_names(
                         factors
@@ -1609,6 +1953,7 @@ class MonitoringPage(QWidget):
             self.sound_player.play_alert()
 
         else:
+
             self.alert_label.setText(
                 "Alert Policy: "
                 f"{decision}"
@@ -1617,38 +1962,24 @@ class MonitoringPage(QWidget):
         return pipeline_result
 
     # ========================================================
-    # ALERT POPUP LIFECYCLE
+    # ALERT POPUP
     # ========================================================
 
     def close_posture_alert(
         self,
     ) -> None:
-        """
-        Close the currently visible posture alert popup.
-
-        Closing the popup only changes presentation state.
-        It does not alter:
-        - Risk Evaluation
-        - Risk Event
-        - Alert Policy
-        """
 
         if self.alert_popup is None:
+
             return
 
         try:
+
             self.alert_popup.close()
 
         finally:
+
             self.alert_popup = None
-
-    # ========================================================
-    # POPUP
-    # ========================================================
-
-        # ========================================================
-    # POPUP
-    # ========================================================
 
     def show_posture_alert(
         self,
@@ -1658,27 +1989,6 @@ class MonitoringPage(QWidget):
         factors: list[str] | None,
         duration_seconds: float,
     ) -> bool:
-        """
-        Show a non-blocking posture alert popup.
-
-        Returns:
-            True:
-                A popup was created and shown.
-
-            False:
-                Notification presentation is disabled, so no
-                popup was created.
-
-        Important:
-        Disabling popup presentation does NOT alter:
-        - Risk Evaluation
-        - Risk Event
-        - Alert Policy
-
-        Alert Policy may still decide that an alert event exists.
-        This method only controls whether the Desktop UI presents
-        that notification to the user.
-        """
 
         notifications_enabled = (
             self.sound_player.settings.get(
@@ -1687,55 +1997,64 @@ class MonitoringPage(QWidget):
             )
         )
 
-        # ----------------------------------------------------
-        # User disabled notification presentation
-        # ----------------------------------------------------
-
         if not notifications_enabled:
+
             self.close_posture_alert()
 
             return False
 
-        # ----------------------------------------------------
-        # Never stack multiple posture alert dialogs.
-        # Replace the previous presentation with the newest one.
-        # ----------------------------------------------------
-
+        # ไม่ให้ popup ซ้อนกัน
         self.close_posture_alert()
 
         self.alert_popup = (
             PostureAlertDialog(
-                risk_level=risk_level,
-                alert_type=alert_type,
-                factors=factors,
-                duration_seconds=duration_seconds,
-                parent=self,
+                risk_level=(
+                    risk_level
+                ),
+                alert_type=(
+                    alert_type
+                ),
+                factors=(
+                    factors
+                ),
+                duration_seconds=(
+                    duration_seconds
+                ),
+                parent=(
+                    self
+                ),
             )
         )
 
-        # Non-blocking presentation.
         self.alert_popup.show()
 
         self.alert_popup.raise_()
 
         return True
+
     # ========================================================
-    # BASELINE COMPARISON DISPLAY
+    # BASELINE COMPARISON
     # ========================================================
 
     def update_baseline_comparison(
         self,
         result: dict,
     ) -> None:
+
         if self.baseline_data is None:
+
             return
 
-        current_shoulder = result.get(
-            "shoulder_tilt"
+        current_shoulder = (
+            result.get(
+                "shoulder_tilt"
+            )
         )
 
-        neck_result = result.get(
-            "neck_lateral_tilt"
+        neck_result = (
+            result.get(
+                "neck_lateral_tilt"
+            )
         )
 
         current_neck = (
@@ -1746,11 +2065,14 @@ class MonitoringPage(QWidget):
                 neck_result,
                 dict,
             )
-            else None
+            else
+            None
         )
 
-        current_flexion = result.get(
-            "neck_flexion"
+        current_flexion = (
+            result.get(
+                "neck_flexion"
+            )
         )
 
         baseline_shoulder = (
@@ -1771,6 +2093,10 @@ class MonitoringPage(QWidget):
             )
         )
 
+        # ====================================================
+        # SHOULDER
+        # ====================================================
+
         if (
             type(current_shoulder)
             in
@@ -1788,6 +2114,7 @@ class MonitoringPage(QWidget):
                 baseline_shoulder
             )
         ):
+
             difference = (
                 current_shoulder
                 -
@@ -1800,9 +2127,14 @@ class MonitoringPage(QWidget):
             )
 
         else:
+
             self.shoulder_difference_label.setText(
                 "ผลต่างจาก Baseline ไหล่: --"
             )
+
+        # ====================================================
+        # NECK LATERAL
+        # ====================================================
 
         if (
             type(current_neck)
@@ -1821,6 +2153,7 @@ class MonitoringPage(QWidget):
                 baseline_neck
             )
         ):
+
             difference = (
                 current_neck
                 -
@@ -1833,9 +2166,14 @@ class MonitoringPage(QWidget):
             )
 
         else:
+
             self.neck_difference_label.setText(
                 "ผลต่างจาก Baseline คอด้านข้าง: --"
             )
+
+        # ====================================================
+        # FLEXION / EXTENSION
+        # ====================================================
 
         if (
             type(current_flexion)
@@ -1854,6 +2192,7 @@ class MonitoringPage(QWidget):
                 baseline_flexion
             )
         ):
+
             difference = (
                 current_flexion
                 -
@@ -1866,6 +2205,7 @@ class MonitoringPage(QWidget):
             )
 
         else:
+
             self.flexion_difference_label.setText(
                 "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
             )
@@ -1878,6 +2218,7 @@ class MonitoringPage(QWidget):
         self,
         result: dict,
     ) -> None:
+
         self.detection_count += 1
 
         if (
@@ -1886,15 +2227,19 @@ class MonitoringPage(QWidget):
             )
             is not None
         ):
+
             self.pose_detected_count += 1
 
         if result.get(
             "face_detected"
         ):
+
             self.face_detected_count += 1
 
-        shoulder = result.get(
-            "shoulder_tilt"
+        shoulder = (
+            result.get(
+                "shoulder_tilt"
+            )
         )
 
         if (
@@ -1906,12 +2251,17 @@ class MonitoringPage(QWidget):
                 shoulder
             )
         ):
+
             self.shoulder_samples.append(
-                float(shoulder)
+                float(
+                    shoulder
+                )
             )
 
-        neck_result = result.get(
-            "neck_lateral_tilt"
+        neck_result = (
+            result.get(
+                "neck_lateral_tilt"
+            )
         )
 
         neck = (
@@ -1922,7 +2272,8 @@ class MonitoringPage(QWidget):
                 neck_result,
                 dict,
             )
-            else None
+            else
+            None
         )
 
         if (
@@ -1934,15 +2285,260 @@ class MonitoringPage(QWidget):
                 neck
             )
         ):
+
             self.neck_samples.append(
-                float(neck)
+                float(
+                    neck
+                )
             )
+
+    # ========================================================
+    # BLINK DETECTION
+    # ========================================================
+
+    def update_blink_detection(
+        self,
+        detection_result: dict,
+    ) -> dict:
+
+        blink_result = (
+            self.blink_detector.process_detection(
+                detection_result,
+                now=time.monotonic(),
+            )
+        )
+
+        self.last_blink_result = (
+            blink_result
+        )
+
+        calibrated = (
+            blink_result.get(
+                "calibrated"
+            )
+            is True
+        )
+
+        # ========================================================
+        # CALIBRATION
+        # ========================================================
+
+        if not calibrated:
+
+            progress = (
+                blink_result.get(
+                    "calibration_progress"
+                )
+                or
+                0.0
+            )
+
+            calibration_text = (
+                f"กำลัง Calibration "
+                f"{progress * 100:.0f}%"
+            )
+
+            self.right_eye_state_label.setText(
+                f"ตาขวา: {calibration_text}"
+            )
+
+            self.left_eye_state_label.setText(
+                f"ตาซ้าย: {calibration_text}"
+            )
+
+            self.eye_state_label.setText(
+                f"สถานะตารวม: {calibration_text}"
+            )
+
+            self.eye_pattern_label.setText(
+                "รูปแบบตา: CALIBRATING"
+            )
+
+        else:
+
+            right_state = (
+                blink_result.get(
+                    "right_eye_state"
+                )
+                or
+                "UNKNOWN"
+            )
+
+            left_state = (
+                blink_result.get(
+                    "left_eye_state"
+                )
+                or
+                "UNKNOWN"
+            )
+
+            combined_state = (
+                blink_result.get(
+                    "eye_state"
+                )
+                or
+                "UNKNOWN"
+            )
+
+            eye_pattern = (
+                blink_result.get(
+                    "eye_pattern"
+                )
+                or
+                "UNKNOWN"
+            )
+
+            self.right_eye_state_label.setText(
+                f"ตาขวา: {right_state}"
+            )
+
+            self.left_eye_state_label.setText(
+                f"ตาซ้าย: {left_state}"
+            )
+
+            self.eye_state_label.setText(
+                f"สถานะตารวม: {combined_state}"
+            )
+
+            pattern_text = {
+                "BOTH_OPEN": (
+                    "ตาทั้งสองเปิด"
+                ),
+
+                "BOTH_CLOSED": (
+                    "ตาทั้งสองปิด"
+                ),
+
+                "RIGHT_ONLY_CLOSED": (
+                    "ปิดเฉพาะตาขวา"
+                ),
+
+                "LEFT_ONLY_CLOSED": (
+                    "ปิดเฉพาะตาซ้าย"
+                ),
+
+                "UNKNOWN": (
+                    "ไม่สามารถระบุได้"
+                ),
+            }.get(
+                eye_pattern,
+                eye_pattern,
+            )
+
+            self.eye_pattern_label.setText(
+                "รูปแบบตา: "
+                f"{pattern_text}"
+            )
+
+        # ========================================================
+        # OPENNESS
+        # ========================================================
+
+        right_openness = (
+            blink_result.get(
+                "right_eye_openness"
+            )
+        )
+
+        left_openness = (
+            blink_result.get(
+                "left_eye_openness"
+            )
+        )
+
+        if (
+            type(right_openness)
+            in
+            (int, float)
+            and
+            type(left_openness)
+            in
+            (int, float)
+            and
+            math.isfinite(
+                right_openness
+            )
+            and
+            math.isfinite(
+                left_openness
+            )
+        ):
+
+            self.eye_openness_label.setText(
+                "Eye Openness: "
+                f"R={right_openness:.3f} | "
+                f"L={left_openness:.3f}"
+            )
+
+        else:
+
+            self.eye_openness_label.setText(
+                "Eye Openness: --"
+            )
+
+        # ========================================================
+        # BLINK
+        # ========================================================
+
+        blink_count = (
+            blink_result.get(
+                "blink_count"
+            )
+            or
+            0
+        )
+
+        blink_event = (
+            blink_result.get(
+                "blink_event"
+            )
+            is True
+        )
+
+        if blink_event:
+
+            duration = (
+                blink_result.get(
+                    "blink_duration_seconds"
+                )
+            )
+
+            if (
+                type(duration)
+                in
+                (int, float)
+            ):
+
+                self.blink_count_label.setText(
+                    "จำนวนการกระพริบตา: "
+                    f"{blink_count} "
+                    f"| Blink {duration:.2f}s"
+                )
+
+            else:
+
+                self.blink_count_label.setText(
+                    "จำนวนการกระพริบตา: "
+                    f"{blink_count}"
+                )
+
+        else:
+
+            self.blink_count_label.setText(
+                "จำนวนการกระพริบตา: "
+                f"{blink_count}"
+            )
+
+        return blink_result
 
     # ========================================================
     # CAMERA LOOP
     # ========================================================
 
-    def update_frame(self) -> None:
+    def update_frame(
+        self,
+    ) -> None:
+
         if (
             self.capture is None
             or
@@ -1950,6 +2546,7 @@ class MonitoringPage(QWidget):
             or
             self.is_stopping
         ):
+
             return
 
         success, frame = (
@@ -1961,6 +2558,7 @@ class MonitoringPage(QWidget):
             or
             frame is None
         ):
+
             self._finish_after_capture_error()
 
             QMessageBox.warning(
@@ -1973,37 +2571,81 @@ class MonitoringPage(QWidget):
 
         self.frame_count += 1
 
-        # Detection is intentionally not run on every camera
-        # frame to preserve the teammate's existing behavior.
+        # ====================================================
+        # PROCESS EVERY 5 CAMERA FRAMES
+        #
+        # ใช้ Detection result ชุดเดียวร่วมกันทั้งหมด
+        #
+        # Camera
+        #   ↓
+        # DetectionService
+        #   ├─ Detection Statistics
+        #   ├─ Baseline Comparison
+        #   ├─ Blink Detection
+        #   ├─ Risk Pipeline
+        #   └─ Live UI
+        # ====================================================
+
         if (
             self.detector is not None
             and
             self.frame_count % 5 == 0
         ):
+
             try:
+
+                # ============================================
+                # 1. DETECTION
+                # ============================================
+
                 result = (
                     self.detector.process_frame(
                         frame
                     )
                 )
 
+                # ============================================
+                # 2. STATISTICS
+                # ============================================
+
                 self.record_detection_sample(
                     result
                 )
+
+                # ============================================
+                # 3. PERSONAL BASELINE
+                # ============================================
 
                 self.update_baseline_comparison(
                     result
                 )
 
+                # ============================================
+                # 4. BLINK
+                # ============================================
+
+                self.update_blink_detection(
+                    result
+                )
+
+                # ============================================
+                # 5. POSTURE RISK PIPELINE
+                # ============================================
+
                 self.update_validated_risk(
                     result
                 )
+
+                # ============================================
+                # 6. LIVE DETECTION UI
+                # ============================================
 
                 self._update_detection_labels(
                     result
                 )
 
             except Exception as error:
+
                 self._finish_after_capture_error()
 
                 QMessageBox.warning(
@@ -2013,6 +2655,10 @@ class MonitoringPage(QWidget):
                 )
 
                 return
+
+        # ====================================================
+        # CAMERA PREVIEW
+        # ====================================================
 
         self._update_preview(
             frame
@@ -2026,13 +2672,15 @@ class MonitoringPage(QWidget):
         self,
         result: dict,
     ) -> None:
+
         pose_text = (
             "ตรวจพบ"
             if result.get(
                 "pose_points"
             )
             is not None
-            else "ไม่พบ"
+            else
+            "ไม่พบ"
         )
 
         face_text = (
@@ -2040,7 +2688,8 @@ class MonitoringPage(QWidget):
             if result.get(
                 "face_detected"
             )
-            else "ไม่พบ"
+            else
+            "ไม่พบ"
         )
 
         self.detection_label.setText(
@@ -2048,8 +2697,14 @@ class MonitoringPage(QWidget):
             f"ใบหน้า: {face_text}"
         )
 
-        shoulder = result.get(
-            "shoulder_tilt"
+        # ====================================================
+        # SHOULDER
+        # ====================================================
+
+        shoulder = (
+            result.get(
+                "shoulder_tilt"
+            )
         )
 
         self.shoulder_label.setText(
@@ -2067,8 +2722,14 @@ class MonitoringPage(QWidget):
             "ความเอียงไหล่: --"
         )
 
-        neck_result = result.get(
-            "neck_lateral_tilt"
+        # ====================================================
+        # NECK LATERAL
+        # ====================================================
+
+        neck_result = (
+            result.get(
+                "neck_lateral_tilt"
+            )
         )
 
         neck = (
@@ -2079,7 +2740,8 @@ class MonitoringPage(QWidget):
                 neck_result,
                 dict,
             )
-            else None
+            else
+            None
         )
 
         self.neck_label.setText(
@@ -2097,8 +2759,14 @@ class MonitoringPage(QWidget):
             "ความเอียงคอด้านข้าง: --"
         )
 
-        flexion = result.get(
-            "neck_flexion"
+        # ====================================================
+        # FLEXION
+        # ====================================================
+
+        flexion = (
+            result.get(
+                "neck_flexion"
+            )
         )
 
         self.flexion_label.setText(
@@ -2124,9 +2792,12 @@ class MonitoringPage(QWidget):
         self,
         frame,
     ) -> None:
-        frame_rgb = cv2.cvtColor(
-            frame,
-            cv2.COLOR_BGR2RGB,
+
+        frame_rgb = (
+            cv2.cvtColor(
+                frame,
+                cv2.COLOR_BGR2RGB,
+            )
         )
 
         height, width, channels = (
@@ -2141,20 +2812,26 @@ class MonitoringPage(QWidget):
             480,
         )
 
-        image = QImage(
-            frame_rgb.data,
-            width,
-            height,
-            channels * width,
-            QImage.Format.Format_RGB888,
-        ).copy()
+        image = (
+            QImage(
+                frame_rgb.data,
+                width,
+                height,
+                channels * width,
+                QImage.Format.Format_RGB888,
+            )
+            .copy()
+        )
 
-        pixmap = QPixmap.fromImage(
-            image
-        ).scaled(
-            self.preview_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+        pixmap = (
+            QPixmap.fromImage(
+                image
+            )
+            .scaled(
+                self.preview_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
         )
 
         self.preview_label.setPixmap(
@@ -2168,6 +2845,7 @@ class MonitoringPage(QWidget):
     def _finish_after_capture_error(
         self,
     ) -> None:
+
         self._close_capture_resources()
 
         self.pause_button.setEnabled(
@@ -2184,43 +2862,98 @@ class MonitoringPage(QWidget):
     def _close_capture_resources(
         self,
     ) -> None:
+
         self.timer.stop()
 
+        # ====================================================
+        # DETECTOR
+        # ====================================================
+
         if self.detector is not None:
+
             try:
+
                 self.detector.close()
 
             except Exception as error:
+
                 print(
                     "DETECTION CLOSE ERROR:",
                     error,
                 )
 
             finally:
+
                 self.detector = None
 
+        # ====================================================
+        # CAMERA
+        # ====================================================
+
         if self.capture is not None:
+
             try:
+
                 self.capture.release()
 
             finally:
+
                 self.capture = None
 
     def _release_local_resources(
         self,
     ) -> None:
+
         self._close_capture_resources()
 
         self.close_posture_alert()
 
+        # ====================================================
+        # RISK PIPELINE
+        # ====================================================
+
         self.risk_pipeline.reset()
-        self.last_pipeline_result = None
+
+        self.last_pipeline_result = (
+            None
+        )
 
         self.sound_player.notify(
             False
         )
 
+        # ====================================================
+        # BLINK
+        #
+        # Session จบแล้วจึง reset count เป็น 0
+        # ====================================================
+
+        self.blink_detector.reset(
+            preserve_count=False,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = (
+            None
+        )
+
+        self.eye_state_label.setText(
+            "สถานะตา: --"
+        )
+
+        self.blink_count_label.setText(
+            "จำนวนการกระพริบตา: 0"
+        )
+
+        # ====================================================
+        # FRAME
+        # ====================================================
+
         self.frame_count = 0
+
+        # ====================================================
+        # DETECTION UI
+        # ====================================================
 
         self.detection_label.setText(
             "ท่าทาง: กำลังรอ | "
@@ -2251,11 +2984,19 @@ class MonitoringPage(QWidget):
             "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
         )
 
+        # ====================================================
+        # PREVIEW
+        # ====================================================
+
         self.preview_label.clear()
 
         self.preview_label.setText(
             "ภาพการตรวจจับจะแสดงที่นี่"
         )
+
+        # ====================================================
+        # BUTTONS
+        # ====================================================
 
         self.stop_button.setEnabled(
             False
@@ -2271,10 +3012,21 @@ class MonitoringPage(QWidget):
 
         self.is_paused = False
 
+        # ====================================================
+        # SESSION LOCAL DATA
+        # ====================================================
+
         self.session_started_at = None
-        self.session_started_monotonic = None
+
+        self.session_started_monotonic = (
+            None
+        )
 
         self.baseline_data = None
+
+        # ====================================================
+        # BASELINE UI
+        # ====================================================
 
         self.baseline_shoulder_label.setText(
             "Baseline Shoulder Tilt: --"
@@ -2288,12 +3040,20 @@ class MonitoringPage(QWidget):
             "Baseline Neck Flexion: --"
         )
 
+        # ====================================================
+        # SESSION STATS
+        # ====================================================
+
         self.detection_count = 0
         self.pose_detected_count = 0
         self.face_detected_count = 0
 
         self.shoulder_samples.clear()
         self.neck_samples.clear()
+
+        # ====================================================
+        # PIPELINE UI
+        # ====================================================
 
         self.assessment_label.setText(
             "Assessment: Waiting"
@@ -2320,16 +3080,19 @@ class MonitoringPage(QWidget):
         )
 
     # ========================================================
-    # STOP
+    # STOP MONITORING
     # ========================================================
 
     def stop_monitoring(
         self,
     ) -> bool:
+
         ended = True
 
         if self.session_id is not None:
+
             try:
+
                 self._end_remote_session()
 
             except (
@@ -2337,6 +3100,7 @@ class MonitoringPage(QWidget):
                 RuntimeError,
                 ValueError,
             ) as error:
+
                 ended = False
 
                 print(
@@ -2358,6 +3122,7 @@ class MonitoringPage(QWidget):
         self._release_local_resources()
 
         if ended:
+
             self.status_label.setText(
                 "สถานะ: หยุดแล้ว"
             )
@@ -2367,6 +3132,7 @@ class MonitoringPage(QWidget):
             )
 
         else:
+
             self.status_label.setText(
                 "สถานะ: รอยืนยันการจบเซสชัน"
                 "จากฐานข้อมูล"
@@ -2382,16 +3148,18 @@ class MonitoringPage(QWidget):
         return ended
 
     # ========================================================
-    # SUMMARY
+    # BUILD SESSION SUMMARY
     # ========================================================
 
     def build_session_summary(
         self,
     ) -> dict:
+
         if (
             self.session_started_monotonic
             is None
         ):
+
             raise RuntimeError(
                 "No active monitoring session."
             )
@@ -2405,19 +3173,39 @@ class MonitoringPage(QWidget):
 
         baseline = (
             self.baseline_data
-            or {}
+            or
+            {}
         )
 
         camera = (
             self.selected_camera
-            or {}
+            or
+            {}
         )
+
+        # ====================================================
+        # RISK SCORE
+        # ====================================================
 
         risk_score_summary = (
             self.risk_score_collector.get_summary()
         )
 
+        # ====================================================
+        # BLINK
+        # ====================================================
+
+        blink_count = (
+            int(
+                self.blink_detector.total_blinks
+            )
+        )
+
         return {
+            # =================================================
+            # SESSION
+            # =================================================
+
             "session_id": (
                 self.session_id
             ),
@@ -2459,6 +3247,18 @@ class MonitoringPage(QWidget):
                 duration
             ),
 
+            "paused_duration": (
+                0
+            ),
+
+            "pause_count": (
+                0
+            ),
+
+            # =================================================
+            # DETECTION
+            # =================================================
+
             "detection_count": (
                 self.detection_count
             ),
@@ -2475,17 +3275,25 @@ class MonitoringPage(QWidget):
                 statistics.mean(
                     self.shoulder_samples
                 )
-                if self.shoulder_samples
-                else None
+                if
+                self.shoulder_samples
+                else
+                None
             ),
 
             "average_neck": (
                 statistics.mean(
                     self.neck_samples
                 )
-                if self.neck_samples
-                else None
+                if
+                self.neck_samples
+                else
+                None
             ),
+
+            # =================================================
+            # BASELINE
+            # =================================================
 
             "baseline_shoulder": (
                 baseline.get(
@@ -2499,9 +3307,24 @@ class MonitoringPage(QWidget):
                 )
             ),
 
-            # Local validated pipeline statistics.
-            # session_summary_service currently ignores these
-            # until persistent Risk Event storage is added.
+            # =================================================
+            # BLINK
+            # =================================================
+
+            "blink_count": (
+                blink_count
+            ),
+
+            # คำนวณตอน Stop หลังได้
+            # total_duration / paused_duration จาก Backend
+            "blink_rate": (
+                None
+            ),
+
+            # =================================================
+            # RISK STATISTICS
+            # =================================================
+
             "risk_sample_counts": (
                 dict(
                     self.risk_sample_counts
@@ -2511,6 +3334,11 @@ class MonitoringPage(QWidget):
             "alert_notification_count": (
                 self.alert_notification_count
             ),
+
+            # =================================================
+            # SESSION RISK SCORE
+            # =================================================
+
             "average_risk_score": (
                 risk_score_summary.get(
                     "average_risk_score"
@@ -2528,6 +3356,7 @@ class MonitoringPage(QWidget):
                     "maximum_risk_score"
                 )
             ),
+
             "risk_score_method": (
                 "POSTGUARD_MODIFIED_RULA_FRONT_VIEW_V1"
                 if (
@@ -2537,7 +3366,8 @@ class MonitoringPage(QWidget):
                     ==
                     "AVAILABLE"
                 )
-                else None
+                else
+                None
             ),
 
             "risk_score_sample_count": (
@@ -2570,7 +3400,7 @@ class MonitoringPage(QWidget):
         }
 
     # ========================================================
-    # REMOTE PAUSE / RESUME
+    # REMOTE SESSION STATUS
     # ========================================================
 
     def _change_remote_session_status(
@@ -2578,6 +3408,7 @@ class MonitoringPage(QWidget):
         action: str,
         expected_status: str,
     ) -> dict:
+
         session_id = (
             self.session_id
         )
@@ -2588,21 +3419,25 @@ class MonitoringPage(QWidget):
             or
             session_id <= 0
         ):
+
             raise ValueError(
                 "No valid active session"
             )
 
         if action == "pause":
+
             request_function = (
                 APIClient.pause_session
             )
 
         elif action == "resume":
+
             request_function = (
                 APIClient.resume_session
             )
 
         else:
+
             raise ValueError(
                 "Unsupported session action"
             )
@@ -2610,27 +3445,47 @@ class MonitoringPage(QWidget):
         response = None
 
         try:
-            response = request_function(
-                session_id
+
+            response = (
+                request_function(
+                    session_id
+                )
             )
 
         except requests.RequestException:
+
             pass
+
+        # ====================================================
+        # REQUEST SUCCESS
+        # ====================================================
 
         if (
             response is not None
             and
             response.ok
         ):
-            data = response.json()
+
+            data = (
+                response.json()
+            )
+
+        # ====================================================
+        # FALLBACK CHECK CURRENT STATE
+        # ====================================================
 
         else:
-            check = APIClient.get_session(
-                session_id
+
+            check = (
+                APIClient.get_session(
+                    session_id
+                )
             )
 
             if not check.ok:
+
                 if response is not None:
+
                     raise RuntimeError(
                         self._response_error(
                             response
@@ -2642,7 +3497,9 @@ class MonitoringPage(QWidget):
                     "not be confirmed"
                 )
 
-            data = check.json()
+            data = (
+                check.json()
+            )
 
             if (
                 data.get(
@@ -2651,7 +3508,9 @@ class MonitoringPage(QWidget):
                 !=
                 expected_status
             ):
+
                 if response is not None:
+
                     raise RuntimeError(
                         self._response_error(
                             response
@@ -2664,10 +3523,15 @@ class MonitoringPage(QWidget):
                     expected_status
                 )
 
+        # ====================================================
+        # VALIDATE
+        # ====================================================
+
         if not isinstance(
             data,
             dict,
         ):
+
             raise ValueError(
                 "Invalid session response"
             )
@@ -2679,6 +3543,7 @@ class MonitoringPage(QWidget):
             !=
             session_id
         ):
+
             raise ValueError(
                 "Session ID mismatch"
             )
@@ -2690,16 +3555,23 @@ class MonitoringPage(QWidget):
             !=
             expected_status
         ):
+
             raise RuntimeError(
                 f"Expected {expected_status}, "
-                f"received {data.get('status')}"
+                f"received "
+                f"{data.get('status')}"
             )
 
         return data
 
+    # ========================================================
+    # PAUSE / RESUME BUTTON
+    # ========================================================
+
     def handle_pause_resume(
         self,
     ) -> None:
+
         if (
             self.session_id is None
             or
@@ -2707,6 +3579,7 @@ class MonitoringPage(QWidget):
             or
             self.capture is None
         ):
+
             return
 
         self.pause_button.setEnabled(
@@ -2714,22 +3587,31 @@ class MonitoringPage(QWidget):
         )
 
         if self.is_paused:
+
             self._resume_monitoring()
 
         else:
+
             self._pause_monitoring()
 
         if self.session_id is not None:
+
             self.pause_button.setEnabled(
                 True
             )
 
         self.state_changed.emit()
 
+    # ========================================================
+    # PAUSE
+    # ========================================================
+
     def _pause_monitoring(
         self,
     ) -> None:
+
         try:
+
             remote = (
                 self._change_remote_session_status(
                     action="pause",
@@ -2743,6 +3625,7 @@ class MonitoringPage(QWidget):
             ValueError,
             TypeError,
         ) as error:
+
             QMessageBox.warning(
                 self,
                 "หยุดชั่วคราวไม่สำเร็จ",
@@ -2755,10 +3638,48 @@ class MonitoringPage(QWidget):
             return
 
         self.timer.stop()
+
         self.is_paused = True
 
-        # Risk continuity must not cross a user pause.
+        # ====================================================
+        # RISK
+        #
+        # Risk continuity ห้ามข้าม Pause
+        # ====================================================
+
         self.reset_risk_tracking()
+
+        # ====================================================
+        # BLINK
+        #
+        # จำนวนเดิมยังอยู่ แต่ state/calibration เริ่มใหม่
+        #
+        # ป้องกัน:
+        #
+        # CLOSED
+        # → Pause
+        # → Resume
+        # → OPEN
+        #
+        # แล้วถูกนับเป็น Blink ผิด
+        # ====================================================
+
+        self.blink_detector.reset(
+            preserve_count=True,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = (
+            None
+        )
+
+        self.eye_state_label.setText(
+            "สถานะตา: PAUSED"
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
 
         self.preview_label.clear()
 
@@ -2800,10 +3721,16 @@ class MonitoringPage(QWidget):
             "Resume Monitoring"
         )
 
+    # ========================================================
+    # RESUME
+    # ========================================================
+
     def _resume_monitoring(
         self,
     ) -> None:
+
         try:
+
             remote = (
                 self._change_remote_session_status(
                     action="resume",
@@ -2817,6 +3744,7 @@ class MonitoringPage(QWidget):
             ValueError,
             TypeError,
         ) as error:
+
             QMessageBox.warning(
                 self,
                 "ตรวจจับต่อไม่สำเร็จ",
@@ -2830,8 +3758,40 @@ class MonitoringPage(QWidget):
 
         self.is_paused = False
 
-        # Resume starts a new temporal/risk continuity window.
+        # ====================================================
+        # RISK
+        # ====================================================
+
         self.reset_risk_tracking()
+
+        # ====================================================
+        # BLINK
+        #
+        # เริ่ม Eye Calibration ใหม่
+        # แต่ยังคงจำนวน Blink ของ Session
+        # ====================================================
+
+        self.blink_detector.reset(
+            preserve_count=True,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = (
+            None
+        )
+
+        self.eye_state_label.setText(
+            "สถานะตา: กำลัง Calibration"
+        )
+
+        self.blink_count_label.setText(
+            "จำนวนการกระพริบตา: "
+            f"{self.blink_detector.total_blinks}"
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
 
         self.preview_label.setText(
             "กำลังตรวจจับต่อ..."
@@ -2852,43 +3812,64 @@ class MonitoringPage(QWidget):
         self.timer.start()
 
     # ========================================================
-    # FINISH
+    # STOP BUTTON
     # ========================================================
 
     def handle_stop(
         self,
     ) -> None:
+
         if self.is_stopping:
+
             return
 
         self.is_stopping = True
+
         self.state_changed.emit()
 
         try:
+
             self._finish_session()
 
         finally:
+
             self.is_stopping = False
+
             self.state_changed.emit()
+
+    # ========================================================
+    # FINISH SESSION
+    # ========================================================
 
     def _finish_session(
         self,
     ) -> None:
+
         if (
             self.session_started_monotonic
             is None
             or
             self.session_id is None
         ):
+
             return
 
-        # 1. Snapshot statistics before resource reset.
+        # ====================================================
+        # 1. SNAPSHOT LOCAL DATA
+        #
+        # ต้องเก็บก่อน reset resources
+        # ====================================================
+
         summary = (
             self.build_session_summary()
         )
 
-        # 2. End authoritative Backend Session.
+        # ====================================================
+        # 2. END BACKEND SESSION
+        # ====================================================
+
         try:
+
             remote = (
                 self._end_remote_session()
             )
@@ -2898,6 +3879,7 @@ class MonitoringPage(QWidget):
             RuntimeError,
             ValueError,
         ) as error:
+
             QMessageBox.warning(
                 self,
                 "ไม่สามารถจบเซสชัน",
@@ -2910,66 +3892,256 @@ class MonitoringPage(QWidget):
 
             return
 
-        # 3. Use authoritative backend data.
-        summary["database_status"] = (
-            remote["status"]
+        # ====================================================
+        # 3. AUTHORITATIVE BACKEND DATA
+        # ====================================================
+
+        summary[
+            "database_status"
+        ] = (
+            remote[
+                "status"
+            ]
         )
 
-        summary["session_id"] = (
-            remote["session_id"]
+        summary[
+            "session_id"
+        ] = (
+            remote[
+                "session_id"
+            ]
         )
 
-        summary["started_at"] = (
+        summary[
+            "started_at"
+        ] = (
             remote.get(
                 "started_at"
             )
             or
-            summary["started_at"]
+            summary[
+                "started_at"
+            ]
         )
 
-        summary["ended_at"] = (
+        summary[
+            "ended_at"
+        ] = (
             remote.get(
                 "ended_at"
             )
             or
-            summary["ended_at"]
+            summary[
+                "ended_at"
+            ]
         )
 
-        summary["duration_seconds"] = (
+        # ====================================================
+        # TOTAL DURATION
+        # ====================================================
+
+        remote_total_duration = (
             remote.get(
                 "total_duration"
             )
-            if remote.get(
-                "total_duration"
-            )
-            is not None
-            else
-            summary["duration_seconds"]
         )
 
-        # 4. Release local resources.
+        if (
+            remote_total_duration
+            is not None
+        ):
+
+            summary[
+                "duration_seconds"
+            ] = (
+                remote_total_duration
+            )
+
+        # ====================================================
+        # PAUSED DURATION
+        # ====================================================
+
+        paused_duration = (
+            remote.get(
+                "paused_duration"
+            )
+        )
+
+        if (
+            type(paused_duration)
+            not in
+            (int, float)
+        ):
+
+            paused_duration = 0
+
+        paused_duration = max(
+            0.0,
+            float(
+                paused_duration
+            ),
+        )
+
+        summary[
+            "paused_duration"
+        ] = (
+            paused_duration
+        )
+
+        # ====================================================
+        # PAUSE COUNT
+        # ====================================================
+
+        pause_count = (
+            remote.get(
+                "pause_count"
+            )
+        )
+
+        if (
+            type(pause_count)
+            is not int
+        ):
+
+            pause_count = 0
+
+        summary[
+            "pause_count"
+        ] = max(
+            0,
+            pause_count,
+        )
+
+        # ====================================================
+        # 4. BLINK RATE
+        #
+        # Active Time =
+        # Total Duration - Paused Duration
+        #
+        # Blink Rate =
+        # Blink Count / Active Minutes
+        # ====================================================
+
+        total_seconds = (
+            summary.get(
+                "duration_seconds"
+            )
+        )
+
+        if (
+            type(total_seconds)
+            in
+            (int, float)
+            and
+            math.isfinite(
+                float(
+                    total_seconds
+                )
+            )
+        ):
+
+            total_seconds = max(
+                0.0,
+                float(
+                    total_seconds
+                ),
+            )
+
+        else:
+
+            total_seconds = 0.0
+
+        active_seconds = max(
+            0.0,
+            total_seconds
+            -
+            paused_duration,
+        )
+
+        blink_count = (
+            summary.get(
+                "blink_count"
+            )
+            or
+            0
+        )
+
+        if (
+            active_seconds
+            >
+            0.0
+        ):
+
+            summary[
+                "blink_rate"
+            ] = (
+                float(
+                    blink_count
+                )
+                /
+                active_seconds
+                *
+                60.0
+            )
+
+        else:
+
+            summary[
+                "blink_rate"
+            ] = (
+                None
+            )
+
+        # ====================================================
+        # 5. RELEASE LOCAL RESOURCES
+        #
+        # _end_remote_session()
+        # ได้ set self.session_id = None แล้ว
+        #
+        # ดังนั้น stop_monitoring()
+        # จะไม่ยิง END ไป Backend ซ้ำ
+        # ====================================================
+
         self.stop_monitoring()
 
-        # 5. Save teammate's existing measured summary.
-        summary["summary_save_status"] = (
+        # ====================================================
+        # 6. SAVE SESSION SUMMARY
+        # ====================================================
+
+        summary[
+            "summary_save_status"
+        ] = (
             "FAILED"
         )
 
-        summary["summary_save_error"] = (
+        summary[
+            "summary_save_error"
+        ] = (
             None
         )
 
         try:
-            result = save_session_summary(
-                summary
+
+            result = (
+                save_session_summary(
+                    summary
+                )
             )
 
-            summary["summary_save_status"] = (
-                result["status"]
+            summary[
+                "summary_save_status"
+            ] = (
+                result[
+                    "status"
+                ]
             )
 
-            summary["saved_summary"] = (
-                result["summary"]
+            summary[
+                "saved_summary"
+            ] = (
+                result[
+                    "summary"
+                ]
             )
 
         except (
@@ -2979,9 +4151,14 @@ class MonitoringPage(QWidget):
             KeyError,
             TypeError,
         ) as error:
+
             summary[
                 "summary_save_error"
-            ] = str(error)
+            ] = (
+                str(
+                    error
+                )
+            )
 
             QMessageBox.warning(
                 self,
@@ -2994,11 +4171,10 @@ class MonitoringPage(QWidget):
                 "ที่หน้า Summary ได้",
             )
 
-        # 6. Open teammate's summary page.
+        # ====================================================
+        # 7. OPEN SUMMARY PAGE
+        # ====================================================
+
         self.stop_requested.emit(
             summary
         )
-
-    # Page visibility does not own Session lifetime.
-    # MainWindow explicitly ends and saves the Session on
-    # Stop, logout, or application close.
