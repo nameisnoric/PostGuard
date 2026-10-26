@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>PostGuard — System Workflow and Implementation</title>
+  <style>
+    @page { size: A4; margin: 13mm 13mm 15mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172033; font-family: Tahoma, "Leelawadee UI", sans-serif; font-size: 9.5pt; line-height: 1.48; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { color: #081a3c; font-size: 29pt; line-height: 1.15; margin-bottom: 10px; }
+    h2 { color: #0b2455; font-size: 17pt; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-bottom: 12px; }
+    h3 { color: #174a99; font-size: 11.7pt; margin: 12px 0 6px; }
+    p { margin-bottom: 7px; }
+    ul, ol { margin: 5px 0 10px; padding-left: 21px; }
+    li { margin-bottom: 3px; }
+    table { width: 100%; border-collapse: collapse; margin: 7px 0 11px; font-size: 8.55pt; }
+    th, td { border: 1px solid #ccd7e8; padding: 5px 7px; vertical-align: top; }
+    th { background: #173b7a; color: white; text-align: left; }
+    tbody tr:nth-child(even) td { background: #f7f9fc; }
+    code { color: #174589; background: #edf3fd; padding: 1px 4px; border-radius: 3px; }
+    .cover { height: 268mm; display: flex; flex-direction: column; justify-content: center; padding: 22mm 16mm; background: linear-gradient(145deg,#f8fbff,#e4efff); border: 1px solid #bfd6ff; border-radius: 18px; page-break-after: always; }
+    .brand { color: #2563eb; font-size: 14pt; font-weight: 700; letter-spacing: .8px; }
+    .subtitle { color: #50627e; font-size: 13.5pt; margin-bottom: 18mm; }
+    .meta { color: #425573; border-top: 1px solid #a9c5f6; padding-top: 12px; margin-top: 14mm; }
+    .badge { display: inline-block; color: #164fae; background: #dce9ff; border-radius: 999px; padding: 5px 10px; margin: 3px 2px; font-weight: 700; }
+    .page { page-break-after: always; }
+    .lead { background: #eff6ff; border-left: 4px solid #2563eb; padding: 10px 12px; border-radius: 7px; margin-bottom: 12px; }
+    .flow { background: #101d3b; color: white; border-radius: 10px; padding: 12px 13px; text-align: center; font-weight: 700; line-height: 1.9; margin: 8px 0 13px; }
+    .arrow { color: #83b0ff; padding: 0 3px; }
+    .note { background: #fff8e7; border: 1px solid #efd18b; border-radius: 8px; padding: 8px 10px; margin: 8px 0 11px; }
+    .success { background: #eafaf3; border-color: #a5ddc4; }
+    .danger { background: #fff1f1; border-color: #edb7b7; }
+    .formula { background: #eaf2ff; border: 1px solid #c4d8fb; border-radius: 8px; padding: 10px; text-align: center; color: #173b7a; font-weight: 700; margin: 8px 0 11px; }
+    .step { display: grid; grid-template-columns: 27px 1fr; gap: 8px; margin: 5px 0; break-inside: avoid; }
+    .num { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .step-body { border: 1px solid #d4deed; border-radius: 7px; padding: 6px 9px; background: white; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 7px 0 11px; }
+    .card { border: 1px solid #d4deed; border-radius: 8px; padding: 9px 10px; break-inside: avoid; }
+    .card strong { color: #174589; }
+    .small { color: #62728b; font-size: 8.2pt; }
+    .footer { color: #6a7890; border-top: 1px solid #d7dfeb; padding-top: 6px; margin-top: 12px; font-size: 8pt; }
+    .no-break { break-inside: avoid; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">POSTGUARD DESKTOP</div>
+    <h1>System Workflow &amp;<br>Implementation Summary</h1>
+    <p class="subtitle">สรุปการทำงานของระบบ วิธีที่ใช้ และการไหลของข้อมูลตั้งแต่ผู้ใช้เข้าสู่ระบบจนถึงรายงานผล</p>
+    <div>
+      <span class="badge">Desktop App</span><span class="badge">FastAPI</span>
+      <span class="badge">Supabase PostgreSQL</span><span class="badge">MediaPipe</span>
+      <span class="badge">Camera Adjustment</span><span class="badge">Personal Baseline</span>
+      <span class="badge">RULA-adapted</span><span class="badge">Risk Events</span>
+    </div>
+    <div class="meta"><strong>โครงการ:</strong> PostGuard<br><strong>Branch:</strong> feature/detection<br><strong>สถานะเอกสาร:</strong> อ้างอิงโค้ดปัจจุบัน<br><strong>วันที่:</strong> 27 ตุลาคม 2026</div>
+  </section>
+
+  <section class="page">
+    <h2>1. ภาพรวมระบบ</h2>
+    <div class="lead">PostGuard เป็น Desktop Application สำหรับประเมินท่าทางจากกล้องด้านหน้า ภาพกล้องถูกประมวลผลบนเครื่องผู้ใช้ ส่วน Backend รับผิดชอบบัญชี สิทธิ์ ข้อมูล Session, Baseline, Risk Event, Alert และ Report</div>
+    <div class="flow">สมัคร/เข้าสู่ระบบ <span class="arrow">→</span> ตรวจ Privacy Consent <span class="arrow">→</span> Dashboard<br>เลือกกล้อง <span class="arrow">→</span> Camera Adjustment <span class="arrow">→</span> Corrected Preview<br>Personal Baseline <span class="arrow">→</span> Monitoring <span class="arrow">→</span> Risk Event / Alert<br>Stop <span class="arrow">→</span> Session Summary <span class="arrow">→</span> Dashboard / History / Report</div>
+    <div class="grid">
+      <div class="card"><strong>Desktop</strong><br>PySide6 UI, OpenCV, MediaPipe, การประมวลผลท่าทาง, เสียงและ popup</div>
+      <div class="card"><strong>Backend</strong><br>FastAPI, JWT, validation, ownership checks และ REST API</div>
+      <div class="card"><strong>Database</strong><br>Supabase PostgreSQL ผ่าน SQLAlchemy และ Alembic migrations</div>
+      <div class="card"><strong>External services</strong><br>Resend สำหรับ OTP และ private object storage สำหรับ avatar</div>
+    </div>
+    <h3>หลักการแบ่งความรับผิดชอบ</h3>
+    <table><thead><tr><th>ชั้น</th><th>หน้าที่</th><th>ข้อมูลสำคัญ</th></tr></thead><tbody>
+      <tr><td>UI Pages / Dialogs</td><td>รับคำสั่งและแสดงสถานะให้ผู้ใช้</td><td>ไม่คำนวณ risk policy เอง</td></tr>
+      <tr><td>Desktop Services</td><td>เชื่อม UI กับ Vision และ API</td><td>จัดการ camera, persistence, session</td></tr>
+      <tr><td>Vision Pipeline</td><td>ตรวจ landmark, สร้าง measurement, assessment และ risk</td><td>ทำงานในเครื่องผู้ใช้</td></tr>
+      <tr><td>Backend</td><td>ตรวจสิทธิ์และบันทึกข้อมูลถาวร</td><td>ไม่รับภาพกล้องดิบ</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="page">
+    <h2>2. Authentication, Privacy และข้อมูลผู้ใช้</h2>
+    <h3>Registration และ OTP</h3>
+    <div class="flow">กรอกข้อมูล + @ku.th + Confirm Password <span class="arrow">→</span> ส่ง OTP ผ่าน Resend<br><span class="arrow">→</span> Verify OTP <span class="arrow">→</span> Hash Password <span class="arrow">→</span> สร้างบัญชี</div>
+    <ul>
+      <li>ระบบรับอีเมลมหาวิทยาลัย <strong>@ku.th</strong> ตามขอบเขตโครงการ</li>
+      <li>Password ถูก hash ก่อนจัดเก็บ และไม่ส่งกลับไปยัง Desktop</li>
+      <li>Login สำเร็จได้ JWT; Desktop แนบ Bearer token กับ API ส่วนตัว</li>
+      <li>Forgot Password ใช้ OTP → reset token อายุจำกัด → ตั้งรหัสผ่านใหม่</li>
+    </ul>
+    <h3>Privacy Consent</h3>
+    <p>ก่อนเปิด Camera Flow ระบบอ่าน consent version ปัจจุบัน หากยังไม่ยินยอมจะแสดง Privacy Notice และบันทึกเวลา/เวอร์ชันเมื่อยอมรับ Backend ตรวจซ้ำก่อนสร้าง Session เพื่อป้องกันการข้ามขั้นจาก client</p>
+    <h3>Profile, Settings และ Account Lifecycle</h3>
+    <table><thead><tr><th>ส่วน</th><th>วิธีทำงาน</th></tr></thead><tbody>
+      <tr><td>Profile</td><td>แก้ username/full name และยืนยันก่อน PATCH; avatar ใช้ private storage และ endpoint ที่ตรวจ JWT</td></tr>
+      <tr><td>Settings</td><td>บันทึกเปิด/ปิด notification, sound, volume และ reminder interval ต่อผู้ใช้</td></tr>
+      <tr><td>Delete account</td><td>ขอคำยืนยัน → ตั้งสถานะ PENDING_DELETION → มีช่วงกู้คืน 14 วัน → background purge ตรวจทุก 6 ชั่วโมง</td></tr>
+      <tr><td>Ownership</td><td>ทุก Camera, Baseline, Session, Risk และ Report ถูกกรองด้วย user จาก JWT</td></tr>
+    </tbody></table>
+    <div class="note success"><strong>Privacy by design:</strong> ภาพกล้องและภาพบัตรอ้างอิงไม่ถูกอัปโหลด Backend เก็บเฉพาะค่าตัวเลขและผลสรุปที่จำเป็น</div>
+  </section>
+
+  <section class="page">
+    <h2>3. Camera Flow และการแก้ภาพเอียง</h2>
+    <div class="flow">1. Scan &amp; Select <span class="arrow">→</span> 2. Camera Adjustment<br><span class="arrow">→</span> 3. Corrected Preview <span class="arrow">→</span> 4. Personal Baseline</div>
+    <h3>Camera Scan</h3>
+    <ol>
+      <li>OpenCV ทดลองเปิด device index และอ่าน frame จริง</li>
+      <li>แสดงเฉพาะกล้องที่พร้อมใช้งาน พร้อมชื่อและ resolution</li>
+      <li>กล้องที่เลือกถูกลงทะเบียนด้วย device identifier เช่น <code>opencv-index:0</code></li>
+    </ol>
+    <h3>Camera Adjustment ด้วยบัตรอ้างอิง</h3>
+    <table><thead><tr><th>ขั้นตอน</th><th>วิธี</th></tr></thead><tbody>
+      <tr><td>ค้นหาบัตร</td><td>Grayscale → Gaussian blur → Canny edge → dilation → contour/hull → polygon 4 มุม</td></tr>
+      <tr><td>ตรวจรูปทรง</td><td>อัตราส่วนบัตรมาตรฐาน 85.60 × 53.98 มม., มุมใกล้ 90°, ตำแหน่งและขนาดอยู่ใน guide</td></tr>
+      <tr><td>ตรวจแนว</td><td>คำนวณ card roll และ perspective difference; roll ต้องไม่เกิน ±5° และ perspective ไม่เกิน 10%</td></tr>
+      <tr><td>ความนิ่ง</td><td>ต้องผ่าน 10 เฟรมติดต่อกัน พร้อมตัวนับ 1/10–10/10</td></tr>
+      <tr><td>ผลลัพธ์</td><td>resolution, pixel scale X/Y/average, card roll, perspective และเวลาที่ตรวจ</td></tr>
+    </tbody></table>
+    <h3>Corrected Preview</h3>
+    <p>หลัง Adjustment ระบบนำ <code>card_roll_deg</code> มาสร้าง affine rotation matrix ด้วย OpenCV แล้วใช้ <code>warpAffine</code> หมุนชดเชยภาพ โดยรักษาขนาด frame เดิมและใช้ border replication ลดขอบดำ</p>
+    <div class="formula">Corrected Frame = warpAffine(Raw Frame, rotation(card_roll_deg))</div>
+    <p>เฟรมหลังแก้เอียงถูกใช้ทั้ง Preview, Pose/Face Detection, Personal Baseline และ Monitoring ทำให้สิ่งที่ผู้ใช้เห็นตรงกับข้อมูลที่ระบบนำไปคำนวณ</p>
+  </section>
+
+  <section class="page">
+    <h2>4. Personal Baseline</h2>
+    <div class="lead">Baseline คือท่านั่งปกติของผู้ใช้แต่ละคน ใช้ลดปัญหาการตัดสินทุกคนด้วยมุมคงที่เดียวกัน และผูกกับกล้อง/การตั้งกล้องครั้งนั้น</div>
+    <div class="flow">Corrected Frame <span class="arrow">→</span> Face + Pose valid<br><span class="arrow">→</span> เก็บ Sample <span class="arrow">→</span> ตรวจเวลา/สัดส่วน/ความนิ่ง<br><span class="arrow">→</span> Candidate <span class="arrow">→</span> ผู้ใช้ยืนยัน <span class="arrow">→</span> Save Baseline</div>
+    <table><thead><tr><th>ค่าที่เก็บ</th><th>การใช้งาน</th></tr></thead><tbody>
+      <tr><td>Shoulder tilt</td><td>ระดับไหล่ซ้าย–ขวาปกติ</td></tr>
+      <tr><td>Neck lateral tilt</td><td>การเอียงคอด้านข้างปกติ</td></tr>
+      <tr><td>Neck flexion</td><td>ค่าก้ม/เงยคออ้างอิง</td></tr>
+      <tr><td>Eye distance proxy</td><td>บริบทระยะผู้ใช้กับกล้อง</td></tr>
+      <tr><td>Camera reference</td><td>scale, roll, perspective, frame size และ calibrated time</td></tr>
+    </tbody></table>
+    <h3>การตรวจคุณภาพ</h3>
+    <ul>
+      <li>นับเฉพาะเฟรมที่มีข้อมูลจำเป็นครบและเป็นค่าจำนวน finite</li>
+      <li>ตรวจจำนวน sample, เวลาครอบคลุม, valid ratio และ stability</li>
+      <li>เมื่อผ่านจึงสร้าง Candidate; ผู้ใช้ต้องยืนยันก่อนบันทึก</li>
+      <li>Start Monitoring เปิดใช้งานหลัง Backend ตอบกลับ baseline_id สำเร็จ</li>
+    </ul>
+    <div class="note">การเปรียบเทียบขณะ Monitoring ใช้ผลต่างจาก Baseline ไม่ได้ใช้มุมกล้องดิบเพียงค่าเดียว จึงรองรับความแตกต่างด้านสรีระและท่านั่งเริ่มต้นได้ดีกว่า</div>
+  </section>
+
+  <section class="page">
+    <h2>5. Detection Pipeline</h2>
+    <div class="flow">Raw Frame <span class="arrow">→</span> Roll Correction <span class="arrow">→</span> MediaPipe<br><span class="arrow">→</span> Feature Validation <span class="arrow">→</span> Posture Assessment<br><span class="arrow">→</span> Temporal Tracking <span class="arrow">→</span> Risk Evaluation</div>
+    <div class="step"><div class="num">1</div><div class="step-body"><strong>Capture:</strong> QTimer อ่านกล้องประมาณทุก 30 ms; detection ทำทุก 5 เฟรมเพื่อลดภาระ</div></div>
+    <div class="step"><div class="num">2</div><div class="step-body"><strong>MediaPipe:</strong> Pose Landmarker และ Face Landmarker สร้าง landmark บนเครื่อง</div></div>
+    <div class="step"><div class="num">3</div><div class="step-body"><strong>Context filter:</strong> ตรวจว่ามีใบหน้า/ลำตัวและบริบทเหมาะสมก่อนอนุญาตให้ประเมิน</div></div>
+    <div class="step"><div class="num">4</div><div class="step-body"><strong>Features:</strong> คำนวณ shoulder tilt, neck lateral tilt, neck flexion และ eye state/blink</div></div>
+    <div class="step"><div class="num">5</div><div class="step-body"><strong>Baseline comparison:</strong> เทียบค่าปัจจุบันกับค่าปกติส่วนบุคคลและ threshold</div></div>
+    <div class="step"><div class="num">6</div><div class="step-body"><strong>Assessment:</strong> สร้าง posture factors เฉพาะค่าที่ตรวจได้จากกล้องด้านหน้า</div></div>
+    <div class="step"><div class="num">7</div><div class="step-body"><strong>Temporal tracking:</strong> ติดตามว่า factor ต่อเนื่องกี่วินาที; data gap ไม่ถูกนับเป็นหลักฐานใหม่</div></div>
+    <div class="step"><div class="num">8</div><div class="step-body"><strong>Risk:</strong> คำนวณ RULA-adapted และส่งต่อ Risk Event Tracker</div></div>
+    <h3>กรณีข้อมูลไม่ครบ</h3>
+    <p>หาก landmark หายหรือ feature ไม่ valid ระบบส่งสถานะ <code>NOT_EVALUATED</code>/<code>DATA_GAP</code> และแสดง N/A แทนการสร้างคะแนนจากข้อมูลเดา</p>
+  </section>
+
+  <section class="page">
+    <h2>6. RULA-adapted Risk Score</h2>
+    <div class="lead">ระบบประยุกต์แนวคิดจาก RULA เฉพาะส่วนที่กล้องด้านหน้าตรวจได้ จึงเรียกว่า <strong>RULA-adapted Front Camera</strong> ไม่ใช่ Full RULA และไม่ใช่การวินิจฉัยทางการแพทย์</div>
+    <table><thead><tr><th>หลักฐาน</th><th>เงื่อนไข</th><th>คะแนนภายใน</th></tr></thead><tbody>
+      <tr><td>Neck flexion</td><td>0–10°</td><td>Base 1</td></tr>
+      <tr><td>Neck flexion</td><td>&gt;10–20°</td><td>Base 2</td></tr>
+      <tr><td>Neck flexion</td><td>&gt;20°</td><td>Base 3</td></tr>
+      <tr><td>Neck extension</td><td>ค่าต่ำกว่า 0°</td><td>Base 4</td></tr>
+      <tr><td>Neck side bending</td><td>เกิน tolerance จาก baseline</td><td>+1</td></tr>
+      <tr><td>Shoulder asymmetry</td><td>เกิน tolerance จาก baseline</td><td>+1</td></tr>
+      <tr><td>Sustained posture</td><td>factor ต่อเนื่องมากกว่า 60 วินาที</td><td>+1</td></tr>
+    </tbody></table>
+    <div class="formula">Internal Score = min(7, Neck Base + Side Bend + Shoulder Asymmetry + Sustained Posture)</div>
+    <table><thead><tr><th>คะแนนภายใน</th><th>ระดับ</th><th>เปอร์เซ็นต์ที่แสดง</th></tr></thead><tbody>
+      <tr><td>1–2</td><td>LOW</td><td>0–16.7%</td></tr>
+      <tr><td>3–4</td><td>MODERATE</td><td>33.3–50%</td></tr>
+      <tr><td>5–6</td><td>HIGH</td><td>66.7–83.3%</td></tr>
+      <tr><td>7</td><td>VERY HIGH</td><td>100%</td></tr>
+    </tbody></table>
+    <div class="formula">Display Percentage = (Internal Score − 1) ÷ 6 × 100</div>
+    <p>Database และ Session Summary ยังเก็บคะแนน 1–7 เพื่อรักษาความหมายของ model และข้อมูลย้อนหลัง ส่วน Monitoring, Dashboard, Graph และ Report แปลงเป็น 0–100% ในชั้นแสดงผล</p>
+  </section>
+
+  <section class="page">
+    <h2>7. Risk Event และ Alert Policy</h2>
+    <div class="flow">Risk Result <span class="arrow">→</span> Risk Event Tracker<br><span class="arrow">→</span> START / UPDATE / ESCALATE / RESOLVE<br><span class="arrow">→</span> Alert Policy <span class="arrow">→</span> Popup + Sound + Database</div>
+    <h3>Risk Event Tracker</h3>
+    <p>รวมเฟรมต่อเนื่องให้เป็นเหตุการณ์เดียว เพื่อลดการสร้าง Alert ทุกเฟรม รองรับสถานะ STARTED, UPDATED, ESCALATED, DEESCALATED, DATA_GAP และ RESOLVED พร้อม runtime event id</p>
+    <h3>Alert Policy</h3>
+    <table><thead><tr><th>การตัดสินใจ</th><th>เงื่อนไข</th></tr></thead><tbody>
+      <tr><td>FIRST</td><td>แจ้งครั้งแรกเมื่อ event ระดับ MODERATE/HIGH ผ่าน first delay</td></tr>
+      <tr><td>REPEAT</td><td>เตือนซ้ำเมื่อพ้น cooldown; MODERATE 600 วินาที, HIGH 300 วินาที</td></tr>
+      <tr><td>ESCALATION</td><td>ระดับสูงขึ้นสามารถข้าม cooldown</td></tr>
+      <tr><td>SUPPRESSED</td><td>event ยังทำงานแต่ยังไม่ถึงเวลาที่ควรแจ้งซ้ำ</td></tr>
+    </tbody></table>
+    <p>เมื่อ Policy อนุญาต Desktop แสดง popup แบบ non-modal และเล่นเสียงตาม Settings จึงไม่หยุด camera timer ผู้ใช้ยังทำงานต่อได้</p>
+    <h3>การบันทึกแบบไม่บล็อก UI</h3>
+    <ul>
+      <li><code>RiskPersistenceService</code> ใช้ worker thread เดียวเรียงลำดับคำขอ</li>
+      <li>lifecycle transition และ notification ถูกส่งทันที; UPDATE ปกติ throttle ทุก 5 วินาที</li>
+      <li>retry สูงสุด 3 ครั้ง และใช้ idempotency key ป้องกันข้อมูลซ้ำ</li>
+      <li>ก่อน Pause/Stop ระบบ flush งานที่ค้างเพื่อไม่ให้ event สูญหาย</li>
+    </ul>
+  </section>
+
+  <section class="page">
+    <h2>8. Session Lifecycle และ Recovery</h2>
+    <div class="flow">Start <span class="arrow">→</span> RUNNING <span class="arrow">⇄</span> PAUSED<br>Stop <span class="arrow">→</span> COMPLETED <span class="arrow">→</span> Summary Saved<br>ปิดผิดปกติ <span class="arrow">→</span> Recovery หลัง Login <span class="arrow">→</span> INTERRUPTED</div>
+    <table><thead><tr><th>สถานะ</th><th>ความหมาย</th><th>พฤติกรรม</th></tr></thead><tbody>
+      <tr><td>RUNNING</td><td>กำลังตรวจจับ</td><td>timer, camera และ risk pipeline ทำงาน</td></tr>
+      <tr><td>PAUSED</td><td>พักชั่วคราว</td><td>ไม่นับช่วงพักเป็น active time และปิด active risk event</td></tr>
+      <tr><td>COMPLETED</td><td>ผู้ใช้ Stop สำเร็จ</td><td>บันทึก duration, summary และ report</td></tr>
+      <tr><td>INTERRUPTED</td><td>session ค้างจากการปิดผิดปกติ</td><td>กู้สถานะเมื่อ Login ครั้งถัดไปโดยไม่สร้าง Summary เทียม</td></tr>
+    </tbody></table>
+    <h3>การเปลี่ยนหน้า</h3>
+    <p>เมื่อผู้ใช้ไป Dashboard หรือ History ระหว่าง RUNNING การตรวจจับยังทำงานด้วย timer เดิม ปุ่ม Monitoring จะพากลับ session เดิม ส่วน global Pause/Stop ทำงานได้จาก navigation area</p>
+    <h3>การจบ Session</h3>
+    <ol>
+      <li>flush Risk Event/Notification ที่รอบันทึก</li>
+      <li>เรียก End Session และรับ duration จาก Backend</li>
+      <li>คำนวณสถิติจาก sample ในหน่วยความจำ</li>
+      <li>บันทึก Session Summary หนึ่งรายการต่อ Session</li>
+      <li>หากบันทึกล้มเหลว เก็บ snapshot เพื่อ Retry และไม่เริ่ม session ใหม่ทับข้อมูล</li>
+    </ol>
+  </section>
+
+  <section class="page">
+    <h2>9. Dashboard, History และ Report</h2>
+    <h3>Dashboard</h3>
+    <ul>
+      <li>จำนวน completed, active/interrupted และ active monitoring time</li>
+      <li>ค่าเฉลี่ยและค่าสูงสุด Risk แสดงเป็นเปอร์เซ็นต์</li>
+      <li>ตาราง Session ล่าสุดและจำนวน Alert ที่บันทึกจริง</li>
+      <li>กราฟ RULA Score Trend เรียงตามเวลา: สีน้ำเงิน = ค่าเฉลี่ย, สีแดง = ค่าสูงสุด</li>
+      <li>โหลด API ผ่าน Qt thread pool เพื่อไม่บล็อกการตรวจจับที่กำลังทำงาน</li>
+    </ul>
+    <h3>History และ Saved Report</h3>
+    <p>History โหลด Sessions และ Summaries ที่เป็นของผู้ใช้ เลือก session เพื่อเปิดรายงานที่บันทึกไว้ รายงานอ่านค่าจากฐานข้อมูลและไม่คำนวณ detection ใหม่ จึงตรวจสอบย้อนหลังได้ตรงกับเวลาที่จบ session</p>
+    <h3>Alert Events</h3>
+    <p>แสดง Risk Event และ Alert Notification แยกกัน ผู้ใช้เห็นเวลาเริ่ม/จบ ระยะเวลา ระดับสูงสุด ปัจจัย และชนิดการแจ้งเตือน ทำให้ตรวจสอบได้ว่า posture risk เกิดขึ้นเมื่อใดและระบบแจ้งผู้ใช้จริงเมื่อใด</p>
+    <div class="note">ค่า N/A มีความหมายว่าไม่มีข้อมูลที่ประเมินได้หรือยังไม่ได้เชื่อม calculation นั้น ระบบไม่แทนข้อมูลที่หายด้วยศูนย์และไม่สร้างคะแนนสมมติ</div>
+  </section>
+
+  <section class="page">
+    <h2>10. Data Model และ API Flow</h2>
+    <div class="flow">Desktop UI <span class="arrow">→</span> APIClient + JWT <span class="arrow">→</span> FastAPI Router<br><span class="arrow">→</span> Service / Validation <span class="arrow">→</span> SQLAlchemy <span class="arrow">→</span> PostgreSQL</div>
+    <table><thead><tr><th>Entity</th><th>ข้อมูลหลัก</th><th>ความสัมพันธ์</th></tr></thead><tbody>
+      <tr><td>User</td><td>identity, profile, consent, account lifecycle</td><td>เจ้าของข้อมูลทั้งหมด</td></tr>
+      <tr><td>Camera</td><td>device id, name, resolution</td><td>User 1:N Camera</td></tr>
+      <tr><td>PersonalBaseline</td><td>posture reference + camera calibration</td><td>User/Camera 1:N Baseline</td></tr>
+      <tr><td>Session</td><td>status, start/end, pause, durations</td><td>ผูก User + Camera + Baseline</td></tr>
+      <tr><td>RiskEvent</td><td>lifecycle, level, factors, duration</td><td>Session 1:N RiskEvent</td></tr>
+      <tr><td>AlertNotification</td><td>FIRST/REPEAT/ESCALATION, emitted time</td><td>RiskEvent 1:N Notification</td></tr>
+      <tr><td>SessionSummary</td><td>average/max risk, counts, angles, blink</td><td>Session 1:1 Summary</td></tr>
+    </tbody></table>
+    <h3>ความถูกต้องของข้อมูล</h3>
+    <ul>
+      <li>Foreign key และ cascade delete รักษาความสัมพันธ์</li>
+      <li>Unique constraint ของ runtime event/notification ทำให้ retry ไม่สร้างแถวซ้ำ</li>
+      <li>Pydantic schemas ตรวจ request/response; Backend ตรวจ session ownership ซ้ำ</li>
+      <li>Alembic ใช้จัดลำดับ schema migration สำหรับ deployment</li>
+    </ul>
+  </section>
+
+  <section class="page">
+    <h2>11. Tech Stack และโครงสร้างโค้ด</h2>
+    <table><thead><tr><th>ส่วน</th><th>เทคโนโลยี</th><th>เหตุผล</th></tr></thead><tbody>
+      <tr><td>Desktop UI</td><td>Python, PySide6/Qt</td><td>สร้าง native desktop UI, signal/slot, timer และ worker</td></tr>
+      <tr><td>Computer Vision</td><td>OpenCV, MediaPipe</td><td>อ่าน/ปรับภาพและตรวจ landmark แบบ local</td></tr>
+      <tr><td>Backend</td><td>FastAPI, Pydantic</td><td>REST API, validation และ dependency-based auth</td></tr>
+      <tr><td>Data</td><td>SQLAlchemy, Alembic, PostgreSQL/Supabase</td><td>ORM, migrations และฐานข้อมูลถาวร</td></tr>
+      <tr><td>Email</td><td>Resend + postguardapp.xyz</td><td>ส่ง Registration/Password Reset OTP</td></tr>
+      <tr><td>Testing</td><td>unittest, mocks, Qt offscreen</td><td>ทดสอบ flow โดยไม่ต้องใช้กล้องจริงทุกครั้ง</td></tr>
+    </tbody></table>
+    <h3>โครงสร้างหลัก</h3>
+    <table><thead><tr><th>Path</th><th>หน้าที่</th></tr></thead><tbody>
+      <tr><td><code>desktop/app/ui</code></td><td>pages, dialogs และ windows</td></tr>
+      <tr><td><code>desktop/app/services</code></td><td>API, camera adjustment, baseline, persistence</td></tr>
+      <tr><td><code>desktop/app/vision</code></td><td>detection, assessment, temporal, RULA, event, policy</td></tr>
+      <tr><td><code>backend/app/routers</code></td><td>HTTP endpoints</td></tr>
+      <tr><td><code>backend/app/services</code></td><td>business logic และ external integration</td></tr>
+      <tr><td><code>backend/app/models|schemas</code></td><td>database entities และ API contracts</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="page">
+    <h2>12. การทดสอบและข้อจำกัด</h2>
+    <h3>ผลทดสอบล่าสุด</h3>
+    <table><thead><tr><th>ชุดทดสอบ</th><th>ผล</th><th>ครอบคลุม</th></tr></thead><tbody>
+      <tr><td>Desktop Unit Tests</td><td><strong>214 ผ่านทั้งหมด</strong></td><td>UI flow, camera adjustment, baseline, monitoring, risk, alert, dashboard, history</td></tr>
+      <tr><td>Camera correction</td><td>ผ่าน</td><td>หมุนแก้เส้นเอียงและรักษาขนาด frame</td></tr>
+      <tr><td>Corrected Preview contract</td><td>ผ่าน</td><td>ยืนยันว่า detector รับเฟรมหลัง adjustment</td></tr>
+      <tr><td>Hardware test</td><td>ต้องรันบนเครื่องที่เปิด webcam ได้</td><td>ไม่รวมใน unit suite</td></tr>
+    </tbody></table>
+    <h3>ข้อจำกัดที่ต้องสื่อสาร</h3>
+    <ul>
+      <li>ใช้กล้องด้านหน้าเพียงตัวเดียว จึงไม่เห็นข้อมือ แขน การบิดคอ แรง และภาระงานครบแบบ Full RULA</li>
+      <li>Shoulder asymmetry เป็นการประยุกต์ของ PostGuard ไม่ใช่ item อย่างเป็นทางการของ RULA</li>
+      <li>Risk percentage คือการแปลงเชิงเส้นเพื่อความเข้าใจง่าย ไม่ใช่ความน่าจะเป็นของการบาดเจ็บ</li>
+      <li>ผลลัพธ์เป็นเครื่องมือคัดกรอง/เตือนท่าทาง ไม่ใช่คำวินิจฉัยหรือคำแนะนำทางการแพทย์</li>
+      <li>ควรทดสอบ webcam, แสง, ระยะ, CPU และ session ระยะยาวบนเครื่องเป้าหมายก่อน release</li>
+    </ul>
+    <div class="note danger"><strong>การตีความ:</strong> คะแนนสูงหมายถึงหลักฐานท่าทางที่ระบบรองรับมีความเสี่ยงมากขึ้น ผู้ใช้ควรปรับท่าและพักตามความเหมาะสม แต่ไม่ควรใช้แทนผู้เชี่ยวชาญด้านการยศาสตร์หรือแพทย์</div>
+    <h3>สรุป</h3>
+    <p>PostGuard ใช้การประมวลผลภาพแบบ local ผสาน Personal Baseline, temporal evidence, RULA-adapted scoring และ event-based alerting แล้วบันทึกเฉพาะข้อมูลที่จำเป็นผ่าน Backend ที่ตรวจสิทธิ์ ทำให้ผู้ใช้ได้รับ feedback แบบ real time และตรวจสอบแนวโน้มย้อนหลังได้โดยไม่อัปโหลดภาพกล้อง</p>
+    <div class="footer">PostGuard System Workflow &amp; Implementation Summary · feature/detection · 27 October 2026</div>
+  </section>
+</body>
+</html>

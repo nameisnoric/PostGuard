@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.api_client import APIClient
+from app.ui.utils.risk_display import format_rula_percent
 from app.services.alert_history_service import (
     duration_text,
     event_type_label,
@@ -228,7 +229,8 @@ class SessionSummaryPage(QWidget):
         alert_layout.addLayout(alert_buttons)
 
         self.note_label = QLabel(
-            "Risk Score 1–7 is adapted from RULA for a single front-facing camera. "
+            "Risk Score is shown as 0–100%, converted from the internal RULA-adapted "
+            "1–7 score for a single front-facing camera. "
             "It uses neck angle, lateral neck bending, shoulder asymmetry and sustained "
             "posture; it is not Full RULA or a clinical diagnosis. "
             "Blink rate appears after a complete 60-second window. "
@@ -350,7 +352,6 @@ class SessionSummaryPage(QWidget):
         )
 
         method = report_metrics.get("risk_score_method")
-        scale = "7" if method == "RULA_ADAPTED_FRONT_V1" else "3"
         method_label = (
             "RULA-adapted Front Camera" if method == "RULA_ADAPTED_FRONT_V1"
             else "Legacy Prototype"
@@ -366,14 +367,22 @@ class SessionSummaryPage(QWidget):
             )
         else:
             maximum_level = None
+        if method == "RULA_ADAPTED_FRONT_V1":
+            average_display = format_rula_percent(
+                report_metrics.get("average_risk_score"), 1
+            )
+            maximum_display = format_rula_percent(maximum_value, 1)
+        else:
+            average_display = f"{average_risk}/3" if average_risk != "N/A" else "N/A"
+            maximum_display = f"{maximum_risk}/3" if maximum_risk != "N/A" else "N/A"
         self.average_risk_label.setText(
             "คะแนนความเสี่ยงเฉลี่ย: "
-            + (f"{average_risk}/{scale}" if average_risk != "N/A" else "N/A")
+            + average_display
             + f" ({method_label})"
         )
         self.maximum_risk_label.setText(
             "คะแนนความเสี่ยงสูงสุด: "
-            + (f"{maximum_risk}/{scale}" if maximum_risk != "N/A" else "N/A")
+            + maximum_display
             + (f" • ความเสี่ยง{maximum_level}" if maximum_level else "")
             + f" ({method_label})"
         )

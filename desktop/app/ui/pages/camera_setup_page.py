@@ -1,4 +1,4 @@
-"""Select a physical camera before preview and camera preparation."""
+"""Select a physical camera before camera preparation and corrected preview."""
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -60,7 +60,7 @@ class CameraSetupPage(QWidget):
 
         actions = QHBoxLayout()
         self.scan_button = QPushButton("สแกนกล้อง")
-        self.continue_button = QPushButton("ตรวจสอบกล้อง")
+        self.continue_button = QPushButton("เตรียมและปรับแนวกล้อง")
         self.continue_button.setProperty("variant", "primary")
         self.continue_button.setEnabled(False)
         actions.addWidget(self.scan_button)
@@ -122,7 +122,7 @@ class CameraSetupPage(QWidget):
 
         count = len(cameras)
         self.status_label.setText(
-            f"พบกล้องที่พร้อมใช้งาน {count} ตัว เลือกกล้องเพื่อตรวจสอบภาพตัวอย่าง"
+            f"พบกล้องที่พร้อมใช้งาน {count} ตัว เลือกกล้องเพื่อเริ่มปรับแนวภาพ"
         )
         self.camera_list.setEnabled(True)
         self.camera_list.setCurrentRow(0)

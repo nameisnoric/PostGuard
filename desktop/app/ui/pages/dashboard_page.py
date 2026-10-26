@@ -4,7 +4,10 @@ import math
 from datetime import datetime
 
 import requests
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal, Slot
+from PySide6.QtCore import (
+    QObject, QPointF, QRectF, QRunnable, QThreadPool, Qt, Signal, Slot,
+)
+from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QGridLayout, QHBoxLayout, QHeaderView,
     QLabel, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem,
@@ -12,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.api_client import APIClient
+from app.ui.utils.risk_display import format_rula_percent, rula_score_to_percent
 
 
 class _LoadSignals(QObject):
@@ -112,6 +116,151 @@ def _adapted_risk_label(score):
 def _nonnegative_number(value):
     value = _finite_number(value)
     return value if value is not None and value >= 0 else None
+
+
+def rula_trend_points(sessions, summaries, limit=12):
+    """Build oldest-to-newest RULA points from persisted session reports."""
+    if not isinstance(sessions, list) or not isinstance(summaries, list):
+        return []
+    reports = {
+        row.get("session_id"): row
+        for row in summaries
+        if isinstance(row, dict)
+        and type(row.get("session_id")) is int
+        and row.get("risk_score_method") == "RULA_ADAPTED_FRONT_V1"
+    }
+    points = []
+    for position, session in enumerate(sessions):
+        if not isinstance(session, dict):
+            continue
+        session_id = session.get("session_id")
+        report = reports.get(session_id)
+        if report is None:
+            continue
+        average = _risk_number(report.get("average_risk_score"))
+        maximum = _risk_number(report.get("maximum_risk_score"))
+        if average is None and maximum is None:
+            continue
+        started_at = session.get("started_at")
+        try:
+            parsed = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            sort_key = (1, parsed.timestamp())
+            date_label = parsed.astimezone().strftime("%d %b")
+        except (ValueError, TypeError, AttributeError, OSError):
+            sort_key = (0, session_id if type(session_id) is int else -position)
+            date_label = ""
+        points.append({
+            "session_id": session_id,
+            "average": rula_score_to_percent(average),
+            "maximum": rula_score_to_percent(maximum),
+            "date_label": date_label,
+            "sort_key": sort_key,
+        })
+    points.sort(key=lambda row: row["sort_key"])
+    return points[-max(1, int(limit)):]
+
+
+class RulaTrendChart(QWidget):
+    """Dependency-free chart for persisted RULA-adapted session scores."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.points = []
+        self.setMinimumHeight(300)
+        self.setAccessibleName("RULA score trend")
+        self.setAccessibleDescription(
+            "Average and maximum RULA-adapted risk percentages ordered by monitoring session."
+        )
+
+    def set_points(self, points):
+        self.points = list(points or [])
+        self.update()
+
+    @staticmethod
+    def _score_y(score, plot):
+        return plot.bottom() - (float(score) / 100.0) * plot.height()
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillRect(self.rect(), QColor("#ffffff"))
+        plot = QRectF(52, 30, max(1, self.width() - 76), max(1, self.height() - 78))
+
+        bands = (
+            (0, 100 / 6, QColor(220, 252, 231, 150)),
+            (100 / 6, 50, QColor(254, 249, 195, 135)),
+            (50, 500 / 6, QColor(255, 237, 213, 140)),
+            (500 / 6, 100, QColor(254, 226, 226, 150)),
+        )
+        for low, high, color in bands:
+            top = self._score_y(high, plot)
+            bottom = self._score_y(low, plot)
+            painter.fillRect(QRectF(plot.left(), top, plot.width(), bottom - top), color)
+
+        painter.setPen(QPen(QColor("#d8e1ee"), 1))
+        for score in range(0, 101, 20):
+            y = self._score_y(score, plot)
+            painter.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y))
+            painter.setPen(QPen(QColor("#52627a"), 1))
+            painter.drawText(QRectF(4, y - 9, 42, 18), Qt.AlignmentFlag.AlignRight, f"{score}%")
+            painter.setPen(QPen(QColor("#d8e1ee"), 1))
+
+        if not self.points:
+            painter.setPen(QColor("#60708a"))
+            painter.drawText(
+                plot,
+                Qt.AlignmentFlag.AlignCenter,
+                "No saved RULA-adapted risk percentages yet",
+            )
+            return
+
+        count = len(self.points)
+        x_positions = [
+            plot.center().x()
+            if count == 1
+            else plot.left() + index * plot.width() / (count - 1)
+            for index in range(count)
+        ]
+
+        def draw_series(field, color, width):
+            samples = [
+                QPointF(x, self._score_y(row[field], plot))
+                for x, row in zip(x_positions, self.points)
+                if row.get(field) is not None
+            ]
+            painter.setPen(QPen(QColor(color), width))
+            if len(samples) > 1:
+                painter.drawPolyline(QPolygonF(samples))
+            painter.setBrush(QColor(color))
+            for sample in samples:
+                painter.drawEllipse(sample, 4.0, 4.0)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        draw_series("maximum", "#ef4444", 2)
+        draw_series("average", "#2563eb", 3)
+
+        painter.setPen(QColor("#52627a"))
+        label_step = max(1, math.ceil(count / 6))
+        for index, (x, row) in enumerate(zip(x_positions, self.points)):
+            if index % label_step and index != count - 1:
+                continue
+            label = f"#{row.get('session_id', '--')}"
+            if row.get("date_label"):
+                label += f"\n{row['date_label']}"
+            painter.drawText(
+                QRectF(x - 38, plot.bottom() + 7, 76, 36),
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+                label,
+            )
+
+        painter.setPen(QPen(QColor("#2563eb"), 3))
+        painter.drawLine(QPointF(plot.left(), 12), QPointF(plot.left() + 22, 12))
+        painter.setPen(QColor("#26364d"))
+        painter.drawText(QPointF(plot.left() + 28, 17), "Average")
+        painter.setPen(QPen(QColor("#ef4444"), 2))
+        painter.drawLine(QPointF(plot.left() + 100, 12), QPointF(plot.left() + 122, 12))
+        painter.setPen(QColor("#26364d"))
+        painter.drawText(QPointF(plot.left() + 128, 17), "Maximum")
 
 
 def summary_insights(summaries):
@@ -247,6 +396,7 @@ class DashboardPage(QWidget):
         columns.addWidget(self._build_usage_card(), 3)
         columns.addLayout(self._build_insights_column(), 2)
         layout.addLayout(columns)
+        layout.addWidget(self._build_rula_trend_card())
         layout.addStretch()
 
     def _build_usage_card(self):
@@ -287,7 +437,7 @@ class DashboardPage(QWidget):
         risk_layout.addWidget(self._label("RULA-adapted Risk Score", "heading"))
         self.risk_value = self._label("N/A", "metric")
         self.risk_note = self._label(
-            "คะแนน 1–7 สำหรับกล้องด้านหน้า", "muted"
+            "เปอร์เซ็นต์ 0–100% สำหรับกล้องด้านหน้า", "muted"
         )
         risk_layout.addWidget(self.risk_value)
         risk_layout.addWidget(self.risk_note)
@@ -304,6 +454,18 @@ class DashboardPage(QWidget):
         column.addWidget(blink)
         column.addStretch()
         return column
+
+    def _build_rula_trend_card(self):
+        card, layout = self._card()
+        layout.addWidget(self._label("RULA Score Trend", "heading"))
+        self.risk_trend_note = self._label(
+            "Average and maximum RULA-adapted risk percentage by completed session.",
+            "muted",
+        )
+        layout.addWidget(self.risk_trend_note)
+        self.risk_trend_chart = RulaTrendChart()
+        layout.addWidget(self.risk_trend_chart)
+        return card
 
     @staticmethod
     def _label(text, role):
@@ -374,6 +536,12 @@ class DashboardPage(QWidget):
         self.alerts_value.setText("N/A" if unavailable else "0")
         self.risk_value.setText("N/A")
         self.blink_value.setText("N/A")
+        self.risk_trend_chart.set_points([])
+        self.risk_trend_note.setText(
+            "Saved report metrics are temporarily unavailable."
+            if unavailable
+            else "No saved RULA-adapted scores yet."
+        )
         self.risk_note.setText("ยังไม่มี RULA-adapted Risk Score ใน Report")
         self.blink_note.setText("ยังไม่มี Blink Rate ที่บันทึกใน Report")
 
@@ -390,9 +558,9 @@ class DashboardPage(QWidget):
             self.risk_value.setText("N/A")
             self.risk_note.setText("ยังไม่มี RULA-adapted Risk Score ใน Report")
         else:
-            self.risk_value.setText(f"{average_risk:.1f} / 7")
+            self.risk_value.setText(format_rula_percent(average_risk, 1))
             maximum_text = (
-                f" | สูงสุด {maximum_risk:.1f}/7 ({_adapted_risk_label(maximum_risk)})"
+                f" | สูงสุด {format_rula_percent(maximum_risk, 1)} ({_adapted_risk_label(maximum_risk)})"
                 if maximum_risk is not None else ""
             )
             self.risk_note.setText(
@@ -451,6 +619,21 @@ class DashboardPage(QWidget):
             duration_text(sum(known)) if known or not completed else "N/A"
         )
         self._update_report_metrics(summaries)
+        trend = rula_trend_points(sessions, summaries or [])
+        self.risk_trend_chart.set_points(trend)
+        if summaries is None:
+            self.risk_trend_note.setText(
+                "Saved report metrics are temporarily unavailable."
+            )
+        elif trend:
+            self.risk_trend_note.setText(
+                f"Oldest to newest across {len(trend)} session(s). "
+                "Blue = average, red = maximum; lower percentages indicate lower risk."
+            )
+        else:
+            self.risk_trend_note.setText(
+                "No completed session has a saved RULA-adapted score yet."
+            )
 
         missing_duration = len(completed) - len(known)
         note = (
@@ -483,13 +666,17 @@ class DashboardPage(QWidget):
                 if method == "RULA_ADAPTED_FRONT_V1"
                 else _finite_number(raw_risk)
             )
-            risk_scale = 7 if method == "RULA_ADAPTED_FRONT_V1" else 3
+            risk_text = (
+                format_rula_percent(risk, 1)
+                if method == "RULA_ADAPTED_FRONT_V1"
+                else f"{risk:.1f}/3" if risk is not None else "N/A"
+            )
             alerts = report.get("total_alert_count") if report else None
             values = (
                 session.get("session_id", "N/A"), started,
                 session.get("status", "N/A"),
                 duration_text(active_seconds(session)),
-                f"{risk:.1f}/{risk_scale}" if risk is not None else "N/A",
+                risk_text,
                 alerts if type(alerts) is int and alerts >= 0 else "N/A",
             )
             for column, value in enumerate(values):

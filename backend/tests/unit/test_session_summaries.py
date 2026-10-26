@@ -22,6 +22,8 @@ from app.models.personal_baseline import PersonalBaseline
 from app.models.session import PostureSession
 from app.models.session_summary import SessionSummary
 from app.models.alert_event import AlertEvent
+from app.models.alert_notification import AlertNotification
+from app.models.risk_event import RiskEvent
 from app.routers.auth import get_current_user
 from app.routers.session_summaries import router
 from app.schemas.session_summary import SessionSummaryCreate
@@ -131,6 +133,37 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertEqual(result.status_code, 201, result.text)
         self.assertEqual(result.json()["high_risk_duration"], 0)
         self.assertEqual(result.json()["high_risk_alert_count"], 1)
+
+    def test_integrated_risk_records_take_priority_over_legacy_alerts(self):
+        now = datetime.now(timezone.utc)
+        self.db.add(AlertEvent(
+            session_id=1, event_type="LEGACY", risk_level="LOW",
+            started_at=now, ended_at=now, duration=99,
+        ))
+        event = RiskEvent(
+            session_id=1, runtime_event_id="risk-event-1",
+            initial_risk_level="MODERATE", current_risk_level="HIGH",
+            max_risk_level="HIGH", status="RESOLVED", started_at=now,
+            ended_at=now, duration_seconds=18.4, active_factors=["neck"],
+            evidence_groups=["NECK"],
+        )
+        self.db.add(event)
+        self.db.flush()
+        self.db.add(AlertNotification(
+            risk_event_id=event.risk_event_id, session_id=1,
+            runtime_notification_id="notice-1", alert_type="ESCALATION",
+            risk_level="HIGH", decision="ALERT", reason="RISK_ESCALATED",
+        ))
+        self.db.commit()
+
+        response = self.client.post("/sessions/1/summary", json=self.payload)
+
+        self.assertEqual(response.status_code, 201, response.text)
+        summary = response.json()
+        self.assertEqual(summary["low_risk_duration"], 0)
+        self.assertEqual(summary["high_risk_duration"], 18)
+        self.assertEqual(summary["total_alert_count"], 1)
+        self.assertEqual(summary["most_frequent_alert_event"], "ESCALATION")
 
     def test_other_user_cannot_read_or_write(self):
         self.client.post("/sessions/1/summary", json=self.payload)

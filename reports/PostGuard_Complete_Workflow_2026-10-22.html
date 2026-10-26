@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>PostGuard — Complete System Workflow</title>
+  <style>
+    @page { size: A4; margin: 14mm 13mm 15mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172033; font-family: Tahoma, "Leelawadee UI", Arial, sans-serif; font-size: 9.8pt; line-height: 1.5; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: 27pt; line-height: 1.18; color: #0b1739; margin-bottom: 9px; }
+    h2 { font-size: 16.5pt; color: #0b1739; margin: 0 0 11px; padding-bottom: 6px; border-bottom: 2px solid #2f6fed; }
+    h3 { font-size: 12pt; color: #174589; margin: 14px 0 6px; }
+    p { margin-bottom: 7px; }
+    .cover { height: 264mm; padding: 22mm 13mm; display: flex; flex-direction: column; justify-content: center; background: linear-gradient(145deg,#f7faff,#e7f0ff); border: 1px solid #c8dcff; border-radius: 18px; page-break-after: always; }
+    .brand { color: #2f6fed; font-size: 14pt; font-weight: 700; letter-spacing: .5px; }
+    .subtitle { color: #53627a; font-size: 13.5pt; margin-bottom: 18mm; }
+    .meta { border-top: 1px solid #a9c5f6; padding-top: 12px; color: #455674; }
+    .badge { display: inline-block; margin: 3px 3px 3px 0; padding: 5px 10px; border-radius: 999px; color: #164fae; background: #dfeaff; font-weight: 700; }
+    .page { page-break-after: always; }
+    .lead { background: #f2f7ff; border-left: 4px solid #2f6fed; border-radius: 7px; padding: 11px 13px; margin-bottom: 13px; }
+    .flow { background: #101a35; color: white; padding: 13px 15px; border-radius: 10px; text-align: center; font-weight: 700; line-height: 2; margin: 9px 0 14px; }
+    .arrow { color: #79a7ff; padding: 0 4px; }
+    .step { display: grid; grid-template-columns: 29px 1fr; gap: 8px; margin: 6px 0; break-inside: avoid; }
+    .num { width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; background: #2f6fed; font-weight: 700; }
+    .step-body { border: 1px solid #d7e0ef; border-radius: 7px; padding: 6px 9px; background: #fff; }
+    table { width: 100%; border-collapse: collapse; margin: 7px 0 12px; font-size: 8.9pt; }
+    th { background: #173b7a; color: white; text-align: left; }
+    th, td { border: 1px solid #cfd9e9; padding: 6px 7px; vertical-align: top; }
+    tbody tr:nth-child(even) td { background: #f7f9fc; }
+    ul { margin: 4px 0 11px; padding-left: 21px; }
+    li { margin-bottom: 3px; }
+    .note { background: #fff8e7; border: 1px solid #efd18b; border-radius: 8px; padding: 9px 11px; margin: 8px 0 12px; }
+    .success { background: #ecfbf5; border-color: #a7e1ca; }
+    .danger { background: #fff1f1; border-color: #f1b9b9; }
+    .formula { padding: 10px; text-align: center; color: #173b7a; background: #eaf2ff; border: 1px solid #c6d9fb; border-radius: 8px; font-weight: 700; }
+    .state { font-weight: 700; color: #174589; }
+    .small { font-size: 8.4pt; color: #64738b; }
+    .no-break { break-inside: avoid; }
+    code { color: #173b7a; background: #edf3fd; padding: 1px 4px; border-radius: 3px; }
+    .footer { margin-top: 15px; padding-top: 7px; border-top: 1px solid #d6dfed; color: #738099; font-size: 8pt; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">POSTGUARD DESKTOP</div>
+    <h1>Complete System Workflow</h1>
+    <p class="subtitle">Flow การทำงานทั้งหมดของระบบ ตั้งแต่บัญชีผู้ใช้จนถึงการตรวจจับ รายงาน และการจัดการข้อมูล</p>
+    <div>
+      <span class="badge">Authentication</span><span class="badge">Consent</span>
+      <span class="badge">Camera Preparation</span><span class="badge">Personal Baseline</span>
+      <span class="badge">Monitoring</span><span class="badge">Alert</span>
+      <span class="badge">RULA-adapted</span><span class="badge">Reports</span>
+    </div>
+    <div class="meta"><strong>โครงการ:</strong> PostGuard<br><strong>Branch:</strong> feature/detection<br><strong>เอกสารวันที่:</strong> 22 ตุลาคม 2026</div>
+  </section>
+
+  <section class="page">
+    <h2>1. Master Flow ของระบบ</h2>
+    <div class="lead">PostGuard เป็น Desktop Application ที่ประมวลผลภาพกล้องบนเครื่องผู้ใช้ ส่งเฉพาะค่าที่คำนวณแล้วไปยัง FastAPI และจัดเก็บข้อมูลผู้ใช้ Session, Alert และ Report ใน PostgreSQL/Supabase</div>
+    <div class="flow">เปิดโปรแกรม <span class="arrow">→</span> สมัคร/เข้าสู่ระบบ <span class="arrow">→</span> ตรวจ Consent และ Session ค้าง<br>Dashboard <span class="arrow">→</span> Camera Setup <span class="arrow">→</span> Preview <span class="arrow">→</span> Camera Preparation<br>Personal Baseline <span class="arrow">→</span> Start Session <span class="arrow">→</span> Monitoring <span class="arrow">→</span> Alert<br>Pause/Resume หรือ Stop <span class="arrow">→</span> Session Summary <span class="arrow">→</span> Dashboard / History / Report</div>
+    <div class="step"><div class="num">1</div><div class="step-body"><strong>Identity:</strong> ผู้ใช้สมัครด้วยอีเมล @ku.th ยืนยัน OTP แล้ว Login เพื่อรับ JWT</div></div>
+    <div class="step"><div class="num">2</div><div class="step-body"><strong>Privacy:</strong> ระบบตรวจ Privacy Notice และ Consent ก่อนเริ่มงานที่ใช้กล้อง</div></div>
+    <div class="step"><div class="num">3</div><div class="step-body"><strong>Camera:</strong> สแกนกล้อง เปิด Preview และเตรียมกล้องด้วยบัตรมาตรฐาน</div></div>
+    <div class="step"><div class="num">4</div><div class="step-body"><strong>Baseline:</strong> เก็บท่าปกติของผู้ใช้ ตรวจความครบถ้วน/ความนิ่ง และให้ผู้ใช้ยืนยันก่อนบันทึก</div></div>
+    <div class="step"><div class="num">5</div><div class="step-body"><strong>Session:</strong> เริ่ม Monitoring โดยผูก User + Camera + Personal Baseline</div></div>
+    <div class="step"><div class="num">6</div><div class="step-body"><strong>Detection:</strong> ประมวลผล Face/Pose, เปรียบเทียบ Baseline, ติดตามเวลา และคำนวณความเสี่ยง</div></div>
+    <div class="step"><div class="num">7</div><div class="step-body"><strong>Alert:</strong> สร้าง Alert Event, popup และเสียงตาม Settings</div></div>
+    <div class="step"><div class="num">8</div><div class="step-body"><strong>Report:</strong> เมื่อ Stop จะจบ Session บันทึก Summary และแสดงผ่าน Dashboard/History</div></div>
+    <div class="step"><div class="num">9</div><div class="step-body"><strong>Recovery:</strong> หากแอปถูกปิดผิดปกติ ระบบตรวจ Session ค้างเมื่อ Login ครั้งถัดไป</div></div>
+  </section>
+
+  <section class="page">
+    <h2>2. Authentication และ Account Flow</h2>
+    <h3>Registration</h3>
+    <div class="flow">Register <span class="arrow">→</span> ตรวจ @ku.th + Username + Password/Confirm Password<br><span class="arrow">→</span> ส่ง OTP ผ่าน Resend <span class="arrow">→</span> ยืนยัน OTP 6 หลัก <span class="arrow">→</span> สร้างบัญชี <span class="arrow">→</span> Login</div>
+    <ul>
+      <li>รับเฉพาะอีเมลมหาวิทยาลัยโดเมน <strong>@ku.th</strong></li>
+      <li>Password และ Confirm Password ต้องตรงกัน และผ่านเงื่อนไขที่ Backend กำหนด</li>
+      <li>Backend เก็บเฉพาะ Argon2 password hash</li>
+      <li>Resend ใช้ผู้ส่ง <strong>PostGuard &lt;no-reply@postguardapp.xyz&gt;</strong></li>
+    </ul>
+    <h3>Login</h3>
+    <div class="flow">Email + Password <span class="arrow">→</span> POST /auth/login <span class="arrow">→</span> JWT<br><span class="arrow">→</span> TokenStore ในหน่วยความจำ <span class="arrow">→</span> GET /auth/me <span class="arrow">→</span> Dashboard</div>
+    <p>ทุก API ที่เป็นข้อมูลส่วนตัวแนบ Bearer token และ Backend ตรวจเจ้าของข้อมูลอีกครั้ง ผู้ใช้รายอื่นจึงไม่สามารถอ่าน Camera, Baseline, Session, Alert หรือ Summary ข้ามบัญชีได้</p>
+    <h3>Forgot Password</h3>
+    <table>
+      <thead><tr><th>ขั้น</th><th>การทำงาน</th></tr></thead>
+      <tbody>
+        <tr><td>1. Request</td><td>กรอก @ku.th → <code>POST /auth/forgot-password</code> → ส่ง OTP อายุ 5 นาที</td></tr>
+        <tr><td>2. Verify</td><td>กรอก OTP 6 หลัก → <code>POST /auth/verify-reset-otp</code> → ได้ reset token อายุ 10 นาที</td></tr>
+        <tr><td>3. Reset</td><td>กรอกรหัสผ่านใหม่และยืนยัน → <code>POST /auth/reset_password</code> → token ใช้ได้ครั้งเดียว</td></tr>
+      </tbody>
+    </table>
+    <div class="note">Reset token อยู่ใน dialog ชั่วคราว ไม่เก็บใน TokenStore และถูกล้างเมื่อยกเลิกหรือเปลี่ยนรหัสผ่านสำเร็จ</div>
+  </section>
+
+  <section class="page">
+    <h2>3. Privacy, Profile, Settings และ Account Deletion</h2>
+    <h3>Privacy Consent</h3>
+    <div class="flow">Login <span class="arrow">→</span> ตรวจ Consent เวอร์ชันปัจจุบัน<br>ยังไม่ยินยอม <span class="arrow">→</span> แสดง Privacy Notice <span class="arrow">→</span> ยอมรับ <span class="arrow">→</span> เปิด Camera Flow ได้</div>
+    <ul>
+      <li>สถานะการยอมรับ เวอร์ชัน เวลาให้ Consent และเวลาถอน Consent ถูกเก็บต่อผู้ใช้</li>
+      <li>Backend ตรวจ Consent ซ้ำเมื่อเริ่ม Session</li>
+      <li>ไม่อนุญาตให้ถอน Consent ขณะ Session เป็น RUNNING หรือ PAUSED</li>
+      <li>หลังถอน Consent ต้องยอมรับใหม่ก่อนเริ่ม Monitoring ครั้งถัดไป</li>
+    </ul>
+    <h3>Profile</h3>
+    <table><thead><tr><th>การกระทำ</th><th>Flow</th></tr></thead><tbody>
+      <tr><td>แก้ข้อมูล</td><td>แก้ Username/Full name → กด Save Changes → dialog ยืนยัน → PATCH ข้อมูลผู้ใช้ → refresh profile</td></tr>
+      <tr><td>รูปโปรไฟล์</td><td>เลือกภาพ → upload ไป private storage → Backend เก็บ object key → โหลดผ่าน endpoint ที่ตรวจ JWT</td></tr>
+      <tr><td>ยกเลิกการแก้</td><td>ออกจากหน้าโดยไม่ส่งข้อมูลที่ยังไม่ยืนยันไป Backend</td></tr>
+    </tbody></table>
+    <h3>Settings</h3>
+    <p>Settings บันทึกแยกต่อผู้ใช้ ได้แก่ เปิด/ปิดการแจ้งเตือน เปิด/ปิดเสียง ระดับเสียง และช่วงเตือนให้พัก เมื่อกด Save ระบบส่ง PUT และโหลดค่าที่บันทึกกลับมาแสดง</p>
+    <h3>Delete Account และ Recovery</h3>
+    <div class="flow">Settings <span class="arrow">→</span> Delete Account <span class="arrow">→</span> ยืนยัน<br><span class="arrow">→</span> PENDING_DELETION 14 วัน <span class="arrow">→</span> Logout / จำกัดการใช้งาน<br>Login ภายใน 14 วัน <span class="arrow">→</span> Account Recovery <span class="arrow">→</span> ยกเลิกคำขอลบ</div>
+    <p>เมื่อครบช่วงรอ ระบบ purge จะลบบัญชีและข้อมูลที่เกี่ยวข้อง หากลบ private avatar ไม่สำเร็จจะเลื่อนการลบเพื่อ Retry แทนการทิ้งไฟล์ส่วนตัวไว้โดยไม่ติดตาม</p>
+  </section>
+
+  <section class="page">
+    <h2>4. Camera Setup และ Preparation Flow</h2>
+    <div class="flow">Camera Setup <span class="arrow">→</span> Scan Device Index <span class="arrow">→</span> เลือกกล้อง<br><span class="arrow">→</span> Camera Preview <span class="arrow">→</span> ลงทะเบียน/อ่าน Camera ID<br><span class="arrow">→</span> Camera Preparation ด้วยบัตรมาตรฐาน <span class="arrow">→</span> Personal Baseline</div>
+    <h3>Camera Scan</h3>
+    <ol>
+      <li>เปิด device index ที่กำหนดไว้ทีละตัวด้วย OpenCV</li>
+      <li>ตรวจว่าอุปกรณ์เปิดสำเร็จและอ่าน frame ได้จริง</li>
+      <li>เก็บเฉพาะกล้องที่ใช้งานได้ แสดงชื่อ Device และ Resolution ให้ผู้ใช้เลือก</li>
+      <li>ปล่อย resource ของกล้องที่ใช้ตรวจทุกตัว แล้วเปิดกล้องที่ผู้ใช้เลือกเมื่อเข้าสู่ Preview</li>
+    </ol>
+    <h3>Camera Preview</h3>
+    <p>แสดงภาพแบบรักษาอัตราส่วนและจัดกลางกรอบ ตรวจ Face/Pose เพื่อช่วยให้ผู้ใช้เห็นว่าศีรษะและไหล่อยู่ในภาพ หากเปิดหรืออ่านกล้องไม่ได้จะแสดงข้อผิดพลาดและไม่อนุญาตให้ไปขั้นถัดไป</p>
+    <h3>Camera Preparation ด้วย Reference Card</h3>
+    <table><thead><tr><th>หัวข้อ</th><th>รายละเอียด</th></tr></thead><tbody>
+      <tr><td>บัตรอ้างอิง</td><td>ขนาดมาตรฐาน 85.60 × 53.98 มม.</td></tr>
+      <tr><td>เงื่อนไข</td><td>ตรวจขนาด ตำแหน่ง อัตราส่วน การหมุน และ perspective</td></tr>
+      <tr><td>ความต่อเนื่อง</td><td>ต้องผ่าน 10 เฟรมติดต่อกัน พร้อมตัวนับ 1/10 ถึง 10/10</td></tr>
+      <tr><td>ผลลัพธ์</td><td>frame size, scale X/Y/average, card roll, perspective และ capture time</td></tr>
+    </tbody></table>
+    <div class="note success"><strong>ความเป็นส่วนตัว:</strong> ระบบไม่บันทึกหรืออัปโหลดภาพบัตร frame, contour, card box หรือ transform matrix ส่งเฉพาะค่าตัวเลขไปผูกกับ Personal Baseline</div>
+  </section>
+
+  <section class="page">
+    <h2>5. Personal Baseline Flow</h2>
+    <div class="flow">เปิดภาพกล้อง <span class="arrow">→</span> ตรวจ Face + Pose<br><span class="arrow">→</span> Start Calibration <span class="arrow">→</span> เก็บ Valid Samples<br><span class="arrow">→</span> ตรวจ Coverage + Ratio + Stability <span class="arrow">→</span> Candidate<br><span class="arrow">→</span> ผู้ใช้ยืนยัน <span class="arrow">→</span> Save Baseline <span class="arrow">→</span> ได้ baseline_id</div>
+    <h3>ข้อมูลที่ต้องครบ</h3>
+    <table><thead><tr><th>Measurement</th><th>การใช้งาน</th></tr></thead><tbody>
+      <tr><td>Shoulder tilt</td><td>ค่าระดับไหล่ซ้าย–ขวาปกติของผู้ใช้</td></tr>
+      <tr><td>Neck lateral tilt</td><td>ค่าการเอียงคอด้านข้างปกติ</td></tr>
+      <tr><td>Neck flexion</td><td>ค่าก้ม/เงยคอปกติ</td></tr>
+      <tr><td>Eye-distance proxy</td><td>ค่าประกอบสำหรับระยะและบริบทของกล้อง</td></tr>
+    </tbody></table>
+    <h3>เกณฑ์ผ่าน</h3>
+    <ul>
+      <li>เก็บอย่างน้อย <strong>60 valid samples</strong></li>
+      <li>ครอบคลุมเวลาอย่างน้อย <strong>15 วินาที</strong></li>
+      <li>สัดส่วน valid frame อย่างน้อย <strong>70%</strong></li>
+      <li>ค่าที่วัดต้องนิ่งตาม stability checks</li>
+      <li>ต้องมี Camera Preparation result ครบและเป็นค่าจำนวนที่ใช้งานได้</li>
+    </ul>
+    <p>เมื่อผ่าน ระบบสร้าง Candidate Baseline โดยใช้ค่ากลางและส่วนเบี่ยงเบนของ measurement แต่ยังไม่บันทึกทันที ผู้ใช้ต้องกดยืนยัน Candidate ก่อน ปุ่ม Save Personal Baseline จึงใช้งานได้ และปุ่ม Start Monitoring จะเปิดหลังบันทึกสำเร็จเท่านั้น</p>
+    <div class="note danger"><strong>กรณีไม่ผ่าน:</strong> ระบบแสดงสาเหตุ เช่น Face/Pose ไม่ครบ ตัวอย่างไม่พอ เวลาไม่ถึง valid ratio ต่ำ หรือค่าท่าทางไม่นิ่ง แล้วให้เก็บ Baseline ใหม่</div>
+  </section>
+
+  <section class="page">
+    <h2>6. Monitoring และ Detection Pipeline</h2>
+    <div class="flow">Start Monitoring <span class="arrow">→</span> ตรวจ Consent/Baseline <span class="arrow">→</span> สร้าง Session RUNNING<br>อ่านกล้องทุก ~30 ms <span class="arrow">→</span> ตรวจจับทุก 5 เฟรม <span class="arrow">→</span> Measurement<br><span class="arrow">→</span> Baseline Comparison <span class="arrow">→</span> Temporal Tracking <span class="arrow">→</span> Risk/Alert</div>
+    <h3>Pipeline ภายในหนึ่งรอบตรวจจับ</h3>
+    <div class="step"><div class="num">1</div><div class="step-body">OpenCV อ่าน frame จากกล้องที่เลือก</div></div>
+    <div class="step"><div class="num">2</div><div class="step-body">MediaPipe Face/Pose สร้าง landmark และ validator ตรวจคุณภาพข้อมูล</div></div>
+    <div class="step"><div class="num">3</div><div class="step-body">Detection Pipeline คำนวณ shoulder tilt, neck lateral tilt และ neck flexion</div></div>
+    <div class="step"><div class="num">4</div><div class="step-body">Session Monitor ตรวจว่า Session, Camera และ Baseline เป็นเจ้าของเดียวกันและมีความสัมพันธ์ถูกต้อง</div></div>
+    <div class="step"><div class="num">5</div><div class="step-body">Current Posture Assessment เปรียบเทียบค่าปัจจุบันกับ Personal Baseline และ tolerance</div></div>
+    <div class="step"><div class="num">6</div><div class="step-body">Measurement Change Gate ลดผลจาก noise และค่าที่เปลี่ยนเพียงเล็กน้อย</div></div>
+    <div class="step"><div class="num">7</div><div class="step-body">Temporal Tracker สะสมเวลาต่อเนื่องของ posture factor และ reset เมื่อกลับสู่ท่าปกติหรือ Pause</div></div>
+    <div class="step"><div class="num">8</div><div class="step-body">Risk Evaluator สร้างผลประเมินภายใน และ RULA-adapted mapper สร้างคะแนนสำหรับผู้ใช้</div></div>
+    <p>สถิติที่อยู่ในหน่วยความจำประกอบด้วยจำนวนรอบตรวจจับ จำนวน Face/Pose ที่พบ ค่าเฉลี่ยของมุม คะแนนความเสี่ยง และข้อมูล Alert ก่อนสร้าง Summary ตอนจบ Session</p>
+  </section>
+
+  <section class="page">
+    <h2>7. Session Lifecycle และ Navigation</h2>
+    <table><thead><tr><th>สถานะ</th><th>ความหมายและการเปลี่ยนสถานะ</th></tr></thead><tbody>
+      <tr><td class="state">RUNNING</td><td>กล้องและ timer ทำงาน → Pause เปลี่ยนเป็น PAUSED → Stop เปลี่ยนเป็น COMPLETED</td></tr>
+      <tr><td class="state">PAUSED</td><td>หยุด timer ตรวจจับและ reset เวลาท่าต่อเนื่อง แต่ยังถือกล้องไว้ → Resume กลับ RUNNING → Stop ได้</td></tr>
+      <tr><td class="state">COMPLETED</td><td>จบโดยผู้ใช้หรือ flow ปิดตามปกติ ปล่อยกล้อง แล้วจึงบันทึก Session Summary</td></tr>
+      <tr><td class="state">INTERRUPTED</td><td>Session เก่าที่ไม่มีการจบอย่างสมบูรณ์ ไม่มีการแต่ง ended_at, duration หรือ Summary ขึ้นมา</td></tr>
+    </tbody></table>
+    <h3>การเปลี่ยนหน้า</h3>
+    <div class="flow">Monitoring <span class="arrow">↔</span> Dashboard <span class="arrow">↔</span> History<br>Session และ Detection ยังทำงานต่อ <span class="arrow">→</span> กลับ Monitoring เพื่อดูภาพหรือควบคุม Session</div>
+    <p>การเปลี่ยนหน้าไม่เรียก Stop และไม่ทำลาย MonitoringPage ปุ่มส่วนกลางแสดง Pause/Resume/Stop ตามสถานะเดียวกับหน้า Monitoring</p>
+    <h3>Logout หรือปิดโปรแกรม</h3>
+    <p>หากมี Session ทำงาน แอปจะพยายาม End Session และ Save Summary ก่อนปล่อยกล้องและล้าง token หากขั้นตอนใดล้มเหลว แอปคงข้อมูลที่จำเป็นไว้เพื่อ Retry และไม่เริ่ม Session ใหม่ทับ Summary ที่รอบันทึก</p>
+    <h3>Session Recovery</h3>
+    <div class="flow">Login ครั้งใหม่ <span class="arrow">→</span> GET Sessions <span class="arrow">→</span> พบ RUNNING/PAUSED ที่แอปรอบนี้ไม่ได้ถืออยู่<br><span class="arrow">→</span> ถามผู้ใช้ <span class="arrow">→</span> Interrupt หรือ Cancel</div>
+    <ul>
+      <li>ไม่ตัดสิน Session ค้างเอง เพราะอาจทำงานอยู่บนอุปกรณ์อื่น</li>
+      <li><code>POST /sessions/{id}/interrupt</code> ตรวจเจ้าของและรองรับ Retry</li>
+      <li>Alert ที่ยังเปิดอยู่จะแสดง INCOMPLETE และ duration เป็น N/A</li>
+    </ul>
+  </section>
+
+  <section class="page">
+    <h2>8. Alert และ RULA-adapted Flow</h2>
+    <div class="flow">Posture Assessment <span class="arrow">→</span> Temporal Evidence<br><span class="arrow">→</span> Risk Evaluation <span class="arrow">→</span> เปิด Alert Event<br><span class="arrow">→</span> Popup + Optional Sound <span class="arrow">→</span> ปิด Alert เมื่อท่ากลับปกติ/Session หยุด</div>
+    <p>Alert Service ป้องกันการเปิด popup ซ้ำจากเหตุการณ์เดียวกัน เสียงทำงานตาม notification, sound และ volume ใน Settings ส่วน Alert Event เก็บชนิด เวลาเริ่ม เวลาปิด และระดับความเสี่ยง</p>
+    <h3>RULA-adapted 1–7</h3>
+    <table><thead><tr><th>ส่วน</th><th>เงื่อนไข</th><th>คะแนน</th></tr></thead><tbody>
+      <tr><td>Neck base</td><td>ก้ม 0–10° / &gt;10–20° / &gt;20° / เงย &lt;0°</td><td>1 / 2 / 3 / 4</td></tr>
+      <tr><td>Neck side bending</td><td>เอียงคอเกิน tolerance จาก Baseline</td><td>+1</td></tr>
+      <tr><td>Shoulder asymmetry</td><td>ไหล่ซ้าย–ขวาไม่สมดุลเกิน tolerance</td><td>+1</td></tr>
+      <tr><td>Sustained posture</td><td>ปัจจัยที่รองรับค้างนานกว่า 60 วินาที</td><td>+1</td></tr>
+    </tbody></table>
+    <div class="formula">คะแนน = Neck base + Neck side bending + Shoulder asymmetry + Sustained posture<br>จำกัดสูงสุด 7 คะแนน</div>
+    <table><thead><tr><th>คะแนน</th><th>ระดับ</th><th>คำแนะนำ</th></tr></thead><tbody>
+      <tr><td>1–2</td><td>LOW</td><td>ความเสี่ยงต่ำ สังเกตท่าทางต่อไป</td></tr>
+      <tr><td>3–4</td><td>MODERATE</td><td>ควรปรับท่าทางและติดตามต่อเนื่อง</td></tr>
+      <tr><td>5–6</td><td>HIGH</td><td>ควรปรับท่าทางโดยเร็ว</td></tr>
+      <tr><td>7</td><td>VERY HIGH</td><td>ควรหยุดพักและปรับท่าทางทันที</td></tr>
+    </tbody></table>
+    <div class="note">คะแนนนี้เป็นการประยุกต์ RULA กับกล้องด้านหน้า ไม่ใช่ Full RULA หรือผลวินิจฉัยทางการแพทย์ ระบบแสดง N/A เมื่อหลักฐานหลักไม่ครบ</div>
+  </section>
+
+  <section class="page">
+    <h2>9. Stop, Summary, Dashboard และ History</h2>
+    <h3>Stop และ Summary</h3>
+    <div class="flow">Stop Monitoring <span class="arrow">→</span> Snapshot สถิติ <span class="arrow">→</span> End Session<br><span class="arrow">→</span> ยืนยัน COMPLETED <span class="arrow">→</span> ปล่อยกล้อง <span class="arrow">→</span> POST Summary<br><span class="arrow">→</span> Session Summary Page หรือ Retry</div>
+    <ul>
+      <li>สร้าง Summary หลัง Session เป็น COMPLETED เท่านั้น</li>
+      <li>หนึ่ง Session มีหนึ่ง Summary; หาก POST ซ้ำได้ 409 ระบบอ่านรายงานเดิมกลับมา</li>
+      <li>Total duration รวมเวลาพัก ส่วน Active duration = Total duration − Paused duration</li>
+      <li>Alert duration คือเวลาที่ Event เปิดอยู่ ไม่ใช่เวลาท่าทางเสี่ยงทั้งหมด</li>
+    </ul>
+    <h3>Dashboard</h3>
+    <table><thead><tr><th>ข้อมูล</th><th>แหล่งและวิธีคำนวณ</th></tr></thead><tbody>
+      <tr><td>Completed sessions</td><td>นับ Session สถานะ COMPLETED</td></tr>
+      <tr><td>Active monitoring time</td><td>รวม total_duration − paused_duration ของข้อมูลที่สมบูรณ์</td></tr>
+      <tr><td>Interrupted sessions</td><td>นับ Session สถานะ INTERRUPTED</td></tr>
+      <tr><td>Risk/Alert summary</td><td>อ่านจาก GET /summaries และแยก RULA-adapted /7 ออกจาก legacy /3</td></tr>
+      <tr><td>Recent sessions</td><td>แสดงรายการล่าสุดไม่เกิน 5 รายการ</td></tr>
+    </tbody></table>
+    <p>Dashboard โหลด <code>GET /sessions</code> และ <code>GET /summaries</code> ผ่าน Qt thread pool เพื่อไม่ให้ UI และ timer ตรวจจับค้างระหว่างรอ API</p>
+    <h3>History และ Saved Report</h3>
+    <p>History รองรับค้นหาด้วย Session/Camera/Baseline ID และกรองตามสถานะ เมื่อเลือกแถวจะแสดงเวลาเริ่ม–จบ Total/Paused/Active time, Camera, Baseline และสถานะรายงาน ผู้ใช้เปิด Saved Report หรือ Alert Events ของ Session ที่เลือกได้</p>
+    <div class="note">Saved Report อ่านข้อมูลที่บันทึกไว้จากฐานข้อมูล ไม่ย้อนกลับไปคำนวณ Detection ใหม่ และจะแสดง N/A สำหรับข้อมูลที่ไม่มีแหล่งจริง</div>
+  </section>
+
+  <section class="page">
+    <h2>10. Backend, Database และ Data Privacy</h2>
+    <h3>สถาปัตยกรรม</h3>
+    <div class="flow">PySide6 Desktop <span class="arrow">→</span> HTTP/JSON + JWT <span class="arrow">→</span> FastAPI<br><span class="arrow">→</span> SQLAlchemy/Alembic <span class="arrow">→</span> PostgreSQL on Supabase<br>Resend <span class="arrow">→</span> Registration/Password Reset Email</div>
+    <table><thead><tr><th>กลุ่ม API</th><th>หน้าที่</th></tr></thead><tbody>
+      <tr><td>Auth</td><td>Register OTP, verify OTP, Login, Me และ Password Reset</td></tr>
+      <tr><td>Users/Privacy/Settings</td><td>Profile, private avatar, Consent, preferences และ Account Deletion</td></tr>
+      <tr><td>Cameras/Baselines</td><td>ลงทะเบียนกล้องและจัดเก็บค่าตัวเลข Camera Preparation/Personal Baseline</td></tr>
+      <tr><td>Sessions</td><td>Start, Pause, Resume, End, Interrupt และ List</td></tr>
+      <tr><td>Alerts/Summaries</td><td>สร้าง/ปิด Alert Event และจัดเก็บ/อ่าน Session Report</td></tr>
+    </tbody></table>
+    <h3>ข้อมูลภาพ</h3>
+    <div class="note success"><strong>Local processing:</strong> frame จากกล้องใช้ประมวลผลบนเครื่องผู้ใช้ ไม่บันทึกและไม่อัปโหลดวิดีโอหรือภาพ Monitoring ไป Backend คงไว้เฉพาะค่าตัวเลข Session, Baseline, Alert และ Report ที่จำเป็น</div>
+    <h3>Ownership และ Security</h3>
+    <ul>
+      <li>JWT ระบุผู้ใช้ และ query ทุกชุดจำกัดข้อมูลด้วย user ownership</li>
+      <li>Password จัดเก็บด้วย Argon2 hash</li>
+      <li>OTP/reset token มีอายุและใช้ซ้ำไม่ได้</li>
+      <li>Avatar อยู่ใน private storage และดาวน์โหลดผ่านเส้นทางที่ตรวจสิทธิ์</li>
+      <li>Alembic ควบคุม schema version ของ Supabase</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>11. Error, Retry, การทดสอบ และการเปิดใช้งาน</h2>
+    <table><thead><tr><th>เหตุการณ์</th><th>พฤติกรรมระบบ</th></tr></thead><tbody>
+      <tr><td>กล้องเปิด/อ่านไม่ได้</td><td>แสดงข้อผิดพลาด ปล่อย resource และไม่ไปขั้นถัดไป</td></tr>
+      <tr><td>Baseline ไม่ครบ</td><td>ไม่สร้าง Candidate หรือไม่อนุญาต Start Session</td></tr>
+      <tr><td>API ล้มเหลวระหว่าง Stop</td><td>คงสถิติและ token เพื่อให้ Retry</td></tr>
+      <tr><td>Summary บันทึกล้มเหลว</td><td>แสดง Summary Save Problem และไม่ให้ Session ใหม่ทับข้อมูล</td></tr>
+      <tr><td>Dashboard API ล้มเหลว</td><td>แสดงข้อมูลไม่พร้อมและปุ่ม Refresh ไม่ใช้ตัวเลขสมมติ</td></tr>
+      <tr><td>แอปถูกบังคับปิด</td><td>Login ครั้งต่อไปตรวจ Session ค้างและให้ผู้ใช้เลือก Interrupt</td></tr>
+    </tbody></table>
+    <h3>ผลทดสอบล่าสุด</h3>
+    <ul>
+      <li><strong>Desktop unit tests:</strong> 149 passed</li>
+      <li><strong>Backend unit tests:</strong> 37 passed</li>
+      <li><strong>Regression หลังแก้ Supabase migration:</strong> 19 passed</li>
+      <li>Supabase migration ปัจจุบัน: <strong>e84b7c1d5a20 (head)</strong></li>
+    </ul>
+    <h3>การรันระหว่างพัฒนา</h3>
+    <table><thead><tr><th>ส่วน</th><th>คำสั่ง</th></tr></thead><tbody>
+      <tr><td>Backend</td><td><code>cd backend</code><br><code>.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001</code></td></tr>
+      <tr><td>Desktop</td><td><code>cd desktop</code><br><code>.\.venv\Scripts\python.exe -m app.main</code></td></tr>
+    </tbody></table>
+    <h3>งานก่อนแจกจ่ายโปรแกรม</h3>
+    <ol>
+      <li>ทดสอบ Webcam + Reference Card + Baseline + Alert จริงครบเส้นทาง</li>
+      <li>ทดสอบ Popup, Sound, Dashboard และ Report กับ Supabase จริง</li>
+      <li>ทดสอบ Privacy/Profile/Settings/Deletion ด้วยบัญชีจริง</li>
+      <li>ทดสอบ Session ระยะยาว, Minimize, Pause/Resume และ API ช้า</li>
+      <li>Package เป็น Windows executable/installer พร้อมกำหนดวิธีเริ่ม Backend</li>
+    </ol>
+    <div class="footer">PostGuard — Complete System Workflow • feature/detection • 22 October 2026</div>
+  </section>
+</body>
+</html>

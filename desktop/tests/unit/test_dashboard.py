@@ -11,6 +11,7 @@ from app.services.api_client import APIClient
 from app.ui.pages.dashboard_page import (
     DashboardPage,
     active_seconds,
+    rula_trend_points,
     summary_insights,
 )
 
@@ -65,11 +66,50 @@ class DashboardTests(unittest.TestCase):
 
         self.page._loaded(payload(sessions, summaries), "")
 
-        self.assertEqual(self.page.risk_value.text(), "1.5 / 7")
+        self.assertEqual(self.page.risk_value.text(), "8.3%")
         self.assertEqual(self.page.blink_value.text(), "14.0 / min")
         self.assertEqual(self.page.alerts_value.text(), "4")
-        self.assertEqual(self.page.recent_table.item(0, 4).text(), "1.5/7")
+        self.assertEqual(self.page.recent_table.item(0, 4).text(), "8.3%")
         self.assertEqual(self.page.recent_table.item(0, 5).text(), "4")
+        self.assertEqual(len(self.page.risk_trend_chart.points), 1)
+        self.assertAlmostEqual(
+            self.page.risk_trend_chart.points[0]["average"], 100 / 12
+        )
+        self.assertIn("Blue = average", self.page.risk_trend_note.text())
+
+    def test_rula_trend_is_chronological_and_ignores_invalid_reports(self):
+        sessions = [
+            dict(session_id=3, status="COMPLETED", started_at="2026-10-23T12:00:00Z"),
+            dict(session_id=2, status="COMPLETED", started_at="2026-10-22T12:00:00Z"),
+            dict(session_id=1, status="COMPLETED", started_at="2026-10-21T12:00:00Z"),
+        ]
+        summaries = [
+            dict(session_id=3, average_risk_score=5.0, maximum_risk_score=7.0, risk_score_method="RULA_ADAPTED_FRONT_V1"),
+            dict(session_id=2, average_risk_score=9.0, maximum_risk_score=None, risk_score_method="RULA_ADAPTED_FRONT_V1"),
+            dict(session_id=1, average_risk_score=2.0, maximum_risk_score=3.0, risk_score_method="RULA_ADAPTED_FRONT_V1"),
+        ]
+
+        points = rula_trend_points(sessions, summaries)
+
+        self.assertEqual([row["session_id"] for row in points], [1, 3])
+        self.assertAlmostEqual(points[0]["average"], 100 / 6)
+        self.assertEqual(points[1]["maximum"], 100.0)
+
+    def test_rula_trend_keeps_latest_twelve_sessions(self):
+        sessions = [
+            dict(session_id=index, status="COMPLETED", started_at=f"2026-10-{index:02d}T12:00:00Z")
+            for index in range(1, 16)
+        ]
+        summaries = [
+            dict(session_id=index, average_risk_score=2.0, maximum_risk_score=3.0, risk_score_method="RULA_ADAPTED_FRONT_V1")
+            for index in range(1, 16)
+        ]
+
+        points = rula_trend_points(sessions, summaries)
+
+        self.assertEqual(len(points), 12)
+        self.assertEqual(points[0]["session_id"], 4)
+        self.assertEqual(points[-1]["session_id"], 15)
 
     def test_insights_ignore_missing_and_invalid_measurements(self):
         result = summary_insights([
@@ -99,6 +139,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(self.page.completed_value.text(), "0")
         self.assertEqual(self.page.time_value.text(), "00:00:00")
         self.assertEqual(self.page.alerts_value.text(), "0")
+        self.assertEqual(self.page.risk_trend_chart.points, [])
 
         self.page._loaded(payload([], None, "unavailable"), "")
         self.assertEqual(self.page.alerts_value.text(), "N/A")

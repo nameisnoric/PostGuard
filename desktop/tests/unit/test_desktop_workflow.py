@@ -170,7 +170,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.show_monitoring_page(self.camera, 2)
         self.assertEqual(self.window.monitoring_page.session_id, 3)
 
-    def test_detected_camera_selection_opens_preview(self):
+    def test_detected_camera_selection_opens_camera_preparation(self):
         setup = self.window.camera_setup_page
         setup.detected_cameras = [self.camera]
         setup.camera_list.clear()
@@ -182,12 +182,12 @@ class DesktopWorkflowTests(unittest.TestCase):
 
         self.assertIs(
             self.window.pages.currentWidget(),
-            self.window.camera_preview_page,
+            self.window.camera_calibration_page,
         )
-        self.assertEqual(
-            self.window.camera_preview_page.selected_camera,
-            self.camera,
-        )
+        selected = self.window.camera_calibration_page.selected_camera
+        self.assertEqual(selected["camera_id"], self.camera["camera_id"])
+        self.assertEqual(selected["device_index"], self.camera["device_index"])
+        self.assertEqual(selected["device_id"], "opencv-index:0")
 
     def test_camera_previews_are_bounded_and_alerts_live_in_history(self):
         preview = self.window.camera_preview_page.preview_label
@@ -211,13 +211,33 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertFalse(hasattr(self.window, "alert_history_button"))
 
     def test_camera_preview_is_horizontally_centered_after_frame_resize(self):
-        self.window.show_camera_preview(self.camera)
+        camera = {**self.camera, "camera_calibration": self.camera_reference}
+        self.window.show_camera_preview(camera)
         self.window.camera_preview_page.update_frame()
         self.app.processEvents()
 
         page = self.window.camera_preview_page
         preview_center = page.preview_label.mapTo(page, page.preview_label.rect().center()).x()
         self.assertLessEqual(abs(preview_center - page.rect().center().x()), 2)
+
+    def test_preview_detection_uses_frame_after_camera_adjustment(self):
+        camera = {**self.camera, "camera_calibration": self.camera_reference}
+        self.window.show_camera_preview(camera)
+        page = self.window.camera_preview_page
+        adjusted = np.full((360, 640, 3), 77, dtype=np.uint8)
+        page.frame_count = 4
+
+        with patch(
+            "app.ui.pages.camera_preview_page.adjust_camera_frame",
+            return_value=adjusted,
+        ) as adjust:
+            page.update_frame()
+
+        adjust.assert_called_once_with(
+            self.capture.read.return_value[1], self.camera_reference
+        )
+        processed = page.detector.process_frame.call_args.args[0]
+        self.assertTrue(np.array_equal(processed, adjusted))
 
     def test_main_window_uses_centered_resizable_desktop_size(self):
         self.assertEqual(self.window.width(), 1280)
@@ -280,14 +300,19 @@ class DesktopWorkflowTests(unittest.TestCase):
 
     def test_preview_calibrate_save_monitor_pause_stop_summary(self):
         self.window.show_monitor()
-        self.window.show_camera_preview(self.camera)
-        self.window.camera_preview_page.handle_continue()
+        self.window.handle_camera_selected(self.camera)
         camera_preparation = self.window.camera_calibration_page
         self.assertIs(self.window.pages.currentWidget(), camera_preparation)
         self.assertFalse(camera_preparation.continue_button.isEnabled())
         camera_preparation.calibration_reference = self.camera_reference.copy()
         camera_preparation.continue_button.setEnabled(True)
         camera_preparation.handle_continue()
+        preview = self.window.camera_preview_page
+        self.assertIs(self.window.pages.currentWidget(), preview)
+        self.assertEqual(
+            preview.selected_camera["camera_calibration"], self.camera_reference
+        )
+        preview.handle_continue()
         baseline = self.window.baseline_page
         self.assertIs(self.window.pages.currentWidget(), baseline)
         self.assertEqual(
@@ -379,7 +404,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         monitor.update_partial_risk(self.result)
         self.assertEqual(
             monitor.risk_label.text(),
-            "Risk Score (RULA-adapted): 1/7 • ความเสี่ยงต่ำ",
+            "Risk Score (RULA-adapted): 0% • ความเสี่ยงต่ำ",
         )
         self.assertIn("rula", monitor.risk_note_label.text().lower())
 

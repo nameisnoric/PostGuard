@@ -59,6 +59,34 @@ class AlertHistoryDialogTests(unittest.TestCase):
         self.assertEqual(dialog.table.item(0, 1).text(), "Neck Lateral Tilt")
         self.assertEqual(dialog.table.item(0, 5).text(), "00:01:00")
 
+    def test_integrated_risk_events_and_notifications_are_rendered(self):
+        sessions = [{
+            "session_id": 12, "status": "COMPLETED",
+            "started_at": "2026-10-15T04:48:28Z",
+        }]
+        events = [{
+            "risk_event_id": 7, "max_risk_level": "HIGH",
+            "current_risk_level": "HIGH", "status": "RESOLVED",
+            "started_at": "2026-10-15T04:50:00Z",
+            "ended_at": "2026-10-15T04:51:00Z", "duration_seconds": 60,
+        }]
+        notifications = [{
+            "notification_id": 8, "alert_type": "ESCALATION",
+            "risk_level": "HIGH", "emitted_at": "2026-10-15T04:50:30Z",
+        }]
+        with patch.object(APIClient, "get_sessions", return_value=response(sessions)), patch.object(
+            APIClient, "get_session_risk_events", return_value=response(events)
+        ), patch.object(
+            APIClient, "get_session_alert_notifications", return_value=response(notifications)
+        ):
+            dialog = AlertHistoryDialog(session_id=12)
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertEqual(dialog.table.rowCount(), 2)
+        self.assertEqual(dialog.table.item(0, 1).text(), "Risk event")
+        self.assertEqual(dialog.table.item(1, 1).text(), "Alert Escalation")
+        self.assertIn("Notifications: 1", dialog.stats_label.text())
+
 
 if __name__ == "__main__":
     unittest.main()

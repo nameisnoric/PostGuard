@@ -42,7 +42,7 @@ class CameraCalibrationPage(QWidget):
         title = QLabel("เตรียมกล้อง")
         title.setProperty("role", "title")
         subtitle = QLabel(
-            "Step 3 of 4  ·  Hold a standard ID-size card inside the guide. "
+            "Step 2 of 4  ·  Hold a standard ID-size card inside the guide. "
             "PostGuard uses it only to calculate camera scale and alignment."
         )
         subtitle.setProperty("role", "muted")
@@ -116,9 +116,9 @@ class CameraCalibrationPage(QWidget):
         layout.addLayout(body, 1)
 
         actions = QHBoxLayout()
-        self.back_button = QPushButton("กลับไปดูภาพตัวอย่าง")
+        self.back_button = QPushButton("กลับไปเลือกกล้อง")
         self.retry_button = QPushButton("เริ่มเตรียมกล้องใหม่")
-        self.continue_button = QPushButton("ไปยังค่าท่าทางอ้างอิงส่วนบุคคล")
+        self.continue_button = QPushButton("ดูภาพหลังปรับแนวกล้อง")
         self.continue_button.setProperty("variant", "primary")
         self.continue_button.setEnabled(False)
         self.back_button.clicked.connect(self.handle_back)
@@ -186,8 +186,7 @@ class CameraCalibrationPage(QWidget):
             self.stop_camera()
             self.guidance_label.setText('ไม่สามารถอ่านภาพจากกล้องได้')
             return
-        prepared_frame = cv2.flip(frame, 1)
-        result = self.tracker.process(prepared_frame)
+        result = self.tracker.process(frame)
         self.guidance_label.setText(result["guidance"])
         self.progress_label.setText(
             f"เฟรมที่นิ่ง: {result['stable_count']} / {result['stable_frames']}"
@@ -210,7 +209,7 @@ class CameraCalibrationPage(QWidget):
             f"เฟรมที่นิ่ง: {self.tracker.stable_frames}/{self.tracker.stable_frames}\n"
             f"Pixel scale: {reference['scale_avg']:.2f} px/mm\n"
             f"Card roll: {reference['card_roll_deg']:+.2f}°\n\n"
-            "You can now continue to Personal Baseline.",
+            "You can now review the adjusted camera preview.",
         )
 
     def _show_frame(self, frame):

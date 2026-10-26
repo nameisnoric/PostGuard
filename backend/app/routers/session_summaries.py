@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.alert_event import AlertEvent
+from app.models.alert_notification import AlertNotification
+from app.models.risk_event import RiskEvent
 from app.models.session import PostureSession
 from app.models.session_summary import SessionSummary
 from app.models.user import User
@@ -73,60 +75,63 @@ def create_session_summary(
     alert_events = db.scalars(alert_statement).all()
 
     # 5. คำนวณ Risk Duration
-    low_risk_duration = sum(
-        alert.duration or 0
-        for alert in alert_events
-        if alert.risk_level == "LOW"
-    )
+    # Prefer the integrated risk lifecycle. Legacy alert_events remain a
+    # fallback so reports created before this migration still work.
+    risk_events = db.scalars(
+        select(RiskEvent).where(RiskEvent.session_id == session_id)
+    ).all()
+    notifications = db.scalars(
+        select(AlertNotification).where(AlertNotification.session_id == session_id)
+    ).all()
 
-    medium_risk_duration = sum(
-        alert.duration or 0
-        for alert in alert_events
-        if alert.risk_level == "MEDIUM"
-    )
-
-    high_risk_duration = sum(
-        alert.duration or 0
-        for alert in alert_events
-        if alert.risk_level == "HIGH"
-    )
-
-    # 6. นับจำนวน Alert แยกตาม Risk Level
-    low_risk_alert_count = sum(
-        1
-        for alert in alert_events
-        if alert.risk_level == "LOW"
-    )
-
-    medium_risk_alert_count = sum(
-        1
-        for alert in alert_events
-        if alert.risk_level == "MEDIUM"
-    )
-
-    high_risk_alert_count = sum(
-        1
-        for alert in alert_events
-        if alert.risk_level == "HIGH"
-    )
-
-    # 7. จำนวน Alert ทั้งหมด
-    total_alert_count = len(alert_events)
-
-    # 8. หา Event Type ที่เกิดบ่อยที่สุด
-    most_frequent_alert_event = None
-
-    if alert_events:
-        event_counter = Counter(
-            alert.event_type
-            for alert in alert_events
+    if risk_events:
+        low_risk_duration = 0
+        medium_risk_duration = round(sum(
+            event.duration_seconds or 0
+            for event in risk_events
+            if event.current_risk_level == "MODERATE"
+        ))
+        high_risk_duration = round(sum(
+            event.duration_seconds or 0
+            for event in risk_events
+            if event.current_risk_level == "HIGH"
+        ))
+        low_risk_alert_count = 0
+        medium_risk_alert_count = sum(
+            1 for item in notifications if item.risk_level == "MODERATE"
         )
-
-        most_frequent_alert_event = (
-            event_counter.most_common(1)[0][0]
+        high_risk_alert_count = sum(
+            1 for item in notifications if item.risk_level == "HIGH"
         )
+        total_alert_count = len(notifications)
+        event_counter = Counter(item.alert_type for item in notifications)
+    else:
+        low_risk_duration = round(sum(
+            alert.duration or 0 for alert in alert_events if alert.risk_level == "LOW"
+        ))
+        medium_risk_duration = round(sum(
+            alert.duration or 0 for alert in alert_events if alert.risk_level == "MEDIUM"
+        ))
+        high_risk_duration = round(sum(
+            alert.duration or 0 for alert in alert_events if alert.risk_level == "HIGH"
+        ))
+        low_risk_alert_count = sum(
+            1 for alert in alert_events if alert.risk_level == "LOW"
+        )
+        medium_risk_alert_count = sum(
+            1 for alert in alert_events if alert.risk_level == "MEDIUM"
+        )
+        high_risk_alert_count = sum(
+            1 for alert in alert_events if alert.risk_level == "HIGH"
+        )
+        total_alert_count = len(alert_events)
+        event_counter = Counter(alert.event_type for alert in alert_events)
 
-    # 9. สร้าง Session Summary
+    most_frequent_alert_event = (
+        event_counter.most_common(1)[0][0] if event_counter else None
+    )
+
+    # Build the stored report.
     session_summary = SessionSummary(
         session_id=session_id,
 

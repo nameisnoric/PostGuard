@@ -8,9 +8,11 @@ from typing import Any, Mapping
 
 from app.vision.mediapipe_detection.detection_pipeline import DetectionPipeline
 from app.vision.mediapipe_detection.eye.blink_statistics import BlinkStatistics
+from app.vision.alert_policy import AlertPolicy, AlertPolicyConfig
 from app.vision.posture_assessment.current_posture_assessment import (
     assess_current_posture,
 )
+from app.vision.risk_event import RiskEventTracker
 from app.vision.risk_evaluation import evaluate_risk
 from app.vision.session_monitoring.measurement_change_gate import (
     evaluate_measurement_change,
@@ -21,6 +23,16 @@ from app.vision.session_monitoring.session_monitor import (
 )
 from app.vision.temporal_tracking.temporal_posture_tracker import (
     TemporalPostureTracker,
+)
+
+
+DEFAULT_ALERT_POLICY = AlertPolicyConfig(
+    moderate_first_alert_delay_seconds=0.0,
+    high_first_alert_delay_seconds=0.0,
+    moderate_repeat_cooldown_seconds=600.0,
+    high_repeat_cooldown_seconds=300.0,
+    escalation_bypasses_cooldown=True,
+    notify_on_resolution=False,
 )
 
 
@@ -53,6 +65,8 @@ class DetectionService:
         self.blink_statistics = BlinkStatistics()
         self.blink_statistics.start()
         self.temporal_tracker = TemporalPostureTracker()
+        self.risk_event_tracker = RiskEventTracker()
+        self.alert_policy = AlertPolicy(DEFAULT_ALERT_POLICY)
 
         threshold_path = (
             Path(__file__).resolve().parents[1]
@@ -82,6 +96,10 @@ class DetectionService:
         self.pipeline.start_eye_calibration()
         self.blink_statistics.start()
         self.temporal_tracker.reset()
+        # A resumed session must not reuse a runtime event id that was already
+        # persisted before the pause.
+        self.risk_event_tracker.reset(preserve_sequence=True)
+        self.alert_policy.reset()
 
     def process_frame(self, frame):
         if frame is None or frame.size == 0:
@@ -99,6 +117,8 @@ class DetectionService:
         assessment = assess_current_posture(detection)
         temporal = self.temporal_tracker.update(assessment, now=timestamp)
         risk = evaluate_risk(assessment, temporal)
+        risk_event = self.risk_event_tracker.update(risk, now=timestamp)
+        alert_policy = self.alert_policy.update(risk_event, now=timestamp)
 
         monitoring_snapshot = None
         measurement_change = None
@@ -131,6 +151,8 @@ class DetectionService:
             "assessment": assessment,
             "temporal": temporal,
             "risk": risk,
+            "risk_event": risk_event,
+            "alert_policy": alert_policy,
             "monitoring_snapshot": monitoring_snapshot,
             "measurement_change": measurement_change,
             "blink_statistics": blink_statistics,

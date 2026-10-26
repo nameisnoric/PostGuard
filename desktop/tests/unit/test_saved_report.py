@@ -67,6 +67,24 @@ class SavedReportTests(unittest.TestCase):
             post.assert_not_called()
             page.deleteLater()
 
+    def test_saved_rula_scores_are_displayed_as_percentages(self):
+        saved = {
+            **self.saved,
+            "average_risk_score": 4.0,
+            "maximum_risk_score": 7.0,
+        }
+        with patch.object(
+            APIClient,
+            "get_session_alerts",
+            return_value=Mock(ok=True, json=lambda: []),
+        ):
+            page = SessionSummaryPage()
+            page.set_saved_report(self.session, saved)
+
+        self.assertIn("50.0%", page.average_risk_label.text())
+        self.assertIn("100.0%", page.maximum_risk_label.text())
+        page.deleteLater()
+
     def test_history_load_select_and_open(self):
         with patch.object(APIClient, "get", return_value=Mock(ok=True, json=lambda: [self.session])):
             page = HistoryPage()

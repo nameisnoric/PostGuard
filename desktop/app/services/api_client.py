@@ -265,6 +265,83 @@ class APIClient:
         return APIClient.get(f"/alerts/{event_id}")
 
     @staticmethod
+    def create_risk_event(
+        session_id: int,
+        runtime_event_id: str,
+        risk_level: str,
+        active_factors: list[str],
+        evidence_groups: list[str],
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/risk-events",
+            {
+                "runtime_event_id": runtime_event_id,
+                "risk_level": risk_level,
+                "active_factors": active_factors,
+                "evidence_groups": evidence_groups,
+            },
+        )
+
+    @staticmethod
+    def update_risk_event(
+        session_id: int,
+        runtime_event_id: str,
+        event_action: str,
+        risk_level: str,
+        active_factors: list[str],
+        evidence_groups: list[str],
+    ):
+        return APIClient.patch(
+            f"/sessions/{session_id}/risk-events/{runtime_event_id}",
+            {
+                "event_action": event_action,
+                "risk_level": risk_level,
+                "active_factors": active_factors,
+                "evidence_groups": evidence_groups,
+            },
+        )
+
+    @staticmethod
+    def resolve_risk_event(
+        session_id: int,
+        runtime_event_id: str,
+        resolved_reason: str,
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/risk-events/{runtime_event_id}/resolve",
+            {"resolved_reason": resolved_reason},
+        )
+
+    @staticmethod
+    def create_alert_notification(
+        session_id: int,
+        runtime_event_id: str,
+        runtime_notification_id: str,
+        alert_type: str,
+        risk_level: str | None,
+        decision: str,
+        reason: str | None,
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/risk-events/{runtime_event_id}/notifications",
+            {
+                "runtime_notification_id": runtime_notification_id,
+                "alert_type": alert_type,
+                "risk_level": risk_level,
+                "decision": decision,
+                "reason": reason,
+            },
+        )
+
+    @staticmethod
+    def get_session_risk_events(session_id: int):
+        return APIClient.get(f"/sessions/{session_id}/risk-events")
+
+    @staticmethod
+    def get_session_alert_notifications(session_id: int):
+        return APIClient.get(f"/sessions/{session_id}/alert-notifications")
+
+    @staticmethod
     def pause_session(session_id: int):
         """Pause an existing RUNNING session."""
         if type(session_id) is not int or session_id <= 0:

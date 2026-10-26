@@ -24,12 +24,14 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
+from app.services.camera_setup import adjust_camera_frame
 from app.services.api_client import APIClient
-from app.services.risk_alert_service import RiskAlertService
+from app.services.risk_persistence_service import RiskPersistenceService
 from app.services.alert_sound import AlertSoundPlayer
 from app.services.session_summary_service import save_session_summary
 from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
 from app.ui.utils.preview_sizing import fit_preview_label
+from app.ui.utils.risk_display import format_rula_percent
 
 
 class MonitoringPage(QWidget):
@@ -57,7 +59,7 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples = []
         self.latest_risk_result = None
-        self.alert_service = RiskAlertService()
+        self.risk_persistence = RiskPersistenceService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
 
@@ -198,7 +200,8 @@ class MonitoringPage(QWidget):
         self.alert_label = QLabel("Alert: Waiting")
         self.alert_label.setWordWrap(True)
         self.risk_note_label = QLabel(
-            "คะแนน 1–7 ประยุกต์จาก RULA สำหรับกล้องด้านหน้า โดยใช้มุมคอ "
+            "คะแนนแสดงเป็น 0–100% โดยแปลงจากค่า RULA-adapted ภายใน 1–7 "
+            "สำหรับกล้องด้านหน้า โดยใช้มุมคอ "
             "การเอียงคอ ความไม่สมดุลของไหล่ และระยะเวลาค้างท่า ไม่ใช่ Full RULA"
         )
         self.risk_note_label.setWordWrap(True)
@@ -361,7 +364,7 @@ class MonitoringPage(QWidget):
         self.face_detected_count = 0
         self.shoulder_samples.clear()
         self.neck_samples.clear()
-        self.alert_service.reset()
+        self.risk_persistence.reset()
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
@@ -378,9 +381,7 @@ class MonitoringPage(QWidget):
         return True
 
     def reset_risk_tracking(self, *_args) -> None:
-        """Clear the displayed assessment and close locally tracked alerts."""
-        if self.alert_service.has_active_alerts:
-            self.alert_service.close_all()
+        """Clear the displayed assessment and local notification state."""
         self.side_bending_label.setText("Assessment: Waiting")
         self.duration_label.setText("Active posture duration: --")
         self.partial_factors_label.setText("Baseline change: --")
@@ -441,7 +442,7 @@ class MonitoringPage(QWidget):
         }.get(level, level)
         status = risk.get("status", "NOT_EVALUATED") if isinstance(risk, dict) else "NOT_EVALUATED"
         self.risk_label.setText(
-            f"Risk Score (RULA-adapted): {score:.0f}/7 • {level_text}"
+            f"Risk Score (RULA-adapted): {format_rula_percent(score)} • {level_text}"
             if level is not None and score is not None
             else f"Risk Score (RULA-adapted): N/A ({status})"
         )
@@ -460,25 +461,56 @@ class MonitoringPage(QWidget):
 
         if self.session_id is None:
             return
-        actions = self.alert_service.update(self.session_id, risk)
-        created = actions["created"]
-        if created:
-            self.alert_label.setText(
-                f"Alert: {len(created)} sustained posture event(s) saved"
-            )
-            self.show_posture_alert(created[0])
-        elif actions["errors"]:
-            self.alert_label.setText("Alert API error: " + actions["errors"][0])
-        elif self.alert_service.has_active_alerts:
-            self.alert_label.setText("Alert: Sustained posture active")
-        elif actions["ended"]:
+        risk_event = result.get("risk_event") or {}
+        alert_policy = result.get("alert_policy") or {}
+        self.risk_persistence.process_pipeline_result(self.session_id, result)
+        persistence_errors = self.risk_persistence.drain_errors()
+        action = str(risk_event.get("event_action") or "NONE")
+        event_active = risk_event.get("event_active") is True
+        if persistence_errors:
+            self.alert_label.setText("Alert API error: " + persistence_errors[0])
+        elif alert_policy.get("should_notify") is True:
+            alert_type = str(alert_policy.get("alert_type") or "FIRST")
+            self.alert_label.setText(f"Alert: {alert_type.title()} notification")
+            self.show_posture_alert(self._popup_payload(result))
+        elif action == "RESOLVED":
             self.alert_label.setText("Alert: Cleared")
+        elif event_active:
+            level = risk_event.get("current_risk_level") or "--"
+            self.alert_label.setText(f"Alert: {level.title()} risk event active")
         else:
             self.alert_label.setText("Alert: Monitoring")
         self.sound_player.notify(
-            self.alert_service.has_active_alerts,
-            new_alert=bool(created),
+            event_active,
+            new_alert=alert_policy.get("should_notify") is True,
         )
+
+    @staticmethod
+    def _popup_payload(result: dict) -> dict:
+        """Adapt the integrated risk result to the existing popup contract."""
+        assessment = result.get("assessment") or {}
+        temporal = result.get("temporal") or {}
+        risk_event = result.get("risk_event") or {}
+        factors = assessment.get("factors") if isinstance(assessment, dict) else []
+        first_factor = next(
+            (item for item in factors if isinstance(item, dict)),
+            {},
+        )
+        active = temporal.get("active_factors") if isinstance(temporal, dict) else []
+        duration = max(
+            (
+                float(item.get("continuous_seconds", 0.0))
+                for item in active
+                if isinstance(item, dict)
+            ),
+            default=0.0,
+        )
+        return {
+            "event_type": str(first_factor.get("feature") or "POSTURE_RISK").upper(),
+            "factor": first_factor.get("factor"),
+            "duration_seconds": duration,
+            "risk_level": risk_event.get("current_risk_level") or "MODERATE",
+        }
 
     def show_posture_alert(
         self,
@@ -571,6 +603,11 @@ class MonitoringPage(QWidget):
             self._finish_after_capture_error()
             QMessageBox.warning(self, 'ข้อผิดพลาดของกล้อง', "Unable to read camera frame.")
             return
+
+        frame = adjust_camera_frame(
+            frame,
+            self.selected_camera.get("camera_calibration"),
+        )
 
         self.frame_count += 1
         if self.detector is not None and self.frame_count % 5 == 0:
@@ -703,13 +740,15 @@ class MonitoringPage(QWidget):
         # Successful session end automatically closes backend alert events.
         # Preserve IDs when session end fails, for a later retry.
         if self.session_id is None:
-            self.alert_service.reset()
+            self.risk_persistence.reset()
             self.alert_label.setText("Alert: Waiting")
 
     def stop_monitoring(self) -> bool:
         ended = True
         if self.session_id is not None:
             try:
+                if not self.risk_persistence.flush():
+                    raise RuntimeError("Timed out while saving risk events.")
                 self._end_remote_session()
             except (requests.RequestException, RuntimeError, ValueError) as error:
                 ended = False
@@ -859,6 +898,8 @@ class MonitoringPage(QWidget):
     def _pause_monitoring(self) -> None:
 
         try:
+            if not self.risk_persistence.flush():
+                raise RuntimeError("Timed out while saving risk events.")
             remote = self._change_remote_session_status(
                 action="pause",
                 expected_status="PAUSED",
@@ -883,9 +924,8 @@ class MonitoringPage(QWidget):
         self.timer.stop()
         self.is_paused = True
 
-        # Backend closes active alerts when pausing.
-        # Clear stale local alert state.
-        self.alert_service.reset()
+        # Backend closes active risk events when pausing.
+        self.risk_persistence.reset()
 
         self.preview_label.clear()
         self.preview_label.setText('หยุดการตรวจจับชั่วคราว')
@@ -926,7 +966,7 @@ class MonitoringPage(QWidget):
         # Resume only after Backend confirms RUNNING.
         self.is_paused = False
 
-        self.alert_service.reset()
+        self.risk_persistence.reset()
         if self.detector is not None:
             self.detector.reset_runtime()
 
@@ -968,6 +1008,8 @@ class MonitoringPage(QWidget):
         # 2. End the remote session
 
         try:
+            if not self.risk_persistence.flush():
+                raise RuntimeError("Timed out while saving risk events.")
             remote = self._end_remote_session()
 
         except (

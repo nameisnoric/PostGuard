@@ -11,6 +11,7 @@ from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.session import SessionResponse, SessionStart
 from app.models.alert_event import AlertEvent
+from app.services.risk_events import close_active_risk_events, elapsed_seconds
 
 from datetime import timezone, datetime
 import math
@@ -181,12 +182,17 @@ def pause_session(
 
     # ปิด Alert ที่ยัง Active ทั้งหมด
     for alert_event in active_alerts:
-        duration_seconds = int(
-            (now - alert_event.started_at).total_seconds()
-        )
+        duration_seconds = int(elapsed_seconds(alert_event.started_at, now))
 
         alert_event.ended_at = now
         alert_event.duration = duration_seconds
+
+    close_active_risk_events(
+        db,
+        session_id,
+        reason="SESSION_PAUSED",
+        ended_at=now,
+    )
 
     # เปลี่ยน Session เป็น PAUSED
     posture_session.status = "PAUSED"
@@ -235,9 +241,7 @@ def resume_session(
 
     now = datetime.now(timezone.utc)
 
-    pause_seconds = int(
-        (now - posture_session.paused_at).total_seconds()
-    )
+    pause_seconds = int(elapsed_seconds(posture_session.paused_at, now))
 
     posture_session.paused_duration += pause_seconds
     posture_session.paused_at = None
@@ -288,12 +292,17 @@ def end_session(
     active_alerts = db.scalars(active_alert_statement).all()
 
     for alert_event in active_alerts:
-        duration_seconds = int(
-            (now - alert_event.started_at).total_seconds()
-        )
+        duration_seconds = int(elapsed_seconds(alert_event.started_at, now))
 
         alert_event.ended_at = now
         alert_event.duration = duration_seconds
+
+    close_active_risk_events(
+        db,
+        session_id,
+        reason="SESSION_COMPLETED",
+        ended_at=now,
+    )
 
     # ถ้า End ขณะที่ Session กำลัง Pause
     # ต้องเก็บเวลา Pause รอบสุดท้ายด้วย
@@ -304,17 +313,13 @@ def end_session(
                 detail="Session pause time is missing"
             )
 
-        pause_seconds = int(
-            (now - posture_session.paused_at).total_seconds()
-        )
+        pause_seconds = int(elapsed_seconds(posture_session.paused_at, now))
 
         posture_session.paused_duration += pause_seconds
         posture_session.paused_at = None
 
     # คำนวณเวลาทั้งหมดตั้งแต่ Start → End
-    total_seconds = int(
-        (now - posture_session.started_at).total_seconds()
-    )
+    total_seconds = int(elapsed_seconds(posture_session.started_at, now))
 
     posture_session.total_duration = total_seconds
     posture_session.ended_at = now
@@ -369,6 +374,12 @@ def interrupt_session(
     if posture_session.status not in ("RUNNING", "PAUSED"):
         raise HTTPException(status_code=409, detail="Only an active session can be interrupted")
     posture_session.status = "INTERRUPTED"
+    close_active_risk_events(
+        db,
+        session_id,
+        reason="SESSION_INTERRUPTED",
+        ended_at=None,
+    )
     # Do not invent ended_at, elapsed time, alert durations or detection samples.
     # Unclosed alerts retain their unknown end and are displayed as incomplete.
     db.commit()

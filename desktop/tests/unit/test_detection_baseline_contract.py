@@ -26,6 +26,12 @@ class DetectionBaselineContractTests(unittest.TestCase):
         service.temporal_tracker = Mock(
             update=Mock(return_value={"status": "COMPLETE"})
         )
+        service.risk_event_tracker = Mock(
+            update=Mock(return_value={"event_action": "NONE"})
+        )
+        service.alert_policy = Mock(
+            update=Mock(return_value={"should_notify": False})
+        )
         service.session_context = None
         service.measurement_thresholds = {}
         return service

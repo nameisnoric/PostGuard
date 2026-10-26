@@ -11,6 +11,7 @@ except ImportError:
 from app.models.session import PostureSession
 from app.models.user import User
 from app.models.alert_event import AlertEvent
+from app.models.risk_event import RiskEvent
 from app.core.privacy import CURRENT_PRIVACY_NOTICE_VERSION
 from app.routers.sessions import router as sessions_router
 from app.routers.alert_events import router as alerts_router
@@ -100,6 +101,37 @@ class SessionRecoveryTests(unittest.TestCase):
         self.assertEqual(self.client.post(f"/alerts/{open_alert.event_id}/end").status_code, 409)
         for action in ("resume", "pause", "end"):
             self.assertEqual(self.client.post(f"/sessions/1/{action}").status_code, 409)
+
+    def test_pause_and_interrupt_finalize_integrated_risk_events(self):
+        now = datetime.now(timezone.utc)
+        first = RiskEvent(
+            session_id=1, runtime_event_id="risk-event-000001",
+            initial_risk_level="MODERATE", current_risk_level="MODERATE",
+            max_risk_level="MODERATE", status="ACTIVE", started_at=now,
+            duration_seconds=0, active_factors=[], evidence_groups=[],
+        )
+        self.db.add(first)
+        self.db.commit()
+
+        self.assertEqual(self.client.post("/sessions/1/pause").status_code, 200)
+        self.db.refresh(first)
+        self.assertEqual(first.status, "RESOLVED")
+        self.assertEqual(first.resolved_reason, "SESSION_PAUSED")
+
+        self.assertEqual(self.client.post("/sessions/1/resume").status_code, 200)
+        second = RiskEvent(
+            session_id=1, runtime_event_id="risk-event-000002",
+            initial_risk_level="HIGH", current_risk_level="HIGH",
+            max_risk_level="HIGH", status="ACTIVE", started_at=now,
+            duration_seconds=0, active_factors=[], evidence_groups=[],
+        )
+        self.db.add(second)
+        self.db.commit()
+        self.assertEqual(self.client.post("/sessions/1/interrupt").status_code, 200)
+        self.db.refresh(second)
+        self.assertEqual(second.status, "INCOMPLETE")
+        self.assertIsNone(second.ended_at)
+        self.assertEqual(second.resolved_reason, "SESSION_INTERRUPTED")
 
 
 if __name__ == "__main__":

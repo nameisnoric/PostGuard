@@ -20,19 +20,9 @@ class PostureAlertPopupTests(unittest.TestCase):
 
     def test_created_alert_shows_one_non_blocking_popup(self):
         self.page.session_id = 12
-        self.page.alert_service = Mock()
-        self.page.alert_service.update.return_value = {
-            "created": [{
-                "event_type": "NECK_LATERAL_TILT",
-                "factor": "NECK_LATERAL_RIGHT",
-                "duration_seconds": 60.0,
-                "risk_level": "MEDIUM",
-                "event_id": 44,
-            }],
-            "ended": [],
-            "errors": [],
-        }
-        self.page.alert_service.has_active_alerts = True
+        self.page.risk_persistence = Mock()
+        self.page.risk_persistence.process_pipeline_result.return_value = True
+        self.page.risk_persistence.drain_errors.return_value = []
         self.page.apply_notification_settings({"notifications_enabled": True})
 
         self.page.update_partial_risk({
@@ -50,6 +40,15 @@ class PostureAlertPopupTests(unittest.TestCase):
                 "status": "EVALUATED",
                 "risk_level": "MODERATE",
                 "prototype_score": 2.0,
+            },
+            "risk_event": {
+                "event_action": "STARTED",
+                "event_active": True,
+                "current_risk_level": "MODERATE",
+            },
+            "alert_policy": {
+                "should_notify": True,
+                "alert_type": "FIRST",
             },
             "measurement_change": {"features": {}},
         })

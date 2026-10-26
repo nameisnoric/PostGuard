@@ -214,31 +214,31 @@ class MainWindow(QMainWindow):
         # 7. Camera Page Events
         # ========================================
 
-        # Camera Setup -> Camera Preview
+        # Camera Setup -> Camera Preparation
         self.camera_setup_page.camera_selected.connect(
-            self.show_camera_preview
+            self.handle_camera_selected
         )
 
-        # Camera Preview -> Camera Setup
+        # Adjusted Camera Preview -> Camera Preparation
         self.camera_preview_page.back_requested.connect(
-            self.show_camera_setup
+            self.show_camera_calibration
         )
 
-        # Camera Preview -> Camera Preparation
+        # Adjusted Camera Preview -> Personal Baseline
         self.camera_preview_page.continue_requested.connect(
             self.handle_preview_continue
         )
 
         self.camera_calibration_page.back_requested.connect(
-            self.show_camera_preview
+            lambda _camera: self.show_camera_setup()
         )
         self.camera_calibration_page.continue_requested.connect(
             self.handle_camera_calibration_continue
         )
 
-        # Personal Baseline -> Camera Preparation
+        # Personal Baseline -> Adjusted Camera Preview
         self.baseline_page.back_requested.connect(
-            self.show_camera_calibration
+            self.show_camera_preview
         )
 
         # ========================================
@@ -614,7 +614,7 @@ class MainWindow(QMainWindow):
         event.accept()
 
     # ============================================
-    # Camera Preview
+    # Corrected Camera Preview
     # ============================================
 
     def show_camera_preview(
@@ -654,7 +654,7 @@ class MainWindow(QMainWindow):
     # Camera Registration
     # ============================================
 
-    def handle_preview_continue(
+    def handle_camera_selected(
         self,
         camera: dict
     ) -> None:
@@ -775,22 +775,34 @@ class MainWindow(QMainWindow):
                 str(error)
             )
 
-            # Reopen Preview for Retry
-            self.camera_preview_page.start_preview(
-                camera
-            )
-
             return
 
         # 7. Prepare physical camera placement before collecting a baseline.
         self.show_camera_calibration(camera_data)
+
+    def handle_preview_continue(self, camera: dict) -> None:
+        """Continue from the corrected preview to personal baseline capture."""
+        calibration_reference = camera.get("camera_calibration")
+        if (
+            not isinstance(calibration_reference, dict)
+            or calibration_reference.get("status") != "VALID"
+        ):
+            QMessageBox.warning(
+                self,
+                'การเตรียมกล้อง',
+                'โปรดเตรียมกล้องให้เสร็จก่อนสร้างค่าท่าทางอ้างอิงส่วนบุคคล',
+            )
+            return
+        self.camera_preview_page.stop_preview()
+        self.baseline_page.set_camera(camera.copy())
+        self.pages.setCurrentWidget(self.baseline_page)
 
     def handle_camera_calibration_continue(
         self,
         camera: dict,
         calibration_reference: dict,
     ) -> None:
-        """Attach the numeric camera reference to the baseline capture flow."""
+        """Attach the numeric camera reference and open the corrected preview."""
         if calibration_reference.get("status") != "VALID":
             QMessageBox.warning(
                 self,
@@ -800,8 +812,7 @@ class MainWindow(QMainWindow):
             return
         camera_data = camera.copy()
         camera_data["camera_calibration"] = calibration_reference.copy()
-        self.baseline_page.set_camera(camera_data)
-        self.pages.setCurrentWidget(self.baseline_page)
+        self.show_camera_preview(camera_data)
 
     # ============================================
     # Real-time Monitoring

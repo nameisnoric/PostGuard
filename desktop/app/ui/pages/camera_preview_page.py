@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 
+from app.services.camera_setup import adjust_camera_frame
 from app.services.detection_service import DetectionService
 from app.ui.utils.preview_sizing import fit_preview_label
 
@@ -29,7 +30,7 @@ from app.ui.utils.preview_sizing import fit_preview_label
 class CameraPreviewPage(QWidget):
 
     # ส่ง Signal กลับไป Camera Setup
-    back_requested = Signal()
+    back_requested = Signal(dict)
 
     # ส่งข้อมูลกล้องไป Personal Baseline
     continue_requested = Signal(dict)
@@ -95,7 +96,7 @@ class CameraPreviewPage(QWidget):
         self.title_label.setProperty("role", "title")
 
         self.description_label = QLabel(
-            "ขั้นตอน 2 จาก 4  ·  ยืนยันว่ากล้องที่เลือกพร้อมใช้งาน"
+            "ขั้นตอน 3 จาก 4  ·  ตรวจสอบภาพหลังแก้การเอียงของกล้อง"
         )
         self.description_label.setProperty("role", "muted")
 
@@ -143,7 +144,7 @@ class CameraPreviewPage(QWidget):
         )
 
         self.continue_button = QPushButton(
-            "ไปยังการเตรียมกล้อง"
+            "ไปยังค่าท่าทางอ้างอิงส่วนบุคคล"
         )
         self.continue_button.setProperty("variant", "primary")
 
@@ -235,10 +236,16 @@ class CameraPreviewPage(QWidget):
             "resolution_height"
         )
 
+        calibration = camera.get("camera_calibration")
+        if not isinstance(calibration, dict):
+            calibration = {}
+
         self.camera_info_label.setText(
             (
                 f"อุปกรณ์: {device_index} | "
-                f"ความละเอียด: {width}x{height}"
+                f"ความละเอียด: {width}x{height} | "
+                f"แก้การเอียง: "
+                f"{calibration.get('card_roll_deg', 0):+.2f}°"
             )
         )
 
@@ -347,6 +354,11 @@ class CameraPreviewPage(QWidget):
             )
 
             return
+
+        frame = adjust_camera_frame(
+            frame,
+            self.selected_camera.get("camera_calibration"),
+        )
 
         # -------------------------
         # Count Frames
@@ -586,7 +598,8 @@ class CameraPreviewPage(QWidget):
 
         self.stop_preview()
 
-        self.back_requested.emit()
+        camera = self.selected_camera.copy() if self.selected_camera else {}
+        self.back_requested.emit(camera)
 
     # =========================================================
     # Continue
