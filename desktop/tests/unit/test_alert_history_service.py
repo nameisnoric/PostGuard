@@ -3,6 +3,7 @@ from app.services.alert_history_service import (
     duration_text,
     event_type_label,
     summarize_alerts,
+    summarize_integrated_alerts,
     validate_session_id,
 )
 
@@ -32,6 +33,25 @@ class AlertHistoryServiceTests(unittest.TestCase):
     def test_duplicate_rejected(self):
         with self.assertRaises(ValueError):
             summarize_alerts([self.alerts[0], self.alerts[0]])
+
+    def test_integrated_summary_counts_notifications_and_resolved_risk_time(self):
+        events = [
+            {"risk_event_id": 69, "status": "RESOLVED", "duration_seconds": 1.2},
+            {"risk_event_id": 70, "status": "RESOLVED", "duration_seconds": 3.4},
+            {"risk_event_id": 71, "status": "RESOLVED", "duration_seconds": 1.1},
+        ]
+        notifications = [
+            {"notification_id": 27},
+            {"notification_id": 28},
+            {"notification_id": 29},
+        ]
+
+        result = summarize_integrated_alerts(events, notifications)
+
+        self.assertEqual(result["total_alerts"], 3)
+        self.assertEqual(result["closed_alerts"], 3)
+        self.assertEqual(result["active_alerts"], 0)
+        self.assertEqual(result["closed_alert_seconds"], 6)
 
     def test_invalid_duration_rejected(self):
         with self.assertRaises(ValueError):

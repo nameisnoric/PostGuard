@@ -56,6 +56,57 @@ def summarize_alerts(alerts):
     }
 
 
+def summarize_integrated_alerts(risk_events, notifications):
+    """Summarize persisted risk episodes and notifications for one session."""
+    if not isinstance(risk_events, list) or not isinstance(notifications, list):
+        raise ValueError("Integrated alert APIs must return lists")
+
+    event_ids = set()
+    active = 0
+    resolved = 0
+    incomplete = 0
+    resolved_duration = 0.0
+    for event in risk_events:
+        if not isinstance(event, dict):
+            raise ValueError("Each risk event must be an object")
+        event_id = event.get("risk_event_id")
+        if type(event_id) is not int or event_id <= 0 or event_id in event_ids:
+            raise ValueError("Invalid or duplicate risk_event_id")
+        event_ids.add(event_id)
+        event_status = event.get("status")
+        if event_status == "ACTIVE":
+            active += 1
+        elif event_status == "RESOLVED":
+            resolved += 1
+            duration = event.get("duration_seconds")
+            if type(duration) not in (int, float) or duration < 0:
+                raise ValueError("Invalid resolved risk-event duration")
+            resolved_duration += float(duration)
+        elif event_status == "INCOMPLETE":
+            incomplete += 1
+
+    notification_ids = set()
+    for notification in notifications:
+        if not isinstance(notification, dict):
+            raise ValueError("Each alert notification must be an object")
+        notification_id = notification.get("notification_id")
+        if (
+            type(notification_id) is not int
+            or notification_id <= 0
+            or notification_id in notification_ids
+        ):
+            raise ValueError("Invalid or duplicate notification_id")
+        notification_ids.add(notification_id)
+
+    return {
+        "total_alerts": len(notifications),
+        "active_alerts": active,
+        "closed_alerts": resolved,
+        "incomplete_alerts": incomplete,
+        "closed_alert_seconds": round(resolved_duration),
+    }
+
+
 def local_datetime(value):
     """Format an ISO timestamp in the computer's local timezone."""
     if not value:

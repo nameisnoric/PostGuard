@@ -16,6 +16,17 @@ class SavedReportTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        unavailable = Mock(ok=False, status_code=404)
+        self.events_patch = patch.object(
+            APIClient, "get_session_risk_events", return_value=unavailable
+        )
+        self.notifications_patch = patch.object(
+            APIClient, "get_session_alert_notifications", return_value=unavailable
+        )
+        self.events_patch.start()
+        self.notifications_patch.start()
+        self.addCleanup(self.events_patch.stop)
+        self.addCleanup(self.notifications_patch.stop)
         self.session = dict(
             session_id=7,
             status="COMPLETED",
@@ -83,6 +94,34 @@ class SavedReportTests(unittest.TestCase):
 
         self.assertIn("50.0%", page.average_risk_label.text())
         self.assertIn("100.0%", page.maximum_risk_label.text())
+        page.deleteLater()
+
+    def test_saved_report_alert_summary_uses_integrated_notifications(self):
+        events = Mock(ok=True, json=lambda: [
+            {"risk_event_id": 69, "status": "RESOLVED", "duration_seconds": 1.2},
+            {"risk_event_id": 70, "status": "RESOLVED", "duration_seconds": 3.4},
+            {"risk_event_id": 71, "status": "RESOLVED", "duration_seconds": 1.1},
+        ])
+        notifications = Mock(ok=True, json=lambda: [
+            {"notification_id": 27},
+            {"notification_id": 28},
+            {"notification_id": 29},
+        ])
+        with patch.object(
+            APIClient, "get_session_risk_events", return_value=events
+        ), patch.object(
+            APIClient,
+            "get_session_alert_notifications",
+            return_value=notifications,
+        ), patch.object(APIClient, "get_session_alerts") as legacy:
+            page = SessionSummaryPage()
+            page.set_saved_report(self.session, self.saved)
+
+        self.assertTrue(page.alert_total_label.text().endswith("3"))
+        self.assertTrue(page.alert_closed_label.text().endswith("3"))
+        self.assertTrue(page.alert_active_label.text().endswith("0"))
+        self.assertIn("6 seconds", page.alert_duration_label.text())
+        legacy.assert_not_called()
         page.deleteLater()
 
     def test_history_load_select_and_open(self):

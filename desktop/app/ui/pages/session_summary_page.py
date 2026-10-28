@@ -24,6 +24,7 @@ from app.services.alert_history_service import (
     event_type_label,
     local_datetime,
     summarize_alerts,
+    summarize_integrated_alerts,
 )
 from app.services.session_summary_service import (
     save_session_summary,
@@ -504,18 +505,30 @@ class SessionSummaryPage(QWidget):
             return
 
         try:
-            response = APIClient.get_session_alerts(
+            event_response = APIClient.get_session_risk_events(session_id)
+            notification_response = APIClient.get_session_alert_notifications(
                 session_id
             )
-
-            if not response.ok:
-                raise RuntimeError(
-                    f"Alert API HTTP {response.status_code}"
+            stats = None
+            if event_response.ok and notification_response.ok:
+                risk_events = event_response.json()
+                notifications = notification_response.json()
+                integrated_stats = summarize_integrated_alerts(
+                    risk_events,
+                    notifications,
                 )
+                if risk_events or notifications:
+                    stats = integrated_stats
 
-            stats = summarize_alerts(
-                response.json()
-            )
+            # Reports created before integrated risk persistence still use the
+            # legacy alert-events endpoint.
+            if stats is None:
+                response = APIClient.get_session_alerts(session_id)
+                if not response.ok:
+                    raise RuntimeError(
+                        f"Alert API HTTP {response.status_code}"
+                    )
+                stats = summarize_alerts(response.json())
 
             self.alert_total_label.setText(
                 f"การแจ้งเตือนทั้งหมด: {stats['total_alerts']}"
