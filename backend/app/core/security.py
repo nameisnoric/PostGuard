@@ -26,6 +26,7 @@ if not SECRET_KEY:
     raise RuntimeError("JWT_SECRET_KEY is not setup")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTE = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
@@ -34,6 +35,7 @@ def create_access_token(user_id: int) -> str:
 
     payload = {
         "sub": str(user_id),
+        "purpose": "access",
         "exp": expire
     }
 
@@ -45,12 +47,38 @@ def create_access_token(user_id: int) -> str:
 
     return token
 
+def create_refresh_token(user_id: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        days=REFRESH_TOKEN_EXPIRE_DAYS
+    )
+    return jwt.encode(
+        {
+            "sub": str(user_id),
+            "purpose": "refresh",
+            "exp": expire,
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+def decode_refresh_token(token: str) -> int:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if payload.get("purpose") != "refresh":
+        raise ValueError("Invalid refresh token")
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise ValueError("Invalid refresh token")
+    return int(user_id)
+
 def decode_access_token(token: str) -> int:
     payload = jwt.decode(
         token,
         SECRET_KEY,
         algorithms=[ALGORITHM]
     )
+
+    if payload.get("purpose") != "access":
+        raise ValueError("Invalid access token")
 
     user_id = payload.get("sub")
 

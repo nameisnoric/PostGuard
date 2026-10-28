@@ -1,3 +1,5 @@
+import threading
+
 import requests
 
 from app.core.config import API_BASE_URL
@@ -5,6 +7,17 @@ from app.core.token_store import TokenStore
 
 
 class APIClient:
+    _refresh_lock = threading.Lock()
+    _public_auth_endpoints = {
+        "/auth/login",
+        "/auth/forgot-password",
+        "/auth/verify-reset-otp",
+        "/auth/reset_password",
+        "/auth/register/request-otp",
+        "/auth/register/verify-otp",
+        "/auth/refresh",
+    }
+
     @staticmethod
     def request_password_reset(email: str):
         return APIClient.post("/auth/forgot-password", {"email": email})
@@ -39,47 +52,95 @@ class APIClient:
         return headers
 
     @staticmethod
-    def get(endpoint: str):
-        return requests.get(
+    def _refresh_access_token(failed_token: str | None = None) -> bool:
+        refresh_token = TokenStore.get_refresh_token()
+        if not refresh_token:
+            return False
+
+        with APIClient._refresh_lock:
+            current_token = TokenStore.get_token()
+            if failed_token is not None and current_token != failed_token:
+                return bool(current_token)
+            if failed_token is None and not TokenStore.should_refresh():
+                return bool(current_token)
+
+            response = requests.post(
+                f"{API_BASE_URL}/auth/refresh",
+                json={"refresh_token": TokenStore.get_refresh_token()},
+                headers={"Content-Type": "application/json"},
+                timeout=10,
+            )
+            if response.status_code != 200:
+                if response.status_code == 401:
+                    TokenStore.clear_token()
+                return False
+
+            try:
+                data = response.json()
+                access_token = data["access_token"]
+                new_refresh_token = data["refresh_token"]
+                expires_in = int(data.get("expires_in", 30 * 60))
+            except (KeyError, TypeError, ValueError):
+                TokenStore.clear_token()
+                return False
+
+            if not access_token or not new_refresh_token:
+                TokenStore.clear_token()
+                return False
+            TokenStore.set_session(access_token, new_refresh_token, expires_in)
+            return True
+
+    @staticmethod
+    def _request(method: str, endpoint: str, **kwargs):
+        token = TokenStore.get_token()
+        authenticated = bool(token and endpoint not in APIClient._public_auth_endpoints)
+        if authenticated and TokenStore.should_refresh():
+            try:
+                APIClient._refresh_access_token()
+            except requests.RequestException:
+                pass
+
+        token = TokenStore.get_token()
+        kwargs["headers"] = APIClient._get_headers()
+        response = getattr(requests, method)(
             f"{API_BASE_URL}{endpoint}",
-            headers=APIClient._get_headers(),
-            timeout=10,
+            **kwargs,
         )
+        if response.status_code != 401 or not authenticated:
+            return response
+
+        try:
+            refreshed = APIClient._refresh_access_token(failed_token=token)
+        except requests.RequestException:
+            refreshed = False
+        if not refreshed:
+            return response
+
+        kwargs["headers"] = APIClient._get_headers()
+        return getattr(requests, method)(
+            f"{API_BASE_URL}{endpoint}",
+            **kwargs,
+        )
+
+    @staticmethod
+    def get(endpoint: str):
+        return APIClient._request("get", endpoint, timeout=10)
 
     @staticmethod
     def post(endpoint: str, data: dict | None = None):
-        return requests.post(
-            f"{API_BASE_URL}{endpoint}",
-            json=data,
-            headers=APIClient._get_headers(),
-            timeout=10,
-        )
+        return APIClient._request("post", endpoint, json=data, timeout=10)
 
     @staticmethod
     def patch(endpoint: str, data: dict | None = None):
-        return requests.patch(
-            f"{API_BASE_URL}{endpoint}",
-            json=data,
-            headers=APIClient._get_headers(),
-            timeout=10,
-        )
+        return APIClient._request("patch", endpoint, json=data, timeout=10)
 
     @staticmethod
     def put(endpoint: str, data: dict | None = None):
-        return requests.put(
-            f"{API_BASE_URL}{endpoint}",
-            json=data,
-            headers=APIClient._get_headers(),
-            timeout=10,
-        )
+        return APIClient._request("put", endpoint, json=data, timeout=10)
 
     @staticmethod
     def delete(endpoint: str):
-        return requests.delete(
-            f"{API_BASE_URL}{endpoint}",
-            headers=APIClient._get_headers(),
-            timeout=15,
-        )
+        return APIClient._request("delete", endpoint, timeout=15)
 
     @staticmethod
     def login(email: str, password: str):

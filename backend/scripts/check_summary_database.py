@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 def check():
     load_dotenv(".env")
     from app.database.database import get_db
+    from app.core.privacy import CURRENT_PRIVACY_NOTICE_VERSION
     from app.models.user import User
     from app.core.security import hash_password, SECRET_KEY, ALGORITHM
     from app.routers.auth import router as auth_router
@@ -41,7 +42,13 @@ def check():
         db = Session(bind=connection, join_transaction_mode="create_savepoint")
         try:
             password = uuid.uuid4().hex + "Aa1!"
-            user = User(email=marker + "@ku.th", username=marker, password_hash=hash_password(password))
+            user = User(
+                email=marker + "@ku.th",
+                username=marker,
+                password_hash=hash_password(password),
+                privacy_consent_version=CURRENT_PRIVACY_NOTICE_VERSION,
+                privacy_consent_accepted_at=datetime.now(timezone.utc),
+            )
             db.add(user)
             db.flush()
             user_id = user.id
@@ -67,10 +74,30 @@ def check():
                 camera = client.post("/cameras", json={"device_id": marker, "camera_name": "Temporary test", "resolution_width": 640, "resolution_height": 360})
                 assert camera.status_code == 201, f"Camera HTTP {camera.status_code}"
                 camera_id = camera.json()["camera_id"]
-                baseline = client.post("/personal-baselines", json={"camera_id": camera_id, "shoulder_angle": 1.0, "lateral_tilt_baseline": 2.0})
+                baseline = client.post("/personal-baselines", json={
+                    "camera_id": camera_id,
+                    "camera_frame_width": 640,
+                    "camera_frame_height": 360,
+                    "camera_scale_x": 3.5,
+                    "camera_scale_y": 3.5,
+                    "camera_scale_avg": 3.5,
+                    "camera_card_roll": 0.0,
+                    "camera_horizontal_perspective": 0.0,
+                    "camera_vertical_perspective": 0.0,
+                    "camera_calibrated_at": datetime.now(timezone.utc).isoformat(),
+                    "baseline_status": "SUCCESS",
+                    "confirmation_status": "CONFIRMED",
+                    "baseline_sample_count": 60,
+                    "baseline_duration_seconds": 15.0,
+                    "baseline_valid_ratio": 1.0,
+                    "shoulder_angle": 1.0,
+                    "lateral_tilt_baseline": 2.0,
+                    "neck_flexion_baseline": 1.5,
+                    "ipd_baseline": 70.0,
+                })
                 assert baseline.status_code == 201, f"Baseline HTTP {baseline.status_code}"
                 baseline_id = baseline.json()["baseline_id"]
-                assert client.get(f"/personal-baselines/{baseline_id}").json()["shoulder_angle"] == 1.0
+                assert client.get(f"/personal-baselines/{baseline_id}").json()["shoulder_angle"] == 1.0, "Baseline read mismatch"
                 start = client.post("/sessions/start", json={"camera_id": camera_id, "baseline_id": baseline_id})
                 assert start.status_code == 201, f"Start HTTP {start.status_code}"
                 session_id = start.json()["session_id"]
@@ -146,6 +173,9 @@ if __name__ == "__main__":
     parser.parse_args()
     try:
         check()
+    except AssertionError as error:
+        print("FAIL: AssertionError:", str(error)[:200])
+        raise SystemExit(1)
     except Exception as error:
         # Do not include SQL parameters, URLs or credentials in console output.
         print("FAIL:", type(error).__name__)

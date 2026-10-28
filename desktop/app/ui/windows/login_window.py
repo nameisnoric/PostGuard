@@ -113,14 +113,19 @@ class LoginWindow(QWidget):
         access_token = login_data.get(
             "access_token"
         )
+        refresh_token = login_data.get("refresh_token")
 
-        if not access_token:
+        if not access_token or not refresh_token:
             self.show_error(
-                "Access token was not returned by the server."
+                "Authentication tokens were not returned by the server."
             )
             return
 
-        TokenStore.set_token(access_token)
+        TokenStore.set_session(
+            access_token,
+            refresh_token,
+            int(login_data.get("expires_in", 30 * 60)),
+        )
 
         try:
             me_response = APIClient.get_current_user()

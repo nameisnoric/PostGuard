@@ -22,14 +22,27 @@ def upgrade() -> None:
         "ck_summary_rula_neck_score", "session_summaries", type_="check"
     )
     op.drop_column("session_summaries", "rula_neck_score")
-    op.add_column(
-        "session_summaries",
-        sa.Column("risk_score_method", sa.String(length=40), nullable=True),
-    )
+    # The integration/desktop-risk-pipeline deployment added this column while
+    # retaining a different Alembic head. Reconciliation must therefore accept
+    # both that deployed schema and a fresh database.
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("session_summaries")
+    }
+    if "risk_score_method" not in columns:
+        op.add_column(
+            "session_summaries",
+            sa.Column("risk_score_method", sa.String(length=40), nullable=True),
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("session_summaries", "risk_score_method")
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("session_summaries")
+    }
+    if "risk_score_method" in columns:
+        op.drop_column("session_summaries", "risk_score_method")
     op.add_column(
         "session_summaries",
         sa.Column("rula_neck_score", sa.Integer(), nullable=True),

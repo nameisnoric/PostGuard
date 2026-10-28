@@ -30,8 +30,10 @@ class AlertHistoryDialogTests(unittest.TestCase):
             {"session_id": 12, "status": "COMPLETED", "started_at": "2026-10-15T04:48:28Z"},
         ]
         with patch.object(APIClient, "get_sessions", return_value=response(sessions)), patch.object(
-            APIClient, "get_session_alerts", return_value=response(alerts)
-        ):
+            APIClient, "get_session_risk_events", return_value=response([], 404)
+        ), patch.object(
+            APIClient, "get_session_alert_notifications", return_value=response([], 404)
+        ), patch.object(APIClient, "get_session_alerts", return_value=response(alerts)):
             dialog = AlertHistoryDialog(session_id=12)
         self.addCleanup(dialog.deleteLater)
         return dialog

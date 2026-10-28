@@ -91,7 +91,10 @@ class SessionRecoveryTests(unittest.TestCase):
         login = LoginWindow()
         login.email_input.setText("test@ku.th")
         login.password_input.setText("secret-password")
-        login_response = response({"access_token": "secret-token"})
+        login_response = response({
+            "access_token": "secret-token",
+            "refresh_token": "secret-refresh-token",
+        })
         login_response.text = "secret-token"
         output = StringIO()
         with patch.object(APIClient, "login", return_value=login_response), patch.object(APIClient, "get_current_user", return_value=response({"id": 1})), patch("app.ui.windows.login_window.MainWindow") as window, redirect_stdout(output):
@@ -111,7 +114,9 @@ class SessionRecoveryTests(unittest.TestCase):
             "deletion_scheduled_for": "2026-10-29T12:00:00+00:00",
         }
         with patch.object(
-            APIClient, "login", return_value=response({"access_token": "token"})
+            APIClient, "login", return_value=response({
+                "access_token": "token", "refresh_token": "refresh-token"
+            })
         ), patch.object(
             APIClient, "get_current_user", return_value=response(pending_user)
         ), patch(
