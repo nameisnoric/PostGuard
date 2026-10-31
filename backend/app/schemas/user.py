@@ -79,6 +79,33 @@ class UserProfileUpdate(BaseModel):
         return full_name
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, password: str) -> str:
+        if not password:
+            raise ValueError("Current password is required")
+        return password
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, password: str) -> str:
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", password):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", password):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", password):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r"[^A-Za-z0-9]", password):
+            raise ValueError("Password must contain at least one special character")
+        return password
+
+
 class PrivacyConsentAccept(BaseModel):
     notice_version: str
 

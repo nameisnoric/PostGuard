@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.services.camera_setup import CameraCalibrationTracker
+from app.services.camera_setup import CameraCalibrationTracker, mirror_camera_frame
 
 
 class CameraCalibrationPage(QWidget):
@@ -186,6 +186,7 @@ class CameraCalibrationPage(QWidget):
             self.stop_camera()
             self.guidance_label.setText('ไม่สามารถอ่านภาพจากกล้องได้')
             return
+        frame = mirror_camera_frame(frame)
         result = self.tracker.process(frame)
         self.guidance_label.setText(result["guidance"])
         self.progress_label.setText(

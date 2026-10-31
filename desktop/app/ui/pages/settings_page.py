@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from app.services.alert_sound import AlertSoundPlayer, DEFAULT_SETTINGS
 from app.services.api_client import APIClient
 from app.ui.dialogs.account_deletion_dialog import AccountDeletionConfirmationDialog
+from app.ui.dialogs.change_password_dialog import ChangePasswordDialog
 from app.ui.theme import polish
 
 
@@ -27,6 +28,7 @@ class SettingsPage(QWidget):
     settings_updated = Signal(dict)
     privacy_consent_changed = Signal(bool)
     account_deletion_requested = Signal()
+    password_changed = Signal()
 
     def __init__(self, sound_player: AlertSoundPlayer):
         super().__init__()
@@ -126,6 +128,34 @@ class SettingsPage(QWidget):
         row.addStretch()
         layout.addLayout(row)
 
+        security_row = QHBoxLayout()
+        security_row.addStretch()
+        security_card = QFrame()
+        security_card.setProperty("card", True)
+        security_card.setMaximumWidth(900)
+        security_layout = QVBoxLayout(security_card)
+        security_layout.setContentsMargins(28, 26, 28, 26)
+        security_layout.setSpacing(12)
+        security_heading = QLabel("Security")
+        security_heading.setProperty("role", "heading")
+        security_note = QLabel(
+            "เปลี่ยนรหัสผ่านของบัญชี PostGuard ระบบจะยกเลิก Access Token และ "
+            "Refresh Token เดิมจากทุกอุปกรณ์"
+        )
+        security_note.setProperty("role", "muted")
+        security_note.setWordWrap(True)
+        self.change_password_button = QPushButton("เปลี่ยนรหัสผ่าน")
+        self.change_password_button.clicked.connect(self.open_change_password)
+        security_actions = QHBoxLayout()
+        security_actions.addWidget(self.change_password_button)
+        security_actions.addStretch()
+        security_layout.addWidget(security_heading)
+        security_layout.addWidget(security_note)
+        security_layout.addLayout(security_actions)
+        security_row.addWidget(security_card, 1)
+        security_row.addStretch()
+        layout.addLayout(security_row)
+
         privacy_row = QHBoxLayout()
         privacy_row.addStretch()
         privacy_card = QFrame()
@@ -204,6 +234,11 @@ class SettingsPage(QWidget):
         dialog = AccountDeletionConfirmationDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.account_deletion_requested.emit()
+
+    def open_change_password(self) -> None:
+        dialog = ChangePasswordDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.password_changed.emit()
 
     def load_settings(self) -> None:
         self.status_label.setText('กำลังโหลดการตั้งค่า...')

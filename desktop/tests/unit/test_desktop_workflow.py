@@ -234,7 +234,7 @@ class DesktopWorkflowTests(unittest.TestCase):
             page.update_frame()
 
         adjust.assert_called_once_with(
-            self.capture.read.return_value[1], self.camera_reference
+            self.capture.read.return_value[1][:, ::-1], self.camera_reference
         )
         processed = page.detector.process_frame.call_args.args[0]
         self.assertTrue(np.array_equal(processed, adjusted))
@@ -396,6 +396,27 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertTrue(page.continue_button.isEnabled())
         self.assertEqual(page.calibration_reference, self.camera_reference)
         information.assert_called_once()
+
+    def test_camera_preparation_tracks_the_mirrored_frame(self):
+        page = self.window.camera_calibration_page
+        raw = np.zeros((4, 6, 3), dtype=np.uint8)
+        raw[:, 0] = 25
+        raw[:, -1] = 200
+        self.capture.read.return_value = (True, raw)
+        page.capture = self.capture
+        page.tracker = Mock()
+        page.tracker.process.return_value = {
+            "guidance": "Ready",
+            "stable_count": 0,
+            "stable_frames": 10,
+            "reference": None,
+            "display_frame": raw[:, ::-1].copy(),
+        }
+
+        page.update_frame()
+
+        tracked = page.tracker.process.call_args.args[0]
+        np.testing.assert_array_equal(tracked, raw[:, ::-1])
 
     def test_integrated_risk_panel_uses_pipeline_results(self):
         monitor = self.window.monitoring_page

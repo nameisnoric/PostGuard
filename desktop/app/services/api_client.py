@@ -158,6 +158,16 @@ class APIClient:
         )
 
     @staticmethod
+    def change_password(current_password: str, new_password: str):
+        return APIClient.put(
+            "/users/me/password",
+            {
+                "current_password": current_password,
+                "new_password": new_password,
+            },
+        )
+
+    @staticmethod
     def request_account_deletion():
         return APIClient.post("/users/me/deletion-request")
 

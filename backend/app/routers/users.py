@@ -1,5 +1,6 @@
 """Authenticated user profile endpoints."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from uuid import uuid4
@@ -13,13 +14,21 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.user import User
 from app.routers.auth import get_authenticated_user, get_current_user
-from app.schemas.user import UserProfileUpdate, UserResponse
+from app.core.security import hash_password, verify_password
+from app.schemas.user import (
+    ChangePasswordRequest,
+    MessageResponse,
+    UserProfileUpdate,
+    UserResponse,
+)
+from app.services.email_service import send_password_changed_notice
 from app.services.avatar_storage import (
     AvatarStorageError, SupabaseAvatarStorage, get_avatar_storage,
 )
 
 
 router = APIRouter(prefix="/users/me", tags=["Profile"])
+logger = logging.getLogger(__name__)
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
 MAX_AVATAR_PIXELS = 25_000_000
 AVATAR_SIZE = (400, 400)
@@ -108,6 +117,39 @@ def update_profile(
             detail="Username is already in use.",
         ) from exc
     return current_user
+
+
+@router.put("/password", response_model=MessageResponse)
+def change_password(
+    request: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change the signed-in user's password and revoke existing sessions."""
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+    if verify_password(request.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password.",
+        )
+
+    current_user.password_hash = hash_password(request.new_password)
+    current_user.auth_version += 1
+    db.commit()
+
+    try:
+        send_password_changed_notice(current_user.email)
+    except Exception:
+        logger.exception(
+            "Password changed but notification email could not be sent for user %s",
+            current_user.id,
+        )
+
+    return {"message": "Password changed successfully. Sign in again."}
 
 
 def normalize_avatar(content: bytes) -> bytes:

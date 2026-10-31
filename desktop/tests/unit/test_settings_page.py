@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.services.api_client import APIClient
 from app.ui.dialogs.account_deletion_dialog import AccountDeletionConfirmationDialog
+from app.ui.dialogs.change_password_dialog import ChangePasswordDialog
 from app.ui.pages.settings_page import SettingsPage
 
 
@@ -94,6 +95,19 @@ class SettingsPageTests(unittest.TestCase):
             requested.assert_not_called()
             self.page.delete_account_button.click()
             requested.assert_called_once_with()
+
+    def test_change_password_emits_only_after_successful_dialog(self):
+        changed = Mock()
+        self.page.password_changed.connect(changed)
+        with patch.object(
+            ChangePasswordDialog,
+            "exec",
+            side_effect=(QDialog.DialogCode.Rejected, QDialog.DialogCode.Accepted),
+        ):
+            self.page.change_password_button.click()
+            changed.assert_not_called()
+            self.page.change_password_button.click()
+            changed.assert_called_once_with()
 
     def test_privacy_status_and_withdrawal(self):
         accepted = {

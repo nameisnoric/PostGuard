@@ -171,6 +171,10 @@ from app.services.detection_service import (
     DetectionService,
 )
 
+from app.services.camera_setup import (
+    mirror_camera_frame,
+)
+
 from app.vision.posture_assessment.current_posture_assessment import (
     assess_current_posture,
 )
@@ -1809,6 +1813,12 @@ def run_detection_validation(
             if not ok:
                 break
 
+            # Match the Desktop camera pipeline: users see and are assessed
+            # from the same horizontally mirrored frame.
+            frame = mirror_camera_frame(
+                frame
+            )
+
 
             timestamp = (
                 frame_index
@@ -2132,6 +2142,9 @@ def run_detection_validation(
         ),
 
         "production_pipeline": {
+            "frame_transform": [
+                "horizontal_mirror"
+            ],
             "posture": [
                 (
                     "DetectionService"
@@ -3371,6 +3384,10 @@ class ValidationApp:
 
         if not ok:
             return
+
+        frame = mirror_camera_frame(
+            frame
+        )
 
 
         self.current_frame_index = (

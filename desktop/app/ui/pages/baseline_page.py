@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
-from app.services.camera_setup import adjust_camera_frame
+from app.services.camera_setup import adjust_camera_frame, mirror_camera_frame
 from app.services.api_client import APIClient
 from app.services.personal_baseline_service import (
     BASELINE_COLLECTING,
@@ -984,6 +984,7 @@ class BaselinePage(QWidget):
 
             return
 
+        frame = mirror_camera_frame(frame)
         frame = adjust_camera_frame(
             frame,
             self.selected_camera.get("camera_calibration"),

@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 
-from app.services.camera_setup import adjust_camera_frame
+from app.services.camera_setup import adjust_camera_frame, mirror_camera_frame
 from app.services.detection_service import DetectionService
 from app.ui.utils.preview_sizing import fit_preview_label
 
@@ -355,6 +355,7 @@ class CameraPreviewPage(QWidget):
 
             return
 
+        frame = mirror_camera_frame(frame)
         frame = adjust_camera_frame(
             frame,
             self.selected_camera.get("camera_calibration"),

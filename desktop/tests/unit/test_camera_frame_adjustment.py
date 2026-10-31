@@ -3,7 +3,10 @@ import unittest
 import cv2
 import numpy as np
 
-from app.services.camera_setup.frame_adjustment import adjust_camera_frame
+from app.services.camera_setup.frame_adjustment import (
+    adjust_camera_frame,
+    mirror_camera_frame,
+)
 
 
 class CameraFrameAdjustmentTests(unittest.TestCase):
@@ -36,6 +39,21 @@ class CameraFrameAdjustmentTests(unittest.TestCase):
             ),
             frame,
         )
+
+    def test_mirror_camera_frame_reverses_horizontal_direction(self):
+        frame = np.array(
+            [[[1, 2, 3], [4, 5, 6], [7, 8, 9]]],
+            dtype=np.uint8,
+        )
+
+        mirrored = mirror_camera_frame(frame)
+
+        np.testing.assert_array_equal(mirrored, frame[:, ::-1])
+
+    def test_mirror_camera_frame_keeps_invalid_frame_unchanged(self):
+        self.assertIsNone(mirror_camera_frame(None))
+        empty = np.empty((0, 0, 3), dtype=np.uint8)
+        self.assertIs(mirror_camera_frame(empty), empty)
 
 
 if __name__ == "__main__":

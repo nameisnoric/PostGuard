@@ -202,6 +202,7 @@ class MainWindow(QMainWindow):
         self.logout_action.triggered.connect(self.logout)
         self.profile_page.profile_updated.connect(self.update_profile)
         self.settings_page.account_deletion_requested.connect(self.delete_account)
+        self.settings_page.password_changed.connect(self.logout)
         self.settings_page.settings_updated.connect(
             self.monitoring_page.apply_notification_settings
         )
@@ -528,6 +529,10 @@ class MainWindow(QMainWindow):
             "Resume Monitoring" if monitor.is_paused else "Pause Monitoring"
         )
         can_control = active and not monitor.is_stopping
+        self.settings_page.change_password_button.setEnabled(not active)
+        self.settings_page.change_password_button.setToolTip(
+            "Stop Monitoring before changing your password." if active else ""
+        )
         self.session_bar.setVisible(active or monitor.is_stopping)
         self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
         self.global_stop_button.setEnabled(can_control)

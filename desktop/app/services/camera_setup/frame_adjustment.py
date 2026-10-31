@@ -5,6 +5,13 @@ import math
 import cv2
 
 
+def mirror_camera_frame(frame):
+    """Mirror a camera frame so screen directions match the user."""
+    if frame is None or getattr(frame, "size", 0) == 0:
+        return frame
+    return cv2.flip(frame, 1)
+
+
 def adjust_camera_frame(frame, calibration_reference):
     """Return a level frame using the saved card roll, preserving frame size."""
     if frame is None or getattr(frame, "size", 0) == 0:
