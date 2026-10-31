@@ -335,13 +335,14 @@ class APIClient:
     @staticmethod
     def get(
         endpoint: str,
+        *,
+        timeout: float = 10.0,
     ):
         return APIClient._request(
             "get",
             endpoint,
-            timeout=10,
+            timeout=timeout,
         )
-
     @staticmethod
     def post(
         endpoint: str,
@@ -763,9 +764,20 @@ class APIClient:
     @staticmethod
     def get_session(
         session_id: int,
+        *,
+        timeout: float = 10.0,
     ):
+        if (
+            type(session_id) is not int
+            or session_id <= 0
+        ):
+            raise ValueError(
+                "A valid session_id is required."
+            )
+
         return APIClient.get(
-            f"/sessions/{session_id}"
+            f"/sessions/{session_id}",
+            timeout=timeout,
         )
 
     @staticmethod

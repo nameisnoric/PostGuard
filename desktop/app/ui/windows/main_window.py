@@ -504,38 +504,166 @@ class MainWindow(QMainWindow):
 
         self.close()
 
-    def update_monitoring_controls(self):
-        monitor = self.monitoring_page
-        active = monitor.session_id is not None
-        if monitor.is_stopping:
-            status = "Monitoring: Ending and saving..."
-        elif active:
-            state = "Paused" if monitor.is_paused else "Running (camera on)"
-            if monitor.capture is None:
-                state = "Stopped locally; session end pending"
-            status = f"เซสชัน {monitor.session_id}: {state}"
-        else:
-            status = "Monitoring: Not running"
-        self.monitoring_status_label.setText(status)
-        self.monitoring_status_label.setProperty(
-            "status",
-            "paused" if active and monitor.is_paused else (
-                "running" if active else "idle"
-            ),
-        )
-        polish(self.monitoring_status_label)
-        self.global_pause_button.setText(
-            "Resume Monitoring" if monitor.is_paused else "Pause Monitoring"
-        )
-        can_control = active and not monitor.is_stopping
-        self.session_bar.setVisible(active or monitor.is_stopping)
-        self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
-        self.global_stop_button.setEnabled(can_control)
-        self.dashboard_page.set_monitoring_state(
-            monitor.session_id, monitor.is_paused, monitor.is_stopping,
-            monitor.capture is not None,
+    def update_monitoring_controls(
+        self,
+    ):
+        monitor = (
+            self.monitoring_page
         )
 
+        active = (
+            monitor.session_id
+            is not None
+        )
+
+        if monitor.network_stop_pending:
+
+            status = (
+                f"เซสชัน {monitor.session_id}: "
+                "Stop pending | NETWORK GAP"
+            )
+
+        elif monitor.is_stopping:
+
+            status = (
+                "Monitoring: Ending and saving..."
+            )
+
+        elif active:
+
+            if monitor.network_gap_active:
+
+                if monitor.is_paused:
+
+                    state = (
+                        "Paused | NETWORK GAP"
+                    )
+
+                else:
+
+                    state = (
+                        "Running locally | NETWORK GAP"
+                    )
+
+            elif (
+                monitor.camera_gap_started_at
+                is not None
+            ):
+
+                state = (
+                    "Running | CAMERA DATA GAP"
+                )
+
+            elif monitor.is_paused:
+
+                state = "Paused"
+
+            else:
+
+                state = "Running (camera on)"
+
+            status = (
+                f"เซสชัน "
+                f"{monitor.session_id}: "
+                f"{state}"
+            )
+
+        else:
+
+            status = (
+                "Monitoring: Not running"
+            )
+
+        self.monitoring_status_label.setText(
+            status
+        )
+
+        if (
+            active
+            and
+            (
+                monitor.is_paused
+                or
+                monitor.network_gap_active
+                or
+                monitor.network_stop_pending
+            )
+        ):
+
+            status_property = (
+                "paused"
+            )
+
+        elif active:
+
+            status_property = (
+                "running"
+            )
+
+        else:
+
+            status_property = (
+                "idle"
+            )
+
+        self.monitoring_status_label.setProperty(
+            "status",
+            status_property,
+        )
+
+        polish(
+            self.monitoring_status_label
+        )
+
+        self.global_pause_button.setText(
+            (
+                "Resume Monitoring"
+                if monitor.is_paused
+                else
+                "Pause Monitoring"
+            )
+        )
+
+        can_control = (
+            active
+            and
+            not monitor.is_stopping
+            and
+            not monitor.network_stop_pending
+        )
+
+        self.session_bar.setVisible(
+            active
+            or
+            monitor.is_stopping
+        )
+
+        # Pause/Resume requires authoritative Backend state.
+        self.global_pause_button.setEnabled(
+            can_control
+            and
+            monitor.capture is not None
+            and
+            not monitor.network_gap_active
+            and
+            monitor.camera_gap_started_at
+            is None
+        )
+
+        # Stop is still allowed during NETWORK GAP.
+        #
+        # If Backend cannot confirm END, MonitoringPage will
+        # enter pending-stop recovery.
+        self.global_stop_button.setEnabled(
+            can_control
+        )
+
+        self.dashboard_page.set_monitoring_state(
+            monitor.session_id,
+            monitor.is_paused,
+            monitor.is_stopping,
+            monitor.capture is not None,
+        )
     def check_previous_sessions(self) -> bool:
         if self.monitoring_page.session_id is not None:
             return True

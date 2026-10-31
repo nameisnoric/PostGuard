@@ -129,6 +129,44 @@ class MonitoringPage(QWidget):
         self.camera_gap_last_retry_at = None
 
         # ====================================================
+        # NETWORK / BACKEND GAP
+        # ====================================================
+        #
+        # Camera / Detection / Risk remain local and continue
+        # working while Backend is temporarily unavailable.
+        #
+        # Session-changing operations such as Pause / Resume /
+        # Stop still require authoritative Backend confirmation.
+        # ====================================================
+
+        self.network_gap_active = False
+        self.network_gap_started_at = None
+        self.network_gap_last_error = None
+
+        # User requested Stop but Backend could not confirm it.
+        self.network_stop_pending = False
+
+        # Local summary snapshot captured at the moment Stop
+        # was requested. It is kept until Backend confirms
+        # COMPLETED.
+        self.pending_stop_summary = None
+
+        # Recovery retry is active only after a Backend/network
+        # failure is detected. We intentionally do not poll the
+        # Backend continuously during normal Monitoring.
+        self.network_recovery_timer = QTimer(
+            self
+        )
+
+        self.network_recovery_timer.setInterval(
+            3000
+        )
+
+        self.network_recovery_timer.timeout.connect(
+            self._retry_network_recovery
+        )
+
+        # ====================================================
         # CAMERA MOVEMENT GUARD
         # ====================================================
         #
@@ -925,6 +963,416 @@ class MonitoringPage(QWidget):
         )
 
         return button_layout
+
+        # ========================================================
+    # NETWORK / BACKEND GAP
+    # ========================================================
+
+    def _mark_network_gap(
+        self,
+        error,
+        *,
+        stop_pending: bool = False,
+    ) -> None:
+        """
+        Mark Backend connectivity as temporarily unavailable.
+
+        Important:
+        - Local Detection continues unless Stop was requested.
+        - Risk calculation continues locally.
+        - Pause / Resume are disabled until Backend state can
+          be confirmed.
+        - Session ID is never cleared here.
+        """
+
+        now = time.monotonic()
+
+        if not self.network_gap_active:
+
+            self.network_gap_active = True
+
+            self.network_gap_started_at = (
+                now
+            )
+
+        self.network_gap_last_error = (
+            str(error)
+        )
+
+        if stop_pending:
+
+            self.network_stop_pending = (
+                True
+            )
+
+        # Pause/Resume modifies Backend session state.
+        # Do not allow it while Backend is unavailable.
+        self.pause_button.setEnabled(
+            False
+        )
+
+        if self.network_stop_pending:
+
+            self.status_label.setText(
+                "สถานะ: NETWORK GAP | "
+                "หยุดตรวจจับในเครื่องแล้ว "
+                "| รอ Backend ยืนยันการจบ Session"
+            )
+
+        elif self.is_paused:
+
+            self.status_label.setText(
+                "สถานะ: PAUSED | NETWORK GAP "
+                "| รอเชื่อมต่อ Backend"
+            )
+
+        else:
+
+            self.status_label.setText(
+                "สถานะ: กำลังตรวจจับในเครื่อง "
+                "(LOCAL RUNNING) | NETWORK GAP"
+            )
+
+        if (
+            not
+            self.network_recovery_timer.isActive()
+        ):
+
+            self.network_recovery_timer.start()
+
+        self.state_changed.emit()
+
+
+    def _clear_network_gap(
+        self,
+    ) -> None:
+        """
+        Backend is reachable again and authoritative Session
+        state matches Desktop state.
+        """
+
+        if self.network_stop_pending:
+            return
+
+        self.network_gap_active = False
+        self.network_gap_started_at = None
+        self.network_gap_last_error = None
+
+        if (
+            self.network_recovery_timer.isActive()
+        ):
+
+            self.network_recovery_timer.stop()
+
+        if self.session_id is not None:
+
+            if self.is_paused:
+
+                self.status_label.setText(
+                    "สถานะ: หยุดชั่วคราว "
+                    "(PAUSED)"
+                )
+
+            else:
+
+                self.status_label.setText(
+                    "สถานะ: กำลังตรวจจับ "
+                    "(RUNNING)"
+                )
+
+                if (
+                    self.capture is not None
+                    and
+                    self.camera_gap_started_at
+                    is None
+                ):
+
+                    self.pause_button.setEnabled(
+                        True
+                    )
+
+        self.state_changed.emit()
+
+
+    def _retry_network_recovery(
+        self,
+    ) -> None:
+        """
+        Retry Backend reconciliation every few seconds after a
+        NETWORK GAP has been detected.
+
+        This does not create a new Session.
+
+        Existing session_id remains authoritative until Backend
+        confirms its state.
+        """
+
+        session_id = (
+            self.session_id
+        )
+
+        if (
+            type(session_id) is not int
+            or
+            session_id <= 0
+        ):
+
+            self.network_recovery_timer.stop()
+
+            self.network_gap_active = False
+            self.network_gap_started_at = None
+            self.network_gap_last_error = None
+            self.network_stop_pending = False
+            self.pending_stop_summary = None
+
+            return
+
+        # ====================================================
+        # QUICK AUTHORITATIVE CHECK
+        #
+        # Short timeout prevents a long GUI freeze while
+        # Backend is still unavailable.
+        # ====================================================
+
+        try:
+
+            response = (
+                APIClient.get_session(
+                    session_id,
+                    timeout=2.0,
+                )
+            )
+
+        except requests.RequestException:
+
+            return
+
+        except Exception as error:
+
+            print(
+                "NETWORK RECOVERY CHECK ERROR:",
+                error,
+            )
+
+            return
+
+        if not response.ok:
+
+            return
+
+        try:
+
+            remote = (
+                response.json()
+            )
+
+        except (
+            ValueError,
+            AttributeError,
+        ):
+
+            return
+
+        if not isinstance(
+            remote,
+            dict,
+        ):
+
+            return
+
+        if (
+            remote.get(
+                "session_id"
+            )
+            !=
+            session_id
+        ):
+
+            return
+
+        remote_status = (
+            remote.get(
+                "status"
+            )
+        )
+
+        # ====================================================
+        # PENDING STOP
+        # ====================================================
+
+        if self.network_stop_pending:
+
+            # Another request may actually have completed before
+            # the connection disappeared.
+            if remote_status == "COMPLETED":
+
+                self.session_id = None
+
+                summary = (
+                    self.pending_stop_summary
+                    or
+                    {}
+                )
+
+                self.network_gap_active = False
+                self.network_stop_pending = False
+                self.pending_stop_summary = None
+
+                self.network_recovery_timer.stop()
+
+                self._complete_session_after_remote_end(
+                    summary,
+                    remote,
+                )
+
+                return
+
+            # Still active -> retry END now that Backend can
+            # be reached.
+            if remote_status not in (
+                "RUNNING",
+                "PAUSED",
+            ):
+
+                return
+
+            try:
+
+                completed = (
+                    self._end_remote_session()
+                )
+
+            except requests.RequestException:
+
+                return
+
+            except (
+                RuntimeError,
+                ValueError,
+            ) as error:
+
+                print(
+                    "PENDING SESSION END ERROR:",
+                    error,
+                )
+
+                return
+
+            summary = (
+                self.pending_stop_summary
+                or
+                {}
+            )
+
+            self.network_gap_active = False
+            self.network_stop_pending = False
+            self.pending_stop_summary = None
+
+            self.network_recovery_timer.stop()
+
+            self._complete_session_after_remote_end(
+                summary,
+                completed,
+            )
+
+            return
+
+        # ====================================================
+        # NORMAL NETWORK GAP RECOVERY
+        # ====================================================
+
+        expected_status = (
+            "PAUSED"
+            if self.is_paused
+            else
+            "RUNNING"
+        )
+
+        if (
+            remote_status
+            ==
+            expected_status
+        ):
+
+            self._clear_network_gap()
+
+            return
+
+        # Backend is reachable, but state does not agree with
+        # Desktop. Do not silently overwrite local state.
+        self.status_label.setText(
+            "สถานะ: Backend กลับมาแล้ว "
+            "แต่สถานะ Session ไม่ตรงกัน "
+            f"(Local={expected_status}, "
+            f"Backend={remote_status})"
+        )
+
+        self.state_changed.emit()
+
+
+    def _begin_pending_stop(
+        self,
+        summary: dict,
+        error,
+    ) -> None:
+        """
+        User pressed Stop but Backend could not confirm END.
+
+        Local monitoring stops immediately, but session_id and
+        summary snapshot are preserved until reconciliation.
+        """
+
+        self.pending_stop_summary = (
+            dict(
+                summary
+            )
+        )
+
+        self.network_stop_pending = True
+
+        # ====================================================
+        # STOP LOCAL CAMERA / DETECTOR
+        #
+        # Do NOT call _release_local_resources() yet because
+        # that would destroy the local statistics required for
+        # the final summary.
+        # ====================================================
+
+        self._close_capture_resources()
+
+        self.close_posture_alert()
+
+        self.sound_player.notify(
+            False
+        )
+
+        self.pause_button.setEnabled(
+            False
+        )
+
+        self.stop_button.setEnabled(
+            False
+        )
+
+        self._mark_network_gap(
+            error,
+            stop_pending=True,
+        )
+
+        QMessageBox.warning(
+            self,
+            "รอยืนยันการจบเซสชัน",
+            (
+                "PostGuard หยุดการตรวจจับในเครื่องแล้ว "
+                "แต่ Backend ยังไม่สามารถยืนยันการจบ "
+                "Session ได้\n\n"
+                f"Session ID: {self.session_id}\n"
+                f"{error}\n\n"
+                "ระบบจะลองเชื่อมต่อและจบ Session "
+                "ให้อัตโนมัติเมื่อ Backend กลับมา\n"
+                "ระหว่างนี้จะไม่สร้าง Session ใหม่ทับ"
+            ),
+        )
 
     # ========================================================
     # BACKEND HELPERS
@@ -1805,7 +2253,21 @@ class MonitoringPage(QWidget):
         self.stop_button.setEnabled(
             True
         )
+        # ====================================================
+        # NETWORK STATE
+        # ====================================================
 
+        if (
+            self.network_recovery_timer.isActive()
+        ):
+
+            self.network_recovery_timer.stop()
+
+        self.network_gap_active = False
+        self.network_gap_started_at = None
+        self.network_gap_last_error = None
+        self.network_stop_pending = False
+        self.pending_stop_summary = None
         self.timer.start()
 
         self.state_changed.emit()
@@ -1816,6 +2278,7 @@ class MonitoringPage(QWidget):
         )
 
         return True
+
 
     # ========================================================
     # PIPELINE RESET
@@ -2037,6 +2500,13 @@ class MonitoringPage(QWidget):
         # DATABASE PERSISTENCE
         # ====================================================
 
+                # ====================================================
+        # DATABASE PERSISTENCE
+        #
+        # Persistence failure must NOT stop local Detection /
+        # Assessment / Risk calculation.
+        # ====================================================
+
         if self.session_id is not None:
 
             try:
@@ -2050,8 +2520,21 @@ class MonitoringPage(QWidget):
                     ),
                 )
 
+            except requests.RequestException as error:
+
+                print(
+                    "RISK PERSISTENCE NETWORK ERROR:",
+                    error,
+                )
+
+                self._mark_network_gap(
+                    error
+                )
+
             except Exception as error:
 
+                # Application / contract errors are not treated
+                # as Internet loss.
                 print(
                     "RISK PERSISTENCE ERROR:",
                     error,
@@ -3216,11 +3699,22 @@ class MonitoringPage(QWidget):
                         ),
                     )
 
-            except Exception as error:
+            except requests.RequestException as error:
 
                 print(
                     "CAMERA DATA GAP "
-                    "PIPELINE ERROR:",
+                    "PERSISTENCE NETWORK ERROR:",
+                    error,
+                )
+
+                self._mark_network_gap(
+                    error
+                )
+
+            except Exception as error:
+
+                print(
+                    "CAMERA DATA GAP PIPELINE ERROR:",
                     error,
                 )
 
@@ -4687,6 +5181,22 @@ class MonitoringPage(QWidget):
             )
 
             # ====================================================
+            # NETWORK / BACKEND GAP
+            # ====================================================
+
+            if (
+                self.network_recovery_timer.isActive()
+            ):
+
+                self.network_recovery_timer.stop()
+
+            self.network_gap_active = False
+            self.network_gap_started_at = None
+            self.network_gap_last_error = None
+            self.network_stop_pending = False
+            self.pending_stop_summary = None
+
+            # ====================================================
             # SESSION STATS
             # ====================================================
 
@@ -5273,8 +5783,26 @@ class MonitoringPage(QWidget):
             or
             self.is_stopping
             or
+            self.network_stop_pending
+            or
             self.capture is None
         ):
+
+            return
+
+        # Backend state cannot safely be changed while a known
+        # NETWORK GAP is active.
+        if self.network_gap_active:
+
+            QMessageBox.warning(
+                self,
+                "Backend ยังไม่พร้อม",
+                (
+                    "ยังไม่สามารถ Pause / Resume ได้ "
+                    "จนกว่า PostGuard จะยืนยันสถานะ Session "
+                    "กับ Backend อีกครั้ง"
+                ),
+            )
 
             return
 
@@ -5290,7 +5818,15 @@ class MonitoringPage(QWidget):
 
             self._pause_monitoring()
 
-        if self.session_id is not None:
+        if (
+            self.session_id is not None
+            and
+            not self.network_gap_active
+            and
+            not self.network_stop_pending
+            and
+            self.capture is not None
+        ):
 
             self.pause_button.setEnabled(
                 True
@@ -5315,8 +5851,26 @@ class MonitoringPage(QWidget):
                 )
             )
 
+        except requests.RequestException as error:
+
+            self._mark_network_gap(
+                error
+            )
+
+            QMessageBox.warning(
+                self,
+                "หยุดชั่วคราวไม่สำเร็จ",
+                (
+                    "ไม่สามารถติดต่อ Backend "
+                    "เพื่อยืนยันสถานะ PAUSED ได้\n\n"
+                    "Local Monitoring จะยังทำงานต่อ "
+                    "จนกว่า Backend จะกลับมา"
+                ),
+            )
+
+            return
+
         except (
-            requests.RequestException,
             RuntimeError,
             ValueError,
             TypeError,
@@ -5325,40 +5879,31 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(
                 self,
                 "หยุดชั่วคราวไม่สำเร็จ",
-                "ไม่สามารถยืนยันสถานะ "
-                "PAUSED ได้\n"
-                f"{error}\n"
-                "กรุณาตรวจสอบการเชื่อมต่อ",
+                (
+                    "ไม่สามารถยืนยันสถานะ "
+                    "PAUSED ได้\n"
+                    f"{error}"
+                ),
             )
 
             return
+
+        # Backend has authoritatively confirmed PAUSED.
 
         self.timer.stop()
 
         self.is_paused = True
 
         # ====================================================
-        # RISK
-        #
-        # Risk continuity ห้ามข้าม Pause
+        # RISK CONTINUITY
         # ====================================================
 
         self.reset_risk_tracking()
+
         self.reset_screen_distance_tracking()
 
         # ====================================================
         # BLINK
-        #
-        # จำนวนเดิมยังอยู่ แต่ state/calibration เริ่มใหม่
-        #
-        # ป้องกัน:
-        #
-        # CLOSED
-        # → Pause
-        # → Resume
-        # → OPEN
-        #
-        # แล้วถูกนับเป็น Blink ผิด
         # ====================================================
 
         self.blink_detector.reset(
@@ -5439,8 +5984,26 @@ class MonitoringPage(QWidget):
                 )
             )
 
+        except requests.RequestException as error:
+
+            self._mark_network_gap(
+                error
+            )
+
+            QMessageBox.warning(
+                self,
+                "ตรวจจับต่อไม่สำเร็จ",
+                (
+                    "ไม่สามารถติดต่อ Backend "
+                    "เพื่อยืนยันสถานะ RUNNING ได้\n\n"
+                    "Session จะยังคง PAUSED "
+                    "จนกว่า Backend จะกลับมา"
+                ),
+            )
+
+            return
+
         except (
-            requests.RequestException,
             RuntimeError,
             ValueError,
             TypeError,
@@ -5449,14 +6012,16 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(
                 self,
                 "ตรวจจับต่อไม่สำเร็จ",
-                "ไม่สามารถยืนยันสถานะ "
-                "RUNNING ได้\n"
-                f"{error}\n"
-                "กรุณาตรวจสอบการเชื่อมต่อ",
+                (
+                    "ไม่สามารถยืนยันสถานะ "
+                    "RUNNING ได้\n"
+                    f"{error}"
+                ),
             )
 
             return
 
+        # Backend confirmed RUNNING.
         self.is_paused = False
 
         # ====================================================
@@ -5468,9 +6033,6 @@ class MonitoringPage(QWidget):
 
         # ====================================================
         # BLINK
-        #
-        # เริ่ม Eye Calibration ใหม่
-        # แต่ยังคงจำนวน Blink ของ Session
         # ====================================================
 
         self.blink_detector.reset(
@@ -5478,9 +6040,7 @@ class MonitoringPage(QWidget):
             now=time.monotonic(),
         )
 
-        self.last_blink_result = (
-            None
-        )
+        self.last_blink_result = None
 
         self.eye_state_label.setText(
             "สถานะตา: กำลัง Calibration"
@@ -5492,7 +6052,8 @@ class MonitoringPage(QWidget):
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: กำลังประเมินใหม่"
+            "ระยะห่างหน้าจอ: "
+            "กำลังประเมินใหม่"
         )
 
         # ====================================================
@@ -5516,7 +6077,6 @@ class MonitoringPage(QWidget):
         )
 
         self.timer.start()
-
     # ========================================================
     # STOP BUTTON
     # ========================================================
@@ -5525,7 +6085,11 @@ class MonitoringPage(QWidget):
         self,
     ) -> None:
 
-        if self.is_stopping:
+        if (
+            self.is_stopping
+            or
+            self.network_stop_pending
+        ):
 
             return
 
@@ -5542,7 +6106,6 @@ class MonitoringPage(QWidget):
             self.is_stopping = False
 
             self.state_changed.emit()
-
     # ========================================================
     # FINISH SESSION
     # ========================================================
@@ -5562,8 +6125,6 @@ class MonitoringPage(QWidget):
 
         # ====================================================
         # 1. SNAPSHOT LOCAL DATA
-        #
-        # ต้องเก็บก่อน reset resources
         # ====================================================
 
         summary = (
@@ -5580,26 +6141,83 @@ class MonitoringPage(QWidget):
                 self._end_remote_session()
             )
 
+        except requests.RequestException as error:
+
+            # =================================================
+            # NETWORK GAP
+            #
+            # User has explicitly requested Stop.
+            #
+            # Stop local camera immediately, preserve Session
+            # ID + summary, and automatically retry END later.
+            # =================================================
+
+            self._begin_pending_stop(
+                summary,
+                error,
+            )
+
+            return
+
         except (
-            requests.RequestException,
             RuntimeError,
             ValueError,
         ) as error:
 
+            # Backend responded but could not confirm a valid
+            # completed Session. This is not classified as a
+            # simple Internet loss.
+
             QMessageBox.warning(
                 self,
                 "ไม่สามารถจบเซสชัน",
-                "Backend ยังไม่ยืนยันว่า "
-                "Session สิ้นสุด\n"
-                f"{error}\n"
-                "กรุณาตรวจสอบ Backend "
-                "แล้วกด Stop อีกครั้ง",
+                (
+                    "Backend ยังไม่ยืนยันว่า "
+                    "Session สิ้นสุด\n"
+                    f"{error}\n\n"
+                    "กรุณาตรวจสอบ Backend "
+                    "แล้วกด Stop อีกครั้ง"
+                ),
             )
 
             return
 
         # ====================================================
-        # 3. AUTHORITATIVE BACKEND DATA
+        # 3. BACKEND CONFIRMED COMPLETED
+        # ====================================================
+
+        self._complete_session_after_remote_end(
+            summary,
+            remote,
+        )
+        # ========================================================
+    # COMPLETE SESSION AFTER BACKEND END
+    # ========================================================
+
+    def _complete_session_after_remote_end(
+        self,
+        summary: dict,
+        remote: dict,
+    ) -> None:
+
+        if not isinstance(
+            summary,
+            dict,
+        ):
+
+            summary = {}
+
+        if not isinstance(
+            remote,
+            dict,
+        ):
+
+            raise ValueError(
+                "Invalid completed session response."
+            )
+
+        # ====================================================
+        # AUTHORITATIVE BACKEND DATA
         # ====================================================
 
         summary[
@@ -5625,9 +6243,9 @@ class MonitoringPage(QWidget):
                 "started_at"
             )
             or
-            summary[
+            summary.get(
                 "started_at"
-            ]
+            )
         )
 
         summary[
@@ -5637,9 +6255,9 @@ class MonitoringPage(QWidget):
                 "ended_at"
             )
             or
-            summary[
+            summary.get(
                 "ended_at"
-            ]
+            )
         )
 
         # ====================================================
@@ -5719,13 +6337,7 @@ class MonitoringPage(QWidget):
         )
 
         # ====================================================
-        # 4. BLINK RATE
-        #
-        # Active Time =
-        # Total Duration - Paused Duration
-        #
-        # Blink Rate =
-        # Blink Count / Active Minutes
+        # BLINK RATE
         # ====================================================
 
         total_seconds = (
@@ -5772,11 +6384,7 @@ class MonitoringPage(QWidget):
             0
         )
 
-        if (
-            active_seconds
-            >
-            0.0
-        ):
+        if active_seconds > 0.0:
 
             summary[
                 "blink_rate"
@@ -5794,37 +6402,43 @@ class MonitoringPage(QWidget):
 
             summary[
                 "blink_rate"
-            ] = (
-                None
-            )
+            ] = None
 
         # ====================================================
-        # 5. RELEASE LOCAL RESOURCES
+        # CLEAR NETWORK PENDING STATE
+        # ====================================================
+
+        self.network_gap_active = False
+        self.network_gap_started_at = None
+        self.network_gap_last_error = None
+        self.network_stop_pending = False
+        self.pending_stop_summary = None
+
+        if (
+            self.network_recovery_timer.isActive()
+        ):
+
+            self.network_recovery_timer.stop()
+
+        # ====================================================
+        # RELEASE LOCAL RESOURCES
         #
-        # _end_remote_session()
-        # ได้ set self.session_id = None แล้ว
-        #
-        # ดังนั้น stop_monitoring()
-        # จะไม่ยิง END ไป Backend ซ้ำ
+        # _end_remote_session() already cleared session_id.
         # ====================================================
 
         self.stop_monitoring()
 
         # ====================================================
-        # 6. SAVE SESSION SUMMARY
+        # SAVE SESSION SUMMARY
         # ====================================================
 
         summary[
             "summary_save_status"
-        ] = (
-            "FAILED"
-        )
+        ] = "FAILED"
 
         summary[
             "summary_save_error"
-        ] = (
-            None
-        )
+        ] = None
 
         try:
 
@@ -5869,16 +6483,18 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(
                 self,
                 "เกิดข้อผิดพลาดในการบันทึกสรุป",
-                "Session สิ้นสุดแล้ว "
-                "แต่ยังบันทึก Summary "
-                "ไม่สำเร็จ\n\n"
-                f"{error}\n\n"
-                "สามารถกด Retry "
-                "ที่หน้า Summary ได้",
+                (
+                    "Session สิ้นสุดแล้ว "
+                    "แต่ยังบันทึก Summary "
+                    "ไม่สำเร็จ\n\n"
+                    f"{error}\n\n"
+                    "สามารถกด Retry "
+                    "ที่หน้า Summary ได้"
+                ),
             )
 
         # ====================================================
-        # 7. OPEN SUMMARY PAGE
+        # OPEN SUMMARY PAGE
         # ====================================================
 
         self.stop_requested.emit(
