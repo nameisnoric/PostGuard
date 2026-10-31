@@ -2773,6 +2773,136 @@ class MonitoringPage(QWidget):
         return pipeline_result
 
     # ========================================================
+    # ALERT TOAST
+    # ========================================================
+
+    def _handle_posture_alert_finished(
+        self,
+        _result: int,
+    ) -> None:
+        """
+        Presentation cleanup after the user acknowledges the
+        toast or after auto-close.
+
+        Closing a notification must NOT:
+        - resolve Risk Event,
+        - reset Alert Policy,
+        - reset cooldown,
+        - pause Monitoring.
+        """
+
+        self.sound_player.stop_alert()
+
+        popup = self.sender()
+
+        if (
+            self.alert_popup
+            is popup
+        ):
+
+            self.alert_popup = None
+
+        if popup is not None:
+
+            delete_later = getattr(
+                popup,
+                "deleteLater",
+                None,
+            )
+
+            if callable(
+                delete_later
+            ):
+
+                delete_later()
+
+    def close_posture_alert(
+        self,
+    ) -> None:
+        """
+        Close only the current user-facing toast.
+
+        Alert Policy and Risk Event state remain unchanged.
+        """
+
+        popup = (
+            self.alert_popup
+        )
+
+        self.alert_popup = None
+
+        self.sound_player.stop_alert()
+
+        if popup is None:
+
+            return
+
+        popup.close()
+
+    def show_posture_alert(
+        self,
+        *,
+        risk_level: str | None,
+        alert_type: str | None,
+        factors: list[str] | None,
+        duration_seconds: float,
+    ) -> bool:
+        """
+        Show one compact non-intrusive PostGuard toast.
+
+        Only one toast may be visible at a time.
+        """
+
+        notifications_enabled = (
+            self.sound_player.settings.get(
+                "notifications_enabled",
+                True,
+            )
+        )
+
+        if not notifications_enabled:
+
+            self.close_posture_alert()
+
+            return False
+
+        # Never stack notifications.
+        self.close_posture_alert()
+
+        popup = PostureAlertDialog(
+            risk_level=(
+                risk_level
+            ),
+            alert_type=(
+                alert_type
+            ),
+            factors=(
+                factors
+            ),
+            duration_seconds=(
+                duration_seconds
+            ),
+
+            # Intentionally no parent.
+            #
+            # Binding the toast to MonitoringPage can cause the
+            # main PostGuard window to be activated/restored.
+            parent=None,
+        )
+
+        popup.finished.connect(
+            self._handle_posture_alert_finished
+        )
+
+        self.alert_popup = (
+            popup
+        )
+
+        popup.show_alert()
+
+        return True
+
+    # ========================================================
     # ALERT POPUP
     # ========================================================
 
@@ -2780,17 +2910,17 @@ class MonitoringPage(QWidget):
         self,
     ) -> None:
 
-        if self.alert_popup is None:
+        popup = self.alert_popup
 
+        if popup is None:
+            self.sound_player.stop_alert()
             return
 
-        try:
+        self.alert_popup = None
 
-            self.alert_popup.close()
+        self.sound_player.stop_alert()
 
-        finally:
-
-            self.alert_popup = None
+        popup.close()
 
     def show_posture_alert(
         self,
@@ -2814,32 +2944,28 @@ class MonitoringPage(QWidget):
 
             return False
 
-        # ไม่ให้ popup ซ้อนกัน
+        # Never stack user-facing notifications.
         self.close_posture_alert()
 
-        self.alert_popup = (
-            PostureAlertDialog(
-                risk_level=(
-                    risk_level
-                ),
-                alert_type=(
-                    alert_type
-                ),
-                factors=(
-                    factors
-                ),
-                duration_seconds=(
-                    duration_seconds
-                ),
-                parent=(
-                    self
-                ),
-            )
+        popup = PostureAlertDialog(
+            risk_level=risk_level,
+            alert_type=alert_type,
+            factors=factors,
+            duration_seconds=duration_seconds,
+
+            # Important:
+            # Do not bind the alert window to MonitoringPage.
+            # The popup must not activate/restore Main Window.
+            parent=None,
         )
 
-        self.alert_popup.show()
+        popup.finished.connect(
+            self._handle_posture_alert_finished
+        )
 
-        self.alert_popup.raise_()
+        self.alert_popup = popup
+
+        popup.show_alert()
 
         return True
 

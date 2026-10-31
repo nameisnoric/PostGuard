@@ -1,6 +1,7 @@
-"""Non-blocking PostGuard notification produced by Alert Policy."""
+"""Non-intrusive PostGuard toast notification produced by Alert Policy."""
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QCursor, QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -13,15 +14,20 @@ from PySide6.QtWidgets import (
 from app.ui.theme import APP_QSS
 
 
+TOAST_WIDTH = 380
+TOAST_SCREEN_MARGIN = 24
+TOAST_AUTO_CLOSE_MS = 8_000
+
+
 RISK_TEXT = {
-    "MODERATE": "ระดับความเสี่ยงปานกลาง",
-    "HIGH": "ระดับความเสี่ยงสูง",
+    "MODERATE": "ความเสี่ยงปานกลาง",
+    "HIGH": "ความเสี่ยงสูง",
 }
 
 ALERT_TYPE_TEXT = {
-    "FIRST": "การแจ้งเตือนครั้งแรก",
-    "REPEAT": "การแจ้งเตือนซ้ำ",
-    "ESCALATION": "ระดับความเสี่ยงเพิ่มขึ้น",
+    "FIRST": "แจ้งเตือนครั้งแรก",
+    "REPEAT": "แจ้งเตือนซ้ำ",
+    "ESCALATION": "ความเสี่ยงเพิ่มขึ้น",
     "RESOLUTION": "เหตุการณ์สิ้นสุด",
 }
 
@@ -36,7 +42,22 @@ FACTOR_TEXT = {
 
 
 class PostureAlertDialog(QDialog):
-    """Show an Alert Policy decision without pausing monitoring."""
+    """
+    Compact non-intrusive PostGuard toast notification.
+
+    UX contract
+    -----------
+    - Show at the bottom-right of the user's current screen.
+    - Do not activate the PostGuard Main Window.
+    - Do not steal keyboard focus.
+    - Do not pause Monitoring.
+    - Do not resolve Risk Event.
+    - Do not reset Alert Policy cooldown.
+    - Automatically disappear after a short period.
+    - "รับทราบ" only dismisses the current notification.
+
+    Alert timing remains the responsibility of Alert Policy.
+    """
 
     def __init__(
         self,
@@ -50,6 +71,10 @@ class PostureAlertDialog(QDialog):
     ):
         super().__init__(parent)
 
+        # ====================================================
+        # WINDOW BEHAVIOR
+        # ====================================================
+
         self.setWindowTitle(
             "PostGuard - Posture Alert"
         )
@@ -58,10 +83,31 @@ class PostureAlertDialog(QDialog):
             Qt.WindowModality.NonModal
         )
 
+        # Tool:
+        #     Notification-like auxiliary window.
+        #
+        # FramelessWindowHint:
+        #     Remove the large native title bar so the window
+        #     behaves visually like a toast.
+        #
+        # WindowStaysOnTopHint:
+        #     Keep the toast visible briefly above other apps.
+        #
+        # WindowDoesNotAcceptFocus:
+        #     Do not steal keyboard focus from the application
+        #     currently being used.
         self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowType.Tool
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+
+        # Prevent Qt from activating PostGuard when the toast
+        # becomes visible.
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_ShowWithoutActivating,
+            True,
         )
 
         self.setAttribute(
@@ -69,8 +115,17 @@ class PostureAlertDialog(QDialog):
             False,
         )
 
-        self.setStyleSheet(APP_QSS)
-        self.setFixedWidth(520)
+        self.setStyleSheet(
+            APP_QSS
+        )
+
+        self.setFixedWidth(
+            TOAST_WIDTH
+        )
+
+        # ====================================================
+        # NORMALIZE INPUT
+        # ====================================================
 
         normalized_risk = (
             risk_level
@@ -87,45 +142,124 @@ class PostureAlertDialog(QDialog):
         normalized_factors = [
             factor
             for factor in (factors or [])
-            if isinstance(factor, str)
+            if isinstance(
+                factor,
+                str,
+            )
         ]
 
-        layout = QVBoxLayout(self)
+        # ====================================================
+        # ROOT CARD
+        # ====================================================
 
-        layout.setContentsMargins(
-            26,
-            24,
-            26,
-            22,
+        root_layout = QVBoxLayout(
+            self
         )
 
-        layout.setSpacing(14)
+        root_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        card = QFrame()
+
+        card.setProperty(
+            "card",
+            True,
+        )
+
+        card_layout = QVBoxLayout(
+            card
+        )
+
+        card_layout.setContentsMargins(
+            18,
+            16,
+            18,
+            14,
+        )
+
+        card_layout.setSpacing(
+            10
+        )
+
+        root_layout.addWidget(
+            card
+        )
 
         # ====================================================
-        # HEADING
+        # HEADER
         # ====================================================
 
-        heading_row = QHBoxLayout()
+        header = QHBoxLayout()
 
-        icon = QLabel("!")
+        header.setSpacing(
+            10
+        )
+
+        icon = QLabel(
+            "!"
+        )
+
         icon.setProperty(
             "role",
             "warningIcon",
         )
+
         icon.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
-        icon.setFixedSize(48, 48)
 
-        heading = QLabel("Posture Alert")
-        heading.setProperty(
+        icon.setFixedSize(
+            36,
+            36,
+        )
+
+        title_layout = QVBoxLayout()
+
+        title_layout.setSpacing(
+            1
+        )
+
+        title = QLabel(
+            "Posture Alert"
+        )
+
+        title.setProperty(
             "role",
             "title",
         )
 
-        heading_row.addWidget(icon)
-        heading_row.addWidget(
-            heading,
+        risk_text = RISK_TEXT.get(
+            normalized_risk,
+            "ตรวจพบท่าทางที่ควรปรับ",
+        )
+
+        risk_label = QLabel(
+            risk_text
+        )
+
+        risk_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        title_layout.addWidget(
+            title
+        )
+
+        title_layout.addWidget(
+            risk_label
+        )
+
+        header.addWidget(
+            icon
+        )
+
+        header.addLayout(
+            title_layout,
             1,
         )
 
@@ -134,72 +268,40 @@ class PostureAlertDialog(QDialog):
         # ====================================================
 
         if normalized_risk == "HIGH":
+
             message_text = (
                 "ตรวจพบท่าทางที่มีความเสี่ยงสูงต่อเนื่อง "
-                "กรุณาปรับท่าทางและจัดตำแหน่งศีรษะ "
-                "คอ และไหล่ให้เหมาะสม"
+                "กรุณาปรับตำแหน่งศีรษะ คอ และไหล่"
             )
 
         elif normalized_risk == "MODERATE":
+
             message_text = (
-                "ตรวจพบท่าทางที่มีความเสี่ยงปานกลาง "
-                "กรุณาปรับท่าทางกลับสู่ตำแหน่งที่เหมาะสม"
+                "ตรวจพบท่าทางที่มีความเสี่ยงต่อเนื่อง "
+                "กรุณาปรับท่าทางให้อยู่ในตำแหน่งที่เหมาะสม"
             )
 
         else:
-            # Compatibility message for the old dialog caller.
+
             message_text = (
                 "ตรวจพบท่าทางที่ควรปรับ "
-                "กรุณาปรับศีรษะและลำตัวกลับสู่ท่าปกติ"
+                "กรุณาปรับท่าทางกลับสู่ตำแหน่งที่เหมาะสม"
             )
 
-        message = QLabel(message_text)
-        message.setWordWrap(True)
+        message = QLabel(
+            message_text
+        )
+
+        message.setWordWrap(
+            True
+        )
 
         # ====================================================
-        # DETAILS
+        # FACTORS
         # ====================================================
-
-        details = QFrame()
-        details.setProperty(
-            "card",
-            True,
-        )
-
-        details_layout = QVBoxLayout(
-            details
-        )
-
-        details_layout.setContentsMargins(
-            18,
-            14,
-            18,
-            14,
-        )
-
-        risk_text = (
-            RISK_TEXT.get(
-                normalized_risk,
-                "N/A",
-            )
-        )
-
-        alert_text = (
-            ALERT_TYPE_TEXT.get(
-                normalized_alert_type,
-                "การแจ้งเตือน",
-            )
-        )
-
-        self.risk_label = QLabel(
-            f"Risk Level: {risk_text}"
-        )
-
-        self.alert_type_label = QLabel(
-            f"ประเภท: {alert_text}"
-        )
 
         if normalized_factors:
+
             factor_text = ", ".join(
                 FACTOR_TEXT.get(
                     factor,
@@ -207,86 +309,139 @@ class PostureAlertDialog(QDialog):
                 )
                 for factor in normalized_factors
             )
+
         elif direction is not None:
+
             factor_text = (
-                "เอียงคอด้านขวา (+)"
+                "คอเอียงขวา"
                 if direction > 0
-                else "เอียงคอด้านซ้าย (-)"
+                else "คอเอียงซ้าย"
             )
+
         else:
+
             factor_text = "ไม่ระบุ"
 
-        # Keep this attribute name for compatibility with
-        # older Desktop popup tests.
+        # Keep the old attribute name for compatibility with
+        # existing Desktop tests.
         self.direction_label = QLabel(
-            f"ปัจจัยที่ตรวจพบ: {factor_text}"
+            f"ตรวจพบ: {factor_text}"
         )
 
-        self.duration_label = QLabel(
-            "ระยะเวลาต่อเนื่องสูงสุด: "
-            f"{max(0.0, float(duration_seconds)):.1f} วินาที"
+        self.direction_label.setWordWrap(
+            True
         )
 
-        source_label = QLabel(
-            "การแจ้งเตือนนี้มาจาก PostGuard Alert Policy v1.0"
-        )
-
-        source_label.setProperty(
+        self.direction_label.setProperty(
             "role",
             "muted",
         )
 
-        details_layout.addWidget(
-            self.risk_label
+        # ====================================================
+        # ALERT TYPE / DURATION
+        # ====================================================
+
+        alert_text = ALERT_TYPE_TEXT.get(
+            normalized_alert_type,
+            "การแจ้งเตือน",
         )
-        details_layout.addWidget(
+
+        safe_duration = max(
+            0.0,
+            float(duration_seconds),
+        )
+
+        self.alert_type_label = QLabel(
+            f"{alert_text}"
+        )
+
+        self.alert_type_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        self.duration_label = QLabel(
+            f"ต่อเนื่อง {safe_duration:.1f} วินาที"
+        )
+
+        self.duration_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        meta_row = QHBoxLayout()
+
+        meta_row.addWidget(
             self.alert_type_label
         )
-        details_layout.addWidget(
-            self.direction_label
-        )
-        details_layout.addWidget(
+
+        meta_row.addStretch()
+
+        meta_row.addWidget(
             self.duration_label
         )
-        details_layout.addWidget(
-            source_label
-        )
+
+        # Compatibility with old popup tests / code.
+        self.risk_label = risk_label
 
         # ====================================================
         # ACTION
         # ====================================================
 
-        actions = QHBoxLayout()
-        actions.addStretch()
+        action_row = QHBoxLayout()
 
-        acknowledge = QPushButton(
+        action_row.addStretch()
+
+        self.acknowledge_button = QPushButton(
             "รับทราบ"
         )
 
-        acknowledge.setProperty(
+        self.acknowledge_button.setProperty(
             "variant",
             "primary",
         )
 
-        acknowledge.clicked.connect(
+        self.acknowledge_button.setFixedWidth(
+            92
+        )
+
+        # Acknowledge means only dismissing this presentation.
+        #
+        # It must NOT:
+        # - resolve Risk Event,
+        # - pause monitoring,
+        # - reset Alert Policy,
+        # - reset cooldown.
+        self.acknowledge_button.clicked.connect(
             self.accept
         )
 
-        actions.addWidget(
-            acknowledge
+        action_row.addWidget(
+            self.acknowledge_button
         )
 
-        layout.addLayout(
-            heading_row
+        # ====================================================
+        # ASSEMBLE
+        # ====================================================
+
+        card_layout.addLayout(
+            header
         )
-        layout.addWidget(
+
+        card_layout.addWidget(
             message
         )
-        layout.addWidget(
-            details
+
+        card_layout.addWidget(
+            self.direction_label
         )
-        layout.addLayout(
-            actions
+
+        card_layout.addLayout(
+            meta_row
+        )
+
+        card_layout.addLayout(
+            action_row
         )
 
         # ====================================================
@@ -302,19 +457,112 @@ class PostureAlertDialog(QDialog):
         )
 
         self.auto_close_timer.setInterval(
-            12_000
+            TOAST_AUTO_CLOSE_MS
         )
 
         self.auto_close_timer.timeout.connect(
             self.accept
         )
 
-    def show_alert(self) -> None:
+    # ========================================================
+    # SCREEN POSITION
+    # ========================================================
+
+    def _target_screen(self):
+        """
+        Prefer the screen currently used by the user.
+
+        QCursor position is used because the toast intentionally
+        does not activate or depend on the PostGuard Main Window.
+        """
+
+        screen = QGuiApplication.screenAt(
+            QCursor.pos()
+        )
+
+        if screen is None:
+
+            screen = (
+                QGuiApplication.primaryScreen()
+            )
+
+        return screen
+
+    def _move_to_bottom_right(
+        self,
+    ) -> None:
+        """
+        Position the toast inside the available desktop area,
+        leaving space for the Windows taskbar.
+        """
+
+        screen = self._target_screen()
+
+        if screen is None:
+            return
+
+        available = (
+            screen.availableGeometry()
+        )
+
+        x = (
+            available.x()
+            + available.width()
+            - self.width()
+            - TOAST_SCREEN_MARGIN
+        )
+
+        y = (
+            available.y()
+            + available.height()
+            - self.height()
+            - TOAST_SCREEN_MARGIN
+        )
+
+        self.move(
+            x,
+            y,
+        )
+
+    # ========================================================
+    # SHOW
+    # ========================================================
+
+    def show_alert(
+        self,
+    ) -> None:
+        """
+        Display the toast without stealing focus.
+
+        Intentionally no:
+            raise_()
+            activateWindow()
+
+        because those operations can pull the user away from
+        the application they are currently using.
+        """
+
+        self.adjustSize()
+
+        self._move_to_bottom_right()
+
         self.show()
-        self.raise_()
-        self.activateWindow()
+
         self.auto_close_timer.start()
 
-    def done(self, result: int) -> None:
-        self.auto_close_timer.stop()
-        super().done(result)
+    # ========================================================
+    # CLOSE
+    # ========================================================
+
+    def done(
+        self,
+        result: int,
+    ) -> None:
+
+        if self.auto_close_timer.isActive():
+
+            self.auto_close_timer.stop()
+
+        super().done(
+            result
+        )
