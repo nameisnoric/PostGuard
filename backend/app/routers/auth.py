@@ -15,9 +15,14 @@ from app.schemas.user import (
     ResetTokenResponse,
     ResetPasswordRequest,
     RegistrationOTPRequest,
-    RegistrationOTPVerify
+    RegistrationOTPVerify,
+    RefreshTokenRequest,
 )
-from app.core.security import hash_password, verify_password, create_access_token, decode_access_token, generate_otp, hash_otp, verify_otp, create_password_reset_token, decode_password_reset_token
+from app.core.security import (
+    hash_password, verify_password, create_access_token, decode_access_token,
+    create_refresh_token, decode_refresh_token, generate_otp, hash_otp,
+    verify_otp, create_password_reset_token, decode_password_reset_token,
+)
 from app.models.password_reset import PasswordResetOTP
 from app.services.email_service import send_password_reset_otp, send_registration_otp
 from app.models.register_otp import RegistrationOTP
@@ -116,10 +121,40 @@ def login_user(
         )
     #JWT
     access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
 
     return{
         "access_token": access_token,
-        "token_type":"bearer"
+        "refresh_token": refresh_token,
+        "token_type":"bearer",
+        "expires_in": 30 * 60,
+    }
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_access_token(
+    token_data: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        user_id = decode_refresh_token(token_data.refresh_token)
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    return {
+        "access_token": create_access_token(user.id),
+        "refresh_token": create_refresh_token(user.id),
+        "token_type": "bearer",
+        "expires_in": 30 * 60,
     }
 
 def get_authenticated_user(

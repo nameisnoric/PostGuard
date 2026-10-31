@@ -103,7 +103,12 @@ class UserLogin(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
+    expires_in: int = 1800
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
