@@ -91,6 +91,8 @@ RISK_LEVELS = (
     "MODERATE",
     "HIGH",
 )
+CAMERA_LOSS_GRACE_SECONDS = 60.0
+CAMERA_RECONNECT_INTERVAL_SECONDS = 2.0
 
 
 FACTOR_THAI = {
@@ -118,6 +120,13 @@ class MonitoringPage(QWidget):
 
         self.capture = None
         self.detector = None
+
+        # ====================================================
+        # CAMERA DATA GAP / RECOVERY
+        # ====================================================
+
+        self.camera_gap_started_at = None
+        self.camera_gap_last_retry_at = None
 
         # ====================================================
         # CAMERA MOVEMENT GUARD
@@ -3077,7 +3086,826 @@ class MonitoringPage(QWidget):
 
         return result
 
+        # ========================================================
+    # CAMERA DATA GAP
     # ========================================================
+
+     # ========================================================
+    # CAMERA DATA GAP
+    # ========================================================
+
+    def _enter_camera_gap(
+        self,
+    ) -> None:
+
+        now = time.monotonic()
+
+        # ====================================================
+        # FIRST FAILED FRAME
+        # ====================================================
+
+        if self.camera_gap_started_at is None:
+
+            self.camera_gap_started_at = (
+                now
+            )
+
+            self.camera_gap_last_retry_at = (
+                None
+            )
+
+            # ระหว่างกล้องหลุด
+            # ไม่อนุญาตให้ Pause/Resume
+            # เพราะระบบกำลังอยู่ใน automatic recovery
+            self.pause_button.setEnabled(
+                False
+            )
+
+            self.preview_label.clear()
+
+            self.preview_label.setText(
+                "กล้องขาดการเชื่อมต่อ\n"
+                "กำลังพยายามเชื่อมต่อใหม่..."
+            )
+
+            self.status_label.setText(
+                "สถานะ: DATA GAP "
+                "(กล้องขาดการเชื่อมต่อ)"
+            )
+
+            self.assessment_label.setText(
+                "Assessment: NOT_EVALUATED "
+                "(CAMERA_DATA_GAP)"
+            )
+
+            self.factor_label.setText(
+                "Posture Factors: DATA_GAP"
+            )
+
+            self.duration_label.setText(
+                "Longest Continuous Factor: 0.0 s"
+            )
+
+            self.risk_label.setText(
+                "Risk Level: N/A "
+                "(DATA_GAP)"
+            )
+
+            self.event_label.setText(
+                "Risk Event: DATA_GAP"
+            )
+
+            self.alert_label.setText(
+                "Alert Policy: DATA_GAP"
+            )
+
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: DATA_GAP"
+            )
+
+            self.eye_state_label.setText(
+                "สถานะตา: DATA_GAP"
+            )
+
+            # หยุด alert presentation
+            # ระหว่างที่ไม่มีข้อมูลใหม่
+            self.sound_player.notify(
+                False
+            )
+
+            self.close_posture_alert()
+
+            # ====================================================
+            # INFORM VALIDATED PIPELINE
+            #
+            # สำคัญ:
+            #
+            # DATA_GAP ไม่ใช่ LOW/NONE
+            # และไม่ใช่ posture ปกติ
+            #
+            # Temporal ถูกตัด continuity
+            # แต่ Risk Event เดิมยังคงอยู่
+            # ====================================================
+
+            try:
+
+                gap_result = (
+                    self.risk_pipeline.process_data_gap(
+                        reason=(
+                            "CAMERA_DATA_GAP"
+                        ),
+                        now=now,
+                    )
+                )
+
+                self.last_pipeline_result = (
+                    gap_result
+                )
+
+                if (
+                    self.session_id
+                    is not None
+                ):
+
+                    self.risk_persistence.process_pipeline_result(
+                        session_id=(
+                            self.session_id
+                        ),
+                        pipeline_result=(
+                            gap_result
+                        ),
+                    )
+
+            except Exception as error:
+
+                print(
+                    "CAMERA DATA GAP "
+                    "PIPELINE ERROR:",
+                    error,
+                )
+
+        # ====================================================
+        # GAP ELAPSED TIME
+        # ====================================================
+
+        elapsed = (
+            now
+            -
+            self.camera_gap_started_at
+        )
+
+        remaining = max(
+            0.0,
+            CAMERA_LOSS_GRACE_SECONDS
+            -
+            elapsed,
+        )
+
+        self.status_label.setText(
+            "สถานะ: กล้องขาดการเชื่อมต่อ "
+            f"| รอเชื่อมต่อใหม่ "
+            f"{remaining:.0f}s"
+        )
+
+        # ====================================================
+        # TIMEOUT
+        # ====================================================
+
+        if (
+            elapsed
+            >=
+            CAMERA_LOSS_GRACE_SECONDS
+        ):
+
+            self._camera_gap_timeout()
+
+            return
+
+        # ====================================================
+        # RECONNECT INTERVAL
+        # ====================================================
+
+        if (
+            self.camera_gap_last_retry_at
+            is not None
+            and
+            now
+            -
+            self.camera_gap_last_retry_at
+            <
+            CAMERA_RECONNECT_INTERVAL_SECONDS
+        ):
+
+            return
+
+        self.camera_gap_last_retry_at = (
+            now
+        )
+
+        self._try_reconnect_camera()
+
+
+    # ========================================================
+    # TRY CAMERA RECONNECT
+    # ========================================================
+
+    def _try_reconnect_camera(
+        self,
+    ) -> None:
+
+        camera = (
+            self.selected_camera
+            or
+            {}
+        )
+
+        baseline = (
+            self.baseline_data
+            or
+            {}
+        )
+
+        device_index = (
+            camera.get(
+                "device_index"
+            )
+        )
+
+        if (
+            type(device_index)
+            is not int
+            or
+            device_index < 0
+        ):
+
+            return
+
+        # ====================================================
+        # REOPEN WITH BASELINE RESOLUTION
+        #
+        # Personal Baseline resolution เป็น source of truth
+        # สำหรับ Monitoring Session นี้
+        # ====================================================
+
+        width = (
+            baseline.get(
+                "camera_frame_width"
+            )
+            or
+            camera.get(
+                "resolution_width"
+            )
+        )
+
+        height = (
+            baseline.get(
+                "camera_frame_height"
+            )
+            or
+            camera.get(
+                "resolution_height"
+            )
+        )
+
+        # ====================================================
+        # CLOSE STALE CAPTURE
+        # ====================================================
+
+        if self.capture is not None:
+
+            try:
+
+                self.capture.release()
+
+            except Exception:
+
+                pass
+
+            self.capture = None
+
+        # ====================================================
+        # OPEN CAMERA
+        #
+        # Windows:
+        # DirectShow first
+        # fallback CAP_ANY
+        # ====================================================
+
+        capture = cv2.VideoCapture(
+            int(device_index),
+            cv2.CAP_DSHOW,
+        )
+
+        if not capture.isOpened():
+
+            capture.release()
+
+            capture = cv2.VideoCapture(
+                int(device_index),
+                cv2.CAP_ANY,
+            )
+
+        if not capture.isOpened():
+
+            capture.release()
+
+            return
+
+        # ====================================================
+        # APPLY EXPECTED RESOLUTION
+        # ====================================================
+
+        if (
+            type(width) is int
+            and
+            type(height) is int
+            and
+            width > 0
+            and
+            height > 0
+        ):
+
+            capture.set(
+                cv2.CAP_PROP_FOURCC,
+                cv2.VideoWriter_fourcc(
+                    *"MJPG"
+                ),
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FRAME_WIDTH,
+                width,
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FRAME_HEIGHT,
+                height,
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FPS,
+                30,
+            )
+
+        # ====================================================
+        # READ REAL FRAME
+        # ====================================================
+
+        success, frame = (
+            capture.read()
+        )
+
+        if (
+            not success
+            or
+            frame is None
+        ):
+
+            capture.release()
+
+            return
+
+        # ====================================================
+        # RESOLUTION COMPATIBILITY
+        #
+        # ห้าม resume ด้วย resolution
+        # ที่ไม่ตรง Personal Baseline
+        # ====================================================
+
+        try:
+
+            result = (
+                evaluate_resolution_compatibility(
+                    self.baseline_data,
+                    frame,
+                )
+            )
+
+        except Exception as error:
+
+            print(
+                "CAMERA RECONNECT "
+                "RESOLUTION ERROR:",
+                error,
+            )
+
+            capture.release()
+
+            return
+
+        if (
+            result.get(
+                "status"
+            )
+            !=
+            RESOLUTION_COMPATIBLE
+            or
+            result.get(
+                "compatible"
+            )
+            is not True
+        ):
+
+            capture.release()
+
+            return
+
+        # ====================================================
+        # ACCEPT NEW CAPTURE
+        # ====================================================
+
+        self.capture = (
+            capture
+        )
+
+        self._recover_from_camera_gap()
+
+
+    # ========================================================
+    # CAMERA GAP RECOVERED
+    # ========================================================
+
+    def _recover_from_camera_gap(
+        self,
+    ) -> None:
+
+        if self.capture is None:
+
+            return
+
+        self.camera_gap_started_at = (
+            None
+        )
+
+        self.camera_gap_last_retry_at = (
+            None
+        )
+
+        # ====================================================
+        # TEMPORAL CONTINUITY
+        #
+        # process_data_gap() ตัด Temporal ไปแล้ว
+        #
+        # Risk Event เดิม intentionally preserve
+        # ====================================================
+
+        # ====================================================
+        # SCREEN DISTANCE
+        #
+        # ห้ามเอาเวลา/ratio ก่อน gap มาต่อ
+        # ====================================================
+
+        self.screen_distance_policy.reset()
+
+        self.last_screen_distance_result = (
+            None
+        )
+
+        # ====================================================
+        # BLINK
+        #
+        # เก็บจำนวน Blink ของ Session เดิม
+        # แต่ recalibrate หลัง stream กลับมา
+        # ====================================================
+
+        self.blink_detector.reset(
+            preserve_count=True,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = (
+            None
+        )
+
+        # ====================================================
+        # CAMERA MOVEMENT GUARD
+        #
+        # Camera stream ถูกสร้างใหม่
+        #
+        # ห้ามเอา optical-flow frame ก่อน disconnect
+        # มาเทียบกับ frame หลัง reconnect เพราะ driver /
+        # exposure / autofocus / timing อาจเปลี่ยนทันที
+        # และทำให้เกิด false CAMERA_MOVED
+        #
+        # Reset เฉพาะ runtime movement reference
+        #
+        # Camera Reference และ Personal Baseline เดิม
+        # ยังอยู่เหมือนเดิม
+        # ====================================================
+
+        self.camera_movement_guard.reset()
+
+        # ====================================================
+        # CONTROLS
+        # ====================================================
+
+        self.pause_button.setEnabled(
+            True
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
+
+        self.preview_label.setText(
+            "เชื่อมต่อกล้องกลับมาแล้ว "
+            "กำลังตรวจจับต่อ..."
+        )
+
+        self.status_label.setText(
+            "สถานะ: กล้องกลับมาแล้ว "
+            "(RUNNING)"
+        )
+
+        self.eye_state_label.setText(
+            "สถานะตา: กำลัง Calibration"
+        )
+
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: "
+            "กำลังประเมินใหม่"
+        )
+
+
+    # ========================================================
+    # CAMERA GAP TIMEOUT
+    # ========================================================
+
+    def _camera_gap_timeout(
+        self,
+    ) -> None:
+
+        self.timer.stop()
+
+        self.status_label.setText(
+            "สถานะ: กล้องขาดการเชื่อมต่อ "
+            "เกิน 60 วินาที "
+            "กำลังจบเซสชัน"
+        )
+
+        if self.capture is not None:
+
+            try:
+
+                self.capture.release()
+
+            except Exception:
+
+                pass
+
+            self.capture = None
+
+        QMessageBox.warning(
+            self,
+            "กล้องขาดการเชื่อมต่อ",
+            (
+                "PostGuard ไม่สามารถเชื่อมต่อ"
+                "กล้องกลับมาได้ภายใน 60 วินาที\n\n"
+                "ระบบจะจบ Session ปัจจุบัน "
+                "เพื่อป้องกันการประเมินจาก"
+                "ข้อมูลที่ไม่ต่อเนื่อง"
+            ),
+        )
+
+        self.handle_stop()
+
+    def _try_reconnect_camera(
+        self,
+    ) -> None:
+
+        camera = (
+            self.selected_camera
+            or
+            {}
+        )
+
+        device_index = (
+            camera.get(
+                "device_index"
+            )
+        )
+
+        if (
+            type(device_index) is not int
+            or
+            device_index < 0
+        ):
+            return
+
+        baseline = (
+            self.baseline_data
+            or
+            {}
+        )
+
+        # Monitoring must recover using the same resolution that
+        # produced the Personal Baseline.
+        width = (
+            baseline.get(
+                "camera_frame_width"
+            )
+            or
+            camera.get(
+                "resolution_width"
+            )
+        )
+
+        height = (
+            baseline.get(
+                "camera_frame_height"
+            )
+            or
+            camera.get(
+                "resolution_height"
+            )
+        )
+
+        # Close stale capture.
+        if self.capture is not None:
+
+            try:
+                self.capture.release()
+
+            except Exception:
+                pass
+
+            self.capture = None
+
+        capture = cv2.VideoCapture(
+            int(device_index),
+            cv2.CAP_DSHOW,
+        )
+
+        if not capture.isOpened():
+
+            capture.release()
+
+            capture = cv2.VideoCapture(
+                int(device_index),
+                cv2.CAP_ANY,
+            )
+
+        if not capture.isOpened():
+
+            capture.release()
+            return
+
+        if (
+            type(width) is int
+            and
+            type(height) is int
+            and
+            width > 0
+            and
+            height > 0
+        ):
+
+            capture.set(
+                cv2.CAP_PROP_FOURCC,
+                cv2.VideoWriter_fourcc(
+                    *"MJPG"
+                ),
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FRAME_WIDTH,
+                width,
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FRAME_HEIGHT,
+                height,
+            )
+
+            capture.set(
+                cv2.CAP_PROP_FPS,
+                30,
+            )
+
+        success, frame = capture.read()
+
+        if (
+            not success
+            or
+            frame is None
+        ):
+
+            capture.release()
+            return
+
+        # ----------------------------------------------------
+        # Resolution must still match Baseline.
+        # ----------------------------------------------------
+
+        try:
+
+            result = (
+                evaluate_resolution_compatibility(
+                    self.baseline_data,
+                    frame,
+                )
+            )
+
+        except Exception:
+
+            capture.release()
+            return
+
+        if (
+            result.get(
+                "status"
+            )
+            !=
+            RESOLUTION_COMPATIBLE
+            or
+            result.get(
+                "compatible"
+            )
+            is not True
+        ):
+
+            capture.release()
+            return
+
+        self.capture = capture
+
+        self._recover_from_camera_gap()
+
+
+    def _recover_from_camera_gap(
+        self,
+    ) -> None:
+
+        if self.capture is None:
+            return
+
+        self.camera_gap_started_at = None
+        self.camera_gap_last_retry_at = None
+
+        # ----------------------------------------------------
+        # Temporal continuity cannot cross the gap.
+        #
+        # process_data_gap() already resets Temporal.
+        #
+        # Risk Event itself is intentionally preserved.
+        # ----------------------------------------------------
+
+        self.screen_distance_policy.reset()
+
+        self.last_screen_distance_result = None
+
+        self.blink_detector.reset(
+            preserve_count=True,
+            now=time.monotonic(),
+        )
+
+        self.last_blink_result = None
+
+        # IMPORTANT:
+        # Do not reset camera_movement_guard here. Keeping the
+        # pre-gap reference allows the existing movement guard
+        # to detect a physical camera-placement change after
+        # reconnection. If the camera moved, the validated
+        # camera-movement path will end the Session instead of
+        # continuing with a stale Personal Baseline.
+
+        self.pause_button.setEnabled(
+            True
+        )
+
+        self.preview_label.setText(
+            "เชื่อมต่อกล้องกลับมาแล้ว "
+            "กำลังตรวจจับต่อ..."
+        )
+
+        self.status_label.setText(
+            "สถานะ: กล้องกลับมาแล้ว "
+            "(RUNNING)"
+        )
+
+        self.eye_state_label.setText(
+            "สถานะตา: กำลัง Calibration"
+        )
+
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: "
+            "กำลังประเมินใหม่"
+        )
+
+
+    def _camera_gap_timeout(
+        self,
+    ) -> None:
+
+        self.timer.stop()
+
+        self.status_label.setText(
+            "สถานะ: กล้องขาดการเชื่อมต่อ "
+            "เกิน 60 วินาที กำลังจบเซสชัน"
+        )
+
+        if self.capture is not None:
+
+            try:
+                self.capture.release()
+
+            except Exception:
+                pass
+
+            self.capture = None
+
+        QMessageBox.warning(
+            self,
+            "กล้องขาดการเชื่อมต่อ",
+            "PostGuard ไม่สามารถเชื่อมต่อกล้องกลับมาได้"
+            "ภายใน 60 วินาที\n\n"
+            "ระบบจะจบ Session ปัจจุบันเพื่อป้องกัน"
+            "การประเมินจากข้อมูลที่ไม่ต่อเนื่อง",
+        )
+
+        self.handle_stop()
+
+     # ========================================================
     # CAMERA LOOP
     # ========================================================
 
@@ -3085,18 +3913,54 @@ class MonitoringPage(QWidget):
         self,
     ) -> None:
 
+        # ====================================================
+        # LIFECYCLE GUARD
+        # ====================================================
+
         if (
-            self.capture is None
-            or
             self.is_paused
             or
             self.is_stopping
         ):
+
             return
 
-        # ========================================================
+        # ====================================================
+        # ACTIVE CAMERA DATA GAP
+        #
+        # สำคัญ:
+        #
+        # Timer ต้องยังทำงานต่อระหว่าง DATA_GAP
+        # เพื่อให้:
+        #
+        # - retry camera ทุก 2 วินาที
+        # - timeout 60 วินาทีทำงาน
+        #
+        # ห้าม return เพียงเพราะ capture=None
+        # ====================================================
+
+        if (
+            self.camera_gap_started_at
+            is not None
+        ):
+
+            self._enter_camera_gap()
+
+            return
+
+        # ====================================================
+        # CAMERA OBJECT LOST
+        # ====================================================
+
+        if self.capture is None:
+
+            self._enter_camera_gap()
+
+            return
+
+        # ====================================================
         # 1. READ RAW CAMERA FRAME
-        # ========================================================
+        # ====================================================
 
         success, raw_frame = (
             self.capture.read()
@@ -3107,17 +3971,12 @@ class MonitoringPage(QWidget):
             or
             raw_frame is None
         ):
-            self._finish_after_capture_error()
 
-            QMessageBox.warning(
-                self,
-                "ข้อผิดพลาดของกล้อง",
-                "ไม่สามารถอ่านภาพจากกล้องได้",
-            )
+            self._enter_camera_gap()
 
             return
 
-        # ========================================================
+        # ====================================================
         # 2. CAMERA MOVEMENT GUARD
         #
         # IMPORTANT:
@@ -3125,7 +3984,7 @@ class MonitoringPage(QWidget):
         # - before Camera Roll correction
         # - before mirror
         # - before Detection / Risk
-        # ========================================================
+        # ====================================================
 
         movement_result = (
             self.camera_movement_guard.update(
@@ -3140,20 +3999,22 @@ class MonitoringPage(QWidget):
             ==
             STATUS_MOVED
         ):
+
             self._handle_camera_movement(
                 movement_result
             )
+
             return
 
-        # ========================================================
-        # 3. APPLY THE LOCKED CAMERA REFERENCE
+        # ====================================================
+        # 3. APPLY LOCKED CAMERA REFERENCE
         #
-        # This is the SAME preprocessing contract used by
-        # Personal Baseline. Monitoring does not estimate a new
-        # Camera Roll. It reuses the locked Camera Reference.
-        # ========================================================
+        # Personal Baseline และ Monitoring
+        # ต้องใช้ preprocessing contract เดียวกัน
+        # ====================================================
 
         try:
+
             corrected_frame = (
                 prepare_detection_frame(
                     raw_frame,
@@ -3162,6 +4023,7 @@ class MonitoringPage(QWidget):
             )
 
         except CameraReferenceError as error:
+
             self._finish_after_capture_error()
 
             QMessageBox.warning(
@@ -3169,55 +4031,81 @@ class MonitoringPage(QWidget):
                 "Camera Reference",
                 str(error),
             )
+
             return
 
         self.frame_count += 1
 
-        # ========================================================
-        # 4. PROCESS EVERY 5 CAMERA FRAMES
+        # ====================================================
+        # 4. DETECTION
         #
-        # Every feature below receives corrected_frame:
-        # Detection / Baseline Comparison / Blink /
-        # Screen Distance / Risk Pipeline.
-        # ========================================================
+        # Process every 5 camera frames.
+        # ====================================================
 
         if (
             self.detector is not None
             and
             self.frame_count % 5 == 0
         ):
+
             try:
+
                 result = (
                     self.detector.process_frame(
                         corrected_frame
                     )
                 )
 
+                # --------------------------------------------
+                # Session statistics
+                # --------------------------------------------
+
                 self.record_detection_sample(
                     result
                 )
+
+                # --------------------------------------------
+                # Personal Baseline comparison
+                # --------------------------------------------
 
                 self.update_baseline_comparison(
                     result
                 )
 
+                # --------------------------------------------
+                # Blink
+                # --------------------------------------------
+
                 self.update_blink_detection(
                     result
                 )
+
+                # --------------------------------------------
+                # Relative screen distance
+                # --------------------------------------------
 
                 self.update_screen_distance(
                     result
                 )
 
+                # --------------------------------------------
+                # Validated PostGuard Risk Pipeline
+                # --------------------------------------------
+
                 self.update_validated_risk(
                     result
                 )
+
+                # --------------------------------------------
+                # UI
+                # --------------------------------------------
 
                 self._update_detection_labels(
                     result
                 )
 
             except Exception as error:
+
                 self._finish_after_capture_error()
 
                 QMessageBox.warning(
@@ -3225,14 +4113,15 @@ class MonitoringPage(QWidget):
                     "ข้อผิดพลาดของระบบตรวจจับ",
                     str(error),
                 )
+
                 return
 
-        # ========================================================
+        # ====================================================
         # 5. PREVIEW
         #
-        # Preview receives the same corrected frame used by
-        # Detection. _update_preview() mirrors DISPLAY only.
-        # ========================================================
+        # Preview ใช้ corrected frame เดียวกับ Detection
+        # แต่ mirror เฉพาะใน _update_preview()
+        # ====================================================
 
         self._update_preview(
             corrected_frame
@@ -3635,201 +4524,206 @@ class MonitoringPage(QWidget):
                 self.capture = None
 
     def _release_local_resources(
-        self,
-    ) -> None:
+            self,
+        ) -> None:
 
-        self._close_capture_resources()
+            self._close_capture_resources()
 
-        self.close_posture_alert()
+            self.close_posture_alert()
 
-        # ====================================================
-        # CAMERA MOVEMENT
-        # ====================================================
+            # ====================================================
+            # CAMERA DATA GAP
+            # ====================================================
 
-        self.camera_movement_guard.reset()
-        self.camera_movement_triggered = False
+            self.camera_gap_started_at = None
+            self.camera_gap_last_retry_at = None
 
-        # ====================================================
-        # RISK PIPELINE
-        # ====================================================
+            # ====================================================
+            # CAMERA MOVEMENT
+            # ====================================================
 
-        self.risk_pipeline.reset()
+            self.camera_movement_guard.reset()
+            self.camera_movement_triggered = False
 
-        self.last_pipeline_result = (
-            None
-        )
+            # ====================================================
+            # RISK PIPELINE
+            # ====================================================
 
-        self.sound_player.notify(
-            False
-        )
+            self.risk_pipeline.reset()
 
-        # ====================================================
-        # SCREEN DISTANCE
-        # ====================================================
+            self.last_pipeline_result = (
+                None
+            )
 
-        self.screen_distance_policy.reset()
-        self.last_screen_distance_result = None
+            self.sound_player.notify(
+                False
+            )
 
-        self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: --"
-        )
+            # ====================================================
+            # SCREEN DISTANCE
+            # ====================================================
 
-        # ====================================================
-        # BLINK
-        #
-        # Session จบแล้วจึง reset count เป็น 0
-        # ====================================================
+            self.screen_distance_policy.reset()
 
-        self.blink_detector.reset(
-            preserve_count=False,
-            now=time.monotonic(),
-        )
+            self.last_screen_distance_result = (
+                None
+            )
 
-        self.last_blink_result = (
-            None
-        )
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: --"
+            )
 
-        self.eye_state_label.setText(
-            "สถานะตา: --"
-        )
+            # ====================================================
+            # BLINK
+            # ====================================================
 
-        self.blink_count_label.setText(
-            "จำนวนการกระพริบตา: 0"
-        )
+            self.blink_detector.reset(
+                preserve_count=False,
+                now=time.monotonic(),
+            )
 
-        # ====================================================
-        # FRAME
-        # ====================================================
+            self.last_blink_result = (
+                None
+            )
 
-        self.frame_count = 0
+            self.eye_state_label.setText(
+                "สถานะตา: --"
+            )
 
-        # ====================================================
-        # DETECTION UI
-        # ====================================================
+            self.blink_count_label.setText(
+                "จำนวนการกระพริบตา: 0"
+            )
 
-        self.detection_label.setText(
-            "ท่าทาง: กำลังรอ | "
-            "ใบหน้า: กำลังรอ"
-        )
+            # ====================================================
+            # FRAME
+            # ====================================================
 
-        self.shoulder_label.setText(
-            "ความเอียงไหล่: --"
-        )
+            self.frame_count = 0
 
-        self.neck_label.setText(
-            "ความเอียงคอด้านข้าง: --"
-        )
+            # ====================================================
+            # DETECTION UI
+            # ====================================================
 
-        self.flexion_label.setText(
-            "มุมก้ม/เงยคอ: --"
-        )
+            self.detection_label.setText(
+                "ท่าทาง: กำลังรอ | "
+                "ใบหน้า: กำลังรอ"
+            )
 
-        self.shoulder_difference_label.setText(
-            "ผลต่างจาก Baseline ไหล่: --"
-        )
+            self.shoulder_label.setText(
+                "ความเอียงไหล่: --"
+            )
 
-        self.neck_difference_label.setText(
-            "ผลต่างจาก Baseline คอด้านข้าง: --"
-        )
+            self.neck_label.setText(
+                "ความเอียงคอด้านข้าง: --"
+            )
 
-        self.flexion_difference_label.setText(
-            "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
-        )
+            self.flexion_label.setText(
+                "มุมก้ม/เงยคอ: --"
+            )
 
-        # ====================================================
-        # PREVIEW
-        # ====================================================
+            self.shoulder_difference_label.setText(
+                "ผลต่างจาก Baseline ไหล่: --"
+            )
 
-        self.preview_label.clear()
+            self.neck_difference_label.setText(
+                "ผลต่างจาก Baseline คอด้านข้าง: --"
+            )
 
-        self.preview_label.setText(
-            "ภาพการตรวจจับจะแสดงที่นี่"
-        )
+            self.flexion_difference_label.setText(
+                "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
+            )
 
-        # ====================================================
-        # BUTTONS
-        # ====================================================
+            # ====================================================
+            # PREVIEW
+            # ====================================================
 
-        self.stop_button.setEnabled(
-            False
-        )
+            self.preview_label.clear()
 
-        self.pause_button.setEnabled(
-            False
-        )
+            self.preview_label.setText(
+                "ภาพการตรวจจับจะแสดงที่นี่"
+            )
 
-        self.pause_button.setText(
-            "Pause Monitoring"
-        )
+            # ====================================================
+            # BUTTONS
+            # ====================================================
 
-        self.is_paused = False
+            self.stop_button.setEnabled(
+                False
+            )
 
-        # ====================================================
-        # SESSION LOCAL DATA
-        # ====================================================
+            self.pause_button.setEnabled(
+                False
+            )
 
-        self.session_started_at = None
+            self.pause_button.setText(
+                "Pause Monitoring"
+            )
 
-        self.session_started_monotonic = (
-            None
-        )
+            self.is_paused = False
 
-        self.baseline_data = None
+            # ====================================================
+            # SESSION LOCAL DATA
+            # ====================================================
 
-        # ====================================================
-        # BASELINE UI
-        # ====================================================
+            self.session_started_at = None
+            self.session_started_monotonic = None
 
-        self.baseline_shoulder_label.setText(
-            "Baseline Shoulder Tilt: --"
-        )
+            self.baseline_data = None
 
-        self.baseline_neck_label.setText(
-            "Baseline Neck Lateral Tilt: --"
-        )
+            # ====================================================
+            # BASELINE UI
+            # ====================================================
 
-        self.baseline_flexion_label.setText(
-            "Baseline Neck Flexion: --"
-        )
+            self.baseline_shoulder_label.setText(
+                "Baseline Shoulder Tilt: --"
+            )
 
-        # ====================================================
-        # SESSION STATS
-        # ====================================================
+            self.baseline_neck_label.setText(
+                "Baseline Neck Lateral Tilt: --"
+            )
 
-        self.detection_count = 0
-        self.pose_detected_count = 0
-        self.face_detected_count = 0
+            self.baseline_flexion_label.setText(
+                "Baseline Neck Flexion: --"
+            )
 
-        self.shoulder_samples.clear()
-        self.neck_samples.clear()
+            # ====================================================
+            # SESSION STATS
+            # ====================================================
 
-        # ====================================================
-        # PIPELINE UI
-        # ====================================================
+            self.detection_count = 0
+            self.pose_detected_count = 0
+            self.face_detected_count = 0
 
-        self.assessment_label.setText(
-            "Assessment: Waiting"
-        )
+            self.shoulder_samples.clear()
+            self.neck_samples.clear()
 
-        self.factor_label.setText(
-            "Posture Factors: -"
-        )
+            # ====================================================
+            # PIPELINE UI
+            # ====================================================
 
-        self.duration_label.setText(
-            "Longest Continuous Factor: -"
-        )
+            self.assessment_label.setText(
+                "Assessment: Waiting"
+            )
 
-        self.risk_label.setText(
-            "Risk Level: -"
-        )
+            self.factor_label.setText(
+                "Posture Factors: -"
+            )
 
-        self.event_label.setText(
-            "Risk Event: -"
-        )
+            self.duration_label.setText(
+                "Longest Continuous Factor: -"
+            )
 
-        self.alert_label.setText(
-            "Alert Policy: Waiting"
-        )
+            self.risk_label.setText(
+                "Risk Level: -"
+            )
+
+            self.event_label.setText(
+                "Risk Event: -"
+            )
+
+            self.alert_label.setText(
+                "Alert Policy: Waiting"
+            )   
 
     # ========================================================
     # STOP MONITORING

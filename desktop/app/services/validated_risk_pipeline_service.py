@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import sys
 import time
 from pathlib import Path
@@ -397,6 +398,217 @@ class ValidatedRiskPipelineService:
         }
 
         self.last_result = result
+
+        return result
+
+    # ========================================================
+    # DATA GAP
+    # ========================================================
+
+        # ========================================================
+    # DATA GAP
+    # ========================================================
+
+    def process_data_gap(
+        self,
+        *,
+        reason: str,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        """
+        Notify the validated pipeline that Monitoring data is
+        temporarily unavailable.
+
+        DATA GAP semantics:
+
+        - No posture is fabricated.
+        - Temporal continuity is broken.
+        - Risk Level is unavailable.
+        - Existing Risk Event is preserved.
+        - Alert Policy receives DATA_GAP.
+        """
+
+        now_value = (
+            time.monotonic()
+            if now is None
+            else float(now)
+        )
+
+        # ====================================================
+        # TEMPORAL
+        #
+        # Missing camera data is a continuity boundary.
+        #
+        # Example:
+        #
+        # FLEXION 8 sec
+        # → camera gap
+        # → FLEXION
+        #
+        # must NOT become 9+ sec.
+        # ====================================================
+
+        self.temporal_tracker.reset()
+
+        previous = (
+            self.last_result
+            if isinstance(
+                self.last_result,
+                dict,
+            )
+            else
+            {}
+        )
+
+        previous_risk = (
+            previous.get(
+                "risk"
+            )
+            if isinstance(
+                previous,
+                dict,
+            )
+            else
+            None
+        )
+
+        # ====================================================
+        # ASSESSMENT
+        #
+        # Do not copy the previous posture.
+        #
+        # There is no new camera evidence during DATA_GAP,
+        # therefore current posture is NOT_EVALUATED.
+        # ====================================================
+
+        assessment = {
+            "contract_version": "1.1",
+            "status": "NOT_EVALUATED",
+            "reason": reason,
+            "factors": [],
+        }
+
+        # ====================================================
+        # RISK
+        #
+        # Important:
+        #
+        # DATA_GAP != NONE
+        # DATA_GAP != LOW
+        #
+        # No new Risk Level is available.
+        # ====================================================
+
+        risk_result = {
+            "risk_contract_version": "1.2",
+
+            "status": "NOT_EVALUATED",
+
+            "reason": reason,
+
+            "risk_level_available": False,
+
+            "risk_level": None,
+
+            # Previous evidence is descriptive only.
+            # It is not treated as a new observation.
+            "evidence_groups": (
+                deepcopy(
+                    previous_risk.get(
+                        "evidence_groups",
+                        [],
+                    )
+                )
+                if isinstance(
+                    previous_risk,
+                    dict,
+                )
+                else
+                []
+            ),
+        }
+
+        # ====================================================
+        # RISK EVENT
+        #
+        # RiskEventTracker v1.0 understands an incomplete
+        # Risk result as DATA_GAP.
+        #
+        # Active Risk Event is intentionally preserved.
+        # ====================================================
+
+        risk_event_result = (
+            self.risk_event_tracker.update(
+                risk_result,
+                now=now_value,
+            )
+        )
+
+        # ====================================================
+        # ALERT POLICY
+        # ====================================================
+
+        alert_policy_result = (
+            self.alert_policy.update(
+                risk_event_result,
+                now=now_value,
+            )
+        )
+
+        # ====================================================
+        # OUTPUT
+        # ====================================================
+
+        result = {
+            "service_version": (
+                VALIDATED_RISK_PIPELINE_SERVICE_VERSION
+            ),
+
+            "timestamp_monotonic": (
+                now_value
+            ),
+
+            "detection": None,
+
+            "baseline_comparison": None,
+
+            "assessment": (
+                assessment
+            ),
+
+            "posture_score": None,
+
+            "temporal": {
+                "contract_version": "1.0",
+
+                "status": "NOT_EVALUATED",
+
+                "reason": reason,
+
+                "active_factors": [],
+            },
+
+            "risk": (
+                risk_result
+            ),
+
+            "risk_event": (
+                risk_event_result
+            ),
+
+            "alert_policy": (
+                alert_policy_result
+            ),
+
+            "data_gap": {
+                "active": True,
+                "reason": reason,
+            },
+        }
+
+        self.last_result = (
+            result
+        )
 
         return result
 
