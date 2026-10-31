@@ -41,7 +41,35 @@ REQUIRED_FEATURES = (
     "eye_distance",
 )
 
-EXPECTED_FEATURE_STATUS = "validated_prototype"
+# ==========================================================
+# FEATURE STATUS POLICY
+# ==========================================================
+
+VALIDATED_FEATURE_STATUS = "validated_prototype"
+EXPERIMENTAL_FEATURE_STATUS = "experimental"
+
+EXPECTED_FEATURE_STATUSES = {
+    "shoulder_tilt": {
+        VALIDATED_FEATURE_STATUS,
+    },
+    "neck_lateral_tilt": {
+        VALIDATED_FEATURE_STATUS,
+    },
+
+    # Neck flexion is still experimental in DetectionService.
+    #
+    # Personal Baseline is allowed to collect its numeric reference value,
+    # but this DOES NOT promote neck_flexion to validated_prototype.
+    # Its experimental status remains unchanged downstream.
+    "neck_flexion": {
+        VALIDATED_FEATURE_STATUS,
+        EXPERIMENTAL_FEATURE_STATUS,
+    },
+
+    "eye_distance": {
+        VALIDATED_FEATURE_STATUS,
+    },
+}
 EXPECTED_CONTEXT_STATE = "VALID"
 EXPECTED_CONTRACT_VERSION = "1.0"
 
@@ -738,26 +766,33 @@ class PersonalBaselineCollector:
             )
 
         # --------------------------------------------------
-        # Validation Status
+        # Feature Status Policy
         # --------------------------------------------------
 
-        if (
-            feature.get(
-                "status"
+        actual_status = feature.get(
+            "status"
+        )
+
+        allowed_statuses = (
+            EXPECTED_FEATURE_STATUSES.get(
+                feature_name,
+                {
+                    VALIDATED_FEATURE_STATUS,
+                },
             )
-            !=
-            EXPECTED_FEATURE_STATUS
-        ):
+        )
+
+        if actual_status not in allowed_statuses:
 
             return (
                 False,
                 None,
                 (
                     f"{feature_name}_"
-                    "not_validated"
+                    "unsupported_status_"
+                    f"{actual_status}"
                 ),
             )
-
         # --------------------------------------------------
         # Unit
         # --------------------------------------------------

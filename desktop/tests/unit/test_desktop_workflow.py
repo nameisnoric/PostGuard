@@ -48,6 +48,8 @@ class DesktopWorkflowTests(unittest.TestCase):
             "scale_y": 3.50,
             "scale_avg": 3.50,
             "card_roll_deg": 0.5,
+            "roll_correction_deg": 2.5,
+            "roll_correction_source": "AUTO_CONFIRMED",
             "horizontal_perspective": 0.02,
             "vertical_perspective": 0.03,
             "captured_at": "2026-10-15T12:00:00+00:00",

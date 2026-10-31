@@ -791,11 +791,15 @@ class MainWindow(QMainWindow):
         calibration_reference: dict,
     ) -> None:
         """Attach the numeric camera reference to the baseline capture flow."""
-        if calibration_reference.get("status") != "VALID":
+        if (
+            calibration_reference.get("status") != "VALID"
+            or calibration_reference.get("roll_correction_source")
+            not in ("AUTO_CONFIRMED", "USER_CONFIRMED")
+        ):
             QMessageBox.warning(
                 self,
                 'การเตรียมกล้อง',
-                'โปรดเตรียมกล้องให้เสร็จก่อนสร้างค่าท่าทางอ้างอิงส่วนบุคคล',
+                'โปรดเตรียมกล้องและยืนยันมุมกล้องให้เสร็จก่อนสร้างค่าท่าทางอ้างอิงส่วนบุคคล',
             )
             return
         camera_data = camera.copy()

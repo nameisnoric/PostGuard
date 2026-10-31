@@ -27,6 +27,10 @@ from PySide6.QtWidgets import (
 
 from app.services.detection_service import DetectionService
 from app.services.api_client import APIClient
+from app.vision.camera_setup.camera_reference_contract import (
+    CameraReferenceError,
+    prepare_detection_frame,
+)
 from app.services.personal_baseline_service import (
     BASELINE_COLLECTING,
     BASELINE_FAILED,
@@ -580,6 +584,28 @@ class BaselinePage(QWidget):
                     'ไม่สามารถเปิดกล้องที่เลือกได้'
                 )
 
+            width = self.selected_camera.get(
+                "resolution_width"
+            )
+            height = self.selected_camera.get(
+                "resolution_height"
+            )
+
+            if (
+                type(width) is int
+                and type(height) is int
+                and width > 0
+                and height > 0
+            ):
+                self.capture.set(
+                    cv2.CAP_PROP_FRAME_WIDTH,
+                    width,
+                )
+                self.capture.set(
+                    cv2.CAP_PROP_FRAME_HEIGHT,
+                    height,
+                )
+
         except Exception as error:
 
             self.stop_camera_preview()
@@ -983,6 +1009,24 @@ class BaselinePage(QWidget):
 
             return
 
+        # Same locked Camera Reference contract as Monitoring.
+        try:
+            frame = prepare_detection_frame(
+                frame,
+                self.selected_camera or {},
+            )
+        except CameraReferenceError as error:
+            self.stop_camera_preview()
+            self.status_label.setText(
+                'สถานะ: Camera Reference ไม่ถูกต้อง'
+            )
+            QMessageBox.warning(
+                self,
+                'Camera Reference',
+                str(error)
+            )
+            return
+
         # -------------------------
         # Count Frames
         # -------------------------
@@ -1099,11 +1143,20 @@ class BaselinePage(QWidget):
                 return
 
         # -------------------------
-        # Convert Frame to RGB
+        # Mirror Preview for User
+        # -------------------------
+
+        display_frame = cv2.flip(
+            frame,
+            1,
+        )
+
+        # -------------------------
+        # Convert Display Frame to RGB
         # -------------------------
 
         frame_rgb = cv2.cvtColor(
-            frame,
+            display_frame,
             cv2.COLOR_BGR2RGB
         )
 

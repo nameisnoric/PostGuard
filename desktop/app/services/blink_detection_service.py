@@ -22,47 +22,34 @@ DEFAULT_MAX_CLOSED_SECONDS = 1.0
 
 class BlinkDetectionService:
     """
-    PostGuard runtime eye/blink adapter.
+    Runtime Blink Detection adapter.
 
     Pipeline:
 
-        DetectionService
-              ↓
-          face_points
-              ↓
-      calculate_eye_openness()
-              ↓
-      ┌──────────────────┐
-      │                  │
-    RIGHT              LEFT
-    openness           openness
-      │                  │
-      ↓                  ↓
-    OPEN/CLOSED       OPEN/CLOSED
-      │                  │
-      └────────┬─────────┘
-               ↓
-        Bilateral State
-               ↓
+        DetectionService.face_points
+                ↓
+        calculate_eye_openness()
+                ↓
+        EyeStateDetector
+                ↓
+        OPEN / CLOSED / UNKNOWN
+                ↓
         CLOSED -> OPEN
-               ↓
-            BLINK
+                ↓
+             Blink Event
 
     Important:
-
-    - Blink ต้องเกิดจาก bilateral CLOSED -> bilateral OPEN
-    - ปิดตาข้างเดียวไม่ใช่ Blink
-    - Wink แสดงเป็นข้อมูล diagnostic/runtime
-    - Eye feature ไม่เข้า Risk Evaluation
-    - ไม่ตีความ fatigue หรือ drowsiness
+    - Blink Detection แยกจาก Posture Risk
+    - ไม่ถูกส่งเข้า Risk Evaluation
+    - ไม่ถูกส่งเข้า Alert Policy
+    - ไม่ตีความ fatigue / drowsiness
+    - Blink count ใช้เป็น Session wellness metric
     """
 
     def __init__(
         self,
         *,
-        max_closed_seconds: float = (
-            DEFAULT_MAX_CLOSED_SECONDS
-        ),
+        max_closed_seconds: float = DEFAULT_MAX_CLOSED_SECONDS,
     ) -> None:
 
         self.max_closed_seconds = float(
@@ -108,6 +95,17 @@ class BlinkDetectionService:
         preserve_count: bool = False,
         now: float | None = None,
     ) -> None:
+        """
+        Reset temporal Blink state.
+
+        preserve_count=False
+            ใช้ตอนเริ่ม Session ใหม่ / จบ Session
+
+        preserve_count=True
+            ใช้ตอน Pause / Resume
+            เพื่อตัด temporal continuity
+            แต่ไม่ทำให้จำนวน Blink ของ Session หาย
+        """
 
         if not preserve_count:
             self.total_blinks = 0
@@ -130,59 +128,49 @@ class BlinkDetectionService:
         self.last_result = None
 
     # ========================================================
-    # WINK CLASSIFICATION
+    # EYE PATTERN
     # ========================================================
 
     @staticmethod
-    def _classify_eye_pattern(
-        *,
-        right_eye_state: str,
-        left_eye_state: str,
+    def _eye_pattern(
+        right_state: str | None,
+        left_state: str | None,
     ) -> str:
         """
-        แยก pattern ของตาสองข้าง
+        แปลงสถานะตาซ้าย/ขวาเป็นรูปแบบที่ UI ใช้
 
         BOTH_OPEN
-            ตาทั้งสองเปิด
-
         BOTH_CLOSED
-            ตาทั้งสองปิด
-
         RIGHT_ONLY_CLOSED
-            เฉพาะตาขวาปิด
-
         LEFT_ONLY_CLOSED
-            เฉพาะตาซ้ายปิด
-
         UNKNOWN
-            ข้อมูลไม่สมบูรณ์
         """
 
         if (
-            right_eye_state == EYE_OPEN
+            right_state == EYE_OPEN
             and
-            left_eye_state == EYE_OPEN
+            left_state == EYE_OPEN
         ):
             return "BOTH_OPEN"
 
         if (
-            right_eye_state == EYE_CLOSED
+            right_state == EYE_CLOSED
             and
-            left_eye_state == EYE_CLOSED
+            left_state == EYE_CLOSED
         ):
             return "BOTH_CLOSED"
 
         if (
-            right_eye_state == EYE_CLOSED
+            right_state == EYE_CLOSED
             and
-            left_eye_state == EYE_OPEN
+            left_state == EYE_OPEN
         ):
             return "RIGHT_ONLY_CLOSED"
 
         if (
-            right_eye_state == EYE_OPEN
+            right_state == EYE_OPEN
             and
-            left_eye_state == EYE_CLOSED
+            left_state == EYE_CLOSED
         ):
             return "LEFT_ONLY_CLOSED"
 
@@ -215,7 +203,7 @@ class BlinkDetectionService:
         )
 
         # ====================================================
-        # FACE POINTS
+        # 1. FACE LANDMARKS
         # ====================================================
 
         face_points = (
@@ -226,12 +214,7 @@ class BlinkDetectionService:
         )
 
         # ====================================================
-        # EYE MEASUREMENT
-        #
-        # ของเดิม PostGuard แยก:
-        #
-        # right_eye_openness
-        # left_eye_openness
+        # 2. EYE OPENNESS MEASUREMENT
         # ====================================================
 
         measurement = (
@@ -241,7 +224,7 @@ class BlinkDetectionService:
         )
 
         # ====================================================
-        # EYE STATE
+        # 3. EYE STATE
         # ====================================================
 
         eye_result = (
@@ -249,13 +232,6 @@ class BlinkDetectionService:
                 measurement,
                 timestamp=now_value,
             )
-        )
-
-        calibrated = (
-            eye_result.get(
-                "calibrated"
-            )
-            is True
         )
 
         eye_state = (
@@ -279,23 +255,19 @@ class BlinkDetectionService:
             )
         )
 
-        # ====================================================
-        # EYE PATTERN
-        # ====================================================
-
-        eye_pattern = (
-            self._classify_eye_pattern(
-                right_eye_state=(
-                    right_eye_state
-                ),
-                left_eye_state=(
-                    left_eye_state
-                ),
+        calibrated = (
+            eye_result.get(
+                "calibrated"
             )
+            is True
         )
 
         # ====================================================
-        # OPENNESS
+        # 4. EXPOSE EYE OPENNESS TO MONITORING UI
+        #
+        # เดิม measurement มีค่าเหล่านี้อยู่แล้ว
+        # แต่ไม่ได้ expose ที่ระดับบนของ result
+        # ทำให้ MonitoringPage อ่านไม่เจอ
         # ====================================================
 
         right_eye_openness = None
@@ -326,14 +298,26 @@ class BlinkDetectionService:
             )
 
         # ====================================================
-        # BLINK EVENT
+        # 5. EYE PATTERN FOR UI
+        # ====================================================
+
+        eye_pattern = (
+            self._eye_pattern(
+                right_eye_state,
+                left_eye_state,
+            )
+        )
+
+        # ====================================================
+        # 6. BLINK STATE MACHINE
         # ====================================================
 
         blink_event = False
+
         blink_duration = None
 
         # ----------------------------------------------------
-        # Bilateral CLOSED starts
+        # CLOSED START
         # ----------------------------------------------------
 
         if (
@@ -341,8 +325,7 @@ class BlinkDetectionService:
             and
             eye_state == EYE_CLOSED
             and
-            self.previous_state
-            != EYE_CLOSED
+            self.previous_state != EYE_CLOSED
         ):
 
             self.closed_started_at = (
@@ -350,9 +333,7 @@ class BlinkDetectionService:
             )
 
         # ----------------------------------------------------
-        # Bilateral CLOSED -> OPEN
-        #
-        # เท่านั้นที่ถือเป็น Blink
+        # CLOSED -> OPEN = BLINK
         # ----------------------------------------------------
 
         elif (
@@ -360,11 +341,9 @@ class BlinkDetectionService:
             and
             eye_state == EYE_OPEN
             and
-            self.previous_state
-            == EYE_CLOSED
+            self.previous_state == EYE_CLOSED
             and
-            self.closed_started_at
-            is not None
+            self.closed_started_at is not None
         ):
 
             blink_duration = max(
@@ -374,6 +353,8 @@ class BlinkDetectionService:
                 self.closed_started_at,
             )
 
+            # การปิดตานานเกิน max_closed_seconds
+            # ไม่ถือเป็น Blink ปกติ
             if (
                 blink_duration
                 <=
@@ -389,13 +370,8 @@ class BlinkDetectionService:
         # ----------------------------------------------------
         # UNKNOWN
         #
-        # รวมถึง:
-        # - face loss
-        # - landmark invalid
-        # - left/right mismatch
-        # - wink
-        #
-        # ต้องตัด blink continuity
+        # landmark หาย / face หาย
+        # ต้องตัด continuity เพื่อไม่สร้าง Blink ปลอม
         # ----------------------------------------------------
 
         elif (
@@ -406,19 +382,16 @@ class BlinkDetectionService:
 
             self.closed_started_at = None
 
-        # ====================================================
-        # SAVE PREVIOUS BILATERAL STATE
-        # ====================================================
-
         self.previous_state = (
             eye_state
         )
 
         # ====================================================
-        # RESULT
+        # 7. RESULT CONTRACT
         # ====================================================
 
         result = {
+
             "service_version": (
                 BLINK_DETECTION_SERVICE_VERSION
             ),
@@ -428,7 +401,7 @@ class BlinkDetectionService:
             ),
 
             # ------------------------------------------------
-            # Calibration
+            # CALIBRATION
             # ------------------------------------------------
 
             "calibrated": (
@@ -454,16 +427,12 @@ class BlinkDetectionService:
             ),
 
             # ------------------------------------------------
-            # Bilateral State
+            # EYE STATE
             # ------------------------------------------------
 
             "eye_state": (
                 eye_state
             ),
-
-            # ------------------------------------------------
-            # Individual Eye State
-            # ------------------------------------------------
 
             "right_eye_state": (
                 right_eye_state
@@ -473,34 +442,15 @@ class BlinkDetectionService:
                 left_eye_state
             ),
 
-            # ------------------------------------------------
-            # Eye Pattern
-            # ------------------------------------------------
-
             "eye_pattern": (
                 eye_pattern
             ),
 
-            "is_right_only_closed": (
-                eye_pattern
-                ==
-                "RIGHT_ONLY_CLOSED"
-            ),
-
-            "is_left_only_closed": (
-                eye_pattern
-                ==
-                "LEFT_ONLY_CLOSED"
-            ),
-
-            "is_bilateral_closed": (
-                eye_pattern
-                ==
-                "BOTH_CLOSED"
-            ),
-
             # ------------------------------------------------
-            # Openness
+            # EYE OPENNESS
+            #
+            # Expose โดยตรงเพื่อให้ MonitoringPage
+            # ใช้งานได้โดยไม่ต้องรู้ internal measurement
             # ------------------------------------------------
 
             "right_eye_openness": (
@@ -515,12 +465,54 @@ class BlinkDetectionService:
                 mean_eye_openness
             ),
 
+            # เก็บ raw measurement ไว้สำหรับ
+            # debug / validation / camera test
             "measurement": (
                 measurement
             ),
 
             # ------------------------------------------------
-            # Blink
+            # REFERENCE / THRESHOLDS
+            # ------------------------------------------------
+
+            "right_open_reference": (
+                eye_result.get(
+                    "right_open_reference"
+                )
+            ),
+
+            "left_open_reference": (
+                eye_result.get(
+                    "left_open_reference"
+                )
+            ),
+
+            "right_close_threshold": (
+                eye_result.get(
+                    "right_close_threshold"
+                )
+            ),
+
+            "left_close_threshold": (
+                eye_result.get(
+                    "left_close_threshold"
+                )
+            ),
+
+            "right_reopen_threshold": (
+                eye_result.get(
+                    "right_reopen_threshold"
+                )
+            ),
+
+            "left_reopen_threshold": (
+                eye_result.get(
+                    "left_reopen_threshold"
+                )
+            ),
+
+            # ------------------------------------------------
+            # BLINK
             # ------------------------------------------------
 
             "blink_event": (
@@ -536,9 +528,7 @@ class BlinkDetectionService:
             ),
         }
 
-        self.last_result = (
-            result
-        )
+        self.last_result = result
 
         return result
 
@@ -550,6 +540,11 @@ class BlinkDetectionService:
         self,
         active_seconds: float | None,
     ) -> float | None:
+        """
+        Blink Rate = Blink Count / Active Minutes
+
+        active_seconds ต้องไม่รวม Pause time
+        """
 
         if (
             active_seconds is None

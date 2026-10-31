@@ -263,9 +263,30 @@ class CameraPreviewPage(QWidget):
         # Open Camera
         # -------------------------
 
+        if (
+            type(width) is not int
+            or type(height) is not int
+            or width <= 0
+            or height <= 0
+        ):
+            QMessageBox.warning(
+                self,
+                "PostGuard",
+                "Selected camera does not contain a valid resolution."
+            )
+            return
+
         self.capture = cv2.VideoCapture(
-            int(device_index)
+            int(device_index),
+            cv2.CAP_DSHOW,
         )
+
+        if not self.capture.isOpened():
+            self.capture.release()
+            self.capture = cv2.VideoCapture(
+                int(device_index),
+                cv2.CAP_ANY,
+            )
 
         if not self.capture.isOpened():
 
@@ -278,6 +299,23 @@ class CameraPreviewPage(QWidget):
             )
 
             return
+
+        self.capture.set(
+            cv2.CAP_PROP_FOURCC,
+            cv2.VideoWriter_fourcc(*"MJPG"),
+        )
+        self.capture.set(
+            cv2.CAP_PROP_FRAME_WIDTH,
+            width,
+        )
+        self.capture.set(
+            cv2.CAP_PROP_FRAME_HEIGHT,
+            height,
+        )
+        self.capture.set(
+            cv2.CAP_PROP_FPS,
+            30,
+        )
 
         # -------------------------
         # Initialize Detection

@@ -57,6 +57,32 @@ from app.ui.utils.preview_sizing import (
 from app.services.blink_detection_service import (
     BlinkDetectionService,
 )
+from app.services.camera_setup.camera_movement import (
+    CameraMovementConfig,
+    CameraMovementGuard,
+    STATUS_MOVED,
+)
+from app.vision.mediapipe_detection.posture.relative_screen_distance import (
+    extract_eye_distance_baseline,
+)
+
+from app.vision.mediapipe_detection.posture.screen_distance_policy import (
+    ScreenDistancePolicy,
+    ScreenDistancePolicyConfig,
+    STATE_NORMAL,
+    STATE_PENDING,
+    STATE_TOO_CLOSE,
+    STATE_NOT_EVALUATED,
+)
+from app.vision.camera_setup.resolution_compatibility import (
+    RESOLUTION_COMPATIBLE,
+    evaluate_resolution_compatibility,
+)
+from app.vision.camera_setup.camera_reference_contract import (
+    CameraReferenceError,
+    validate_locked_camera_reference,
+    prepare_detection_frame,
+)
 
 
 RISK_LEVELS = (
@@ -94,6 +120,30 @@ class MonitoringPage(QWidget):
         self.detector = None
 
         # ====================================================
+        # CAMERA MOVEMENT GUARD
+        # ====================================================
+        #
+        # Uses RAW camera frames before Camera Roll correction.
+        # It tracks background/global motion so user posture
+        # movement is not used as camera-movement evidence.
+        # ====================================================
+
+        self.camera_movement_guard = (
+            CameraMovementGuard(
+                CameraMovementConfig(
+                    analysis_width=640,
+                    sample_every_frames=3,
+                    translation_ratio_threshold=0.008,
+                    rotation_threshold_deg=1.20,
+                    scale_change_threshold=0.025,
+                    consecutive_hits=2,
+                )
+            )
+        )
+
+        self.camera_movement_triggered = False
+
+        # ====================================================
         # BLINK DETECTION
         # ====================================================
 
@@ -102,6 +152,29 @@ class MonitoringPage(QWidget):
         )
 
         self.last_blink_result = None
+
+        # ====================================================
+        # SCREEN DISTANCE POLICY
+        # ====================================================
+        #
+        # Screen Distance เป็น monitoring feature แยกจาก
+        # Posture Risk / RULA
+        #
+        # Threshold ปัจจุบันเป็น candidate engineering policy
+        # ไม่ใช่ ergonomic / physical-distance threshold
+        # ====================================================
+
+        self.screen_distance_policy = (
+            ScreenDistancePolicy(
+                ScreenDistancePolicyConfig(
+                    enter_ratio=1.25,
+                    exit_ratio=1.15,
+                    confirmation_seconds=3.0,
+                )
+            )
+        )
+
+        self.last_screen_distance_result = None
 
         # ====================================================
         # SESSION
@@ -152,6 +225,11 @@ class MonitoringPage(QWidget):
         )
 
         self.last_pipeline_result = None
+        self.screen_distance_policy.reset()
+
+        self.last_screen_distance_result = (
+            None
+        )
 
         self.risk_sample_counts = {
             level: 0
@@ -546,7 +624,6 @@ class MonitoringPage(QWidget):
             self.baseline_flexion_label,
             self.status_label,
         ):
-
             info_layout.addWidget(
                 label
             )
@@ -620,6 +697,13 @@ class MonitoringPage(QWidget):
         self.flexion_label = QLabel(
             "มุมก้ม/เงยคอ: --"
         )
+        self.screen_distance_label = QLabel(
+            "ระยะห่างหน้าจอ: --"
+        )
+
+        self.screen_distance_label.setWordWrap(
+            True
+        )
 
         # ========================================================
         # EYE / BLINK
@@ -670,6 +754,7 @@ class MonitoringPage(QWidget):
             self.shoulder_label,
             self.neck_label,
             self.flexion_label,
+            self.screen_distance_label,
 
             self.right_eye_state_label,
             self.left_eye_state_label,
@@ -1152,6 +1237,122 @@ class MonitoringPage(QWidget):
         )
 
         return baseline
+    
+    # ========================================================
+    # CAMERA RESOLUTION COMPATIBILITY
+    # ========================================================
+
+    def validate_monitoring_resolution(
+        self,
+    ) -> dict:
+        """
+        Validate that the camera resolution used for Monitoring
+        matches the resolution stored with the Personal Baseline.
+
+        The actual camera frame is the source of truth.
+
+        This validation intentionally does NOT:
+        - resize the frame,
+        - modify the Personal Baseline,
+        - apply camera roll correction,
+        - apply perspective correction,
+        - modify Screen Distance,
+        - modify Posture Risk / RULA.
+        """
+
+        if self.capture is None:
+            raise RuntimeError(
+                "Camera is not available for resolution validation."
+            )
+
+        if self.baseline_data is None:
+            raise RuntimeError(
+                "Personal Baseline is not available "
+                "for resolution validation."
+            )
+
+        # ----------------------------------------------------
+        # Read a REAL frame from the newly opened camera.
+        #
+        # Do not trust CAP_PROP_FRAME_WIDTH / HEIGHT alone.
+        # The actual frame.shape is the final source of truth.
+        # ----------------------------------------------------
+
+        success, frame = self.capture.read()
+
+        if (
+            not success
+            or
+            frame is None
+        ):
+            raise RuntimeError(
+                "Unable to read camera frame for "
+                "resolution validation."
+            )
+
+        result = evaluate_resolution_compatibility(
+            self.baseline_data,
+            frame,
+        )
+
+        if (
+            result.get("status")
+            !=
+            RESOLUTION_COMPATIBLE
+            or
+            result.get("compatible")
+            is not True
+        ):
+
+            expected_width = result.get(
+                "expected_width"
+            )
+
+            expected_height = result.get(
+                "expected_height"
+            )
+
+            actual_width = result.get(
+                "actual_width"
+            )
+
+            actual_height = result.get(
+                "actual_height"
+            )
+
+            reason = result.get(
+                "reason",
+                "unknown",
+            )
+
+            if (
+                expected_width is not None
+                and
+                expected_height is not None
+                and
+                actual_width is not None
+                and
+                actual_height is not None
+            ):
+                raise RuntimeError(
+                    "Camera resolution does not match "
+                    "the Personal Baseline.\n\n"
+                    f"Baseline: "
+                    f"{expected_width}x{expected_height}\n"
+                    f"Current camera: "
+                    f"{actual_width}x{actual_height}\n\n"
+                    "Please use the same camera resolution "
+                    "used during Camera Setup / "
+                    "Personal Baseline."
+                )
+
+            raise RuntimeError(
+                "Camera resolution could not be validated "
+                "against the Personal Baseline.\n"
+                f"Reason: {reason}"
+            )
+
+        return result
 
     # ========================================================
     # START MONITORING
@@ -1179,6 +1380,27 @@ class MonitoringPage(QWidget):
         self.selected_camera = (
             camera.copy()
         )
+        try:
+            camera_reference = (
+                validate_locked_camera_reference(
+                    self.selected_camera
+                )
+            )
+
+        except CameraReferenceError as error:
+
+            QMessageBox.warning(
+                self,
+                "Camera Reference",
+                str(error),
+            )
+
+            return False
+
+        # New Monitoring session starts with a fresh
+        # camera-movement reference period.
+        self.camera_movement_guard.reset()
+        self.camera_movement_triggered = False
 
         self.baseline_id = (
             baseline_id
@@ -1277,23 +1499,119 @@ class MonitoringPage(QWidget):
 
         try:
 
-            self.capture = (
-                cv2.VideoCapture(
-                    int(
-                        device_index
-                    )
+            expected_width = self.baseline_data.get(
+                "camera_frame_width"
+            )
+            expected_height = self.baseline_data.get(
+                "camera_frame_height"
+            )
+
+            if (
+                type(expected_width) is not int
+                or type(expected_height) is not int
+                or expected_width <= 0
+                or expected_height <= 0
+            ):
+                raise RuntimeError(
+                    "Personal Baseline does not contain a valid "
+                    "camera resolution."
                 )
+
+            # Monitoring must reopen the camera using the exact
+            # resolution stored with the Personal Baseline.
+            # On Windows, DirectShow + MJPEG is attempted first
+            # because it is the same capture mode used by camera scan.
+            self.capture = cv2.VideoCapture(
+                int(device_index),
+                cv2.CAP_DSHOW,
             )
 
             if not self.capture.isOpened():
+                self.capture.release()
+                self.capture = cv2.VideoCapture(
+                    int(device_index),
+                    cv2.CAP_ANY,
+                )
 
+            if not self.capture.isOpened():
                 raise RuntimeError(
                     "Unable to open camera."
                 )
+            locked_width = (
+                camera_reference[
+                    "locked_frame_width"
+                ]
+            )
+            locked_height = (
+                camera_reference[
+                    "locked_frame_height"
+                ]
+            )
+
+            if (
+                expected_width != locked_width
+                or expected_height != locked_height
+            ):
+                raise RuntimeError(
+                    "Personal Baseline camera resolution does not "
+                    "match the locked Camera Reference. "
+                    f"baseline={expected_width}x{expected_height}, "
+                    f"reference={locked_width}x{locked_height}"
+                )
+
+            self.capture.set(
+                cv2.CAP_PROP_FOURCC,
+                cv2.VideoWriter_fourcc(*"MJPG"),
+            )
+            self.capture.set(
+                cv2.CAP_PROP_FRAME_WIDTH,
+                locked_width,
+            )
+            self.capture.set(
+                cv2.CAP_PROP_FRAME_HEIGHT,
+                locked_height,
+            )
+            self.capture.set(
+                cv2.CAP_PROP_FPS,
+                30,
+            )
+
+            # =================================================
+            # RESOLUTION COMPATIBILITY GATE
+            #
+            # IMPORTANT:
+            # ต้องตรวจจาก frame จริงก่อนสร้าง Detector
+            # และก่อนสร้าง Backend Session
+            # =================================================
+
+            resolution_result = (
+                self.validate_monitoring_resolution()
+            )
+
+            print(
+                "CAMERA RESOLUTION VALIDATED:",
+                f"{resolution_result['actual_width']}"
+                f"x{resolution_result['actual_height']}",
+                "| BASELINE:",
+                f"{resolution_result['expected_width']}"
+                f"x{resolution_result['expected_height']}",
+            )
+
+            # =================================================
+            # DETECTOR
+            #
+            # สร้างหลังจาก Resolution ผ่านแล้วเท่านั้น
+            # =================================================
 
             self.detector = (
                 DetectionService()
             )
+
+            # =================================================
+            # BACKEND SESSION
+            #
+            # ห้ามสร้าง Session ก่อน Resolution ผ่าน
+            # =================================================
 
             response = (
                 APIClient.start_session(
@@ -1432,6 +1750,7 @@ class MonitoringPage(QWidget):
         self.risk_persistence.reset()
 
         self.reset_risk_tracking()
+        self.reset_screen_distance_tracking()
 
         # ====================================================
         # BLINK
@@ -2532,6 +2851,233 @@ class MonitoringPage(QWidget):
         return blink_result
 
     # ========================================================
+    # SCREEN DISTANCE
+    # ========================================================
+
+    def reset_screen_distance_tracking(
+        self,
+    ) -> None:
+        """
+        Reset Screen Distance temporal continuity.
+
+        ใช้เมื่อ:
+        - เริ่ม Session
+        - Pause
+        - Resume
+        - จบ Session
+
+        Personal Baseline ไม่ถูก reset เพราะ baseline เป็น
+        reference ของ Session ไม่ใช่ temporal runtime state.
+        """
+
+        self.screen_distance_policy.reset()
+
+        self.last_screen_distance_result = None
+
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: --"
+        )
+
+
+    def update_screen_distance(
+        self,
+        detection_result: dict,
+    ) -> dict:
+        """
+        Evaluate relative Screen Distance.
+
+        Pipeline:
+
+            DetectionService.eye_distance
+                        +
+            Personal Baseline
+                        ↓
+            ScreenDistancePolicy
+                        ↓
+            NORMAL / PENDING /
+            TOO_CLOSE / NOT_EVALUATED
+
+        Screen Distance ไม่ถูกส่งเข้า Risk/RULA.
+        """
+
+        baseline = (
+            self.baseline_data
+            or {}
+        )
+
+        (
+            baseline_value,
+            baseline_source,
+            baseline_reason,
+        ) = (
+            extract_eye_distance_baseline(
+                baseline
+            )
+        )
+
+        # --------------------------------------------
+        # Baseline unavailable
+        # --------------------------------------------
+
+        if baseline_value is None:
+            result = (
+                self.screen_distance_policy.update(
+                    current_eye_distance_px=None,
+                    baseline_eye_distance_px=None,
+                    now=time.monotonic(),
+                )
+            )
+
+            result[
+                "baseline_source"
+            ] = baseline_source
+
+            result[
+                "baseline_reason"
+            ] = baseline_reason
+
+            self.last_screen_distance_result = (
+                result
+            )
+
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: N/A "
+                "(ไม่มี Eye Distance Baseline)"
+            )
+
+            return result
+
+        # --------------------------------------------
+        # Detection Contract
+        # --------------------------------------------
+
+        features = (
+            detection_result.get(
+                "features"
+            )
+            or {}
+        )
+
+        eye_feature = (
+            features.get(
+                "eye_distance"
+            )
+        )
+
+        current_eye_distance = None
+
+        if (
+            isinstance(
+                eye_feature,
+                dict,
+            )
+            and
+            eye_feature.get(
+                "valid"
+            )
+            is True
+        ):
+            value = eye_feature.get(
+                "value"
+            )
+
+            if (
+                type(value)
+                in
+                (int, float)
+                and
+                math.isfinite(
+                    value
+                )
+                and
+                value > 0
+            ):
+                current_eye_distance = (
+                    float(value)
+                )
+
+        # --------------------------------------------
+        # Policy
+        # --------------------------------------------
+
+        result = (
+            self.screen_distance_policy.update(
+                current_eye_distance_px=(
+                    current_eye_distance
+                ),
+                baseline_eye_distance_px=(
+                    baseline_value
+                ),
+                now=time.monotonic(),
+            )
+        )
+
+        result[
+            "baseline_source"
+        ] = baseline_source
+
+        result[
+            "baseline_reason"
+        ] = baseline_reason
+
+        self.last_screen_distance_result = (
+            result
+        )
+
+        # --------------------------------------------
+        # UI
+        # --------------------------------------------
+
+        state = result.get(
+            "state"
+        )
+
+        ratio = result.get(
+            "ratio"
+        )
+
+        if state == STATE_NORMAL:
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: ปกติ "
+                f"(Ratio {ratio:.2f}x)"
+            )
+
+        elif state == STATE_PENDING:
+            seconds = (
+                result.get(
+                    "candidate_seconds"
+                )
+                or 0.0
+            )
+
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: "
+                "กำลังตรวจสอบว่าใกล้เกินไป "
+                f"(Ratio {ratio:.2f}x, "
+                f"{seconds:.1f}s)"
+            )
+
+        elif state == STATE_TOO_CLOSE:
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: "
+                "ใกล้กว่าค่าอ้างอิงมาก "
+                f"(Ratio {ratio:.2f}x)"
+            )
+
+        elif state == STATE_NOT_EVALUATED:
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: "
+                "ไม่สามารถประเมินได้"
+            )
+
+        else:
+            self.screen_distance_label.setText(
+                "ระยะห่างหน้าจอ: --"
+            )
+
+        return result
+
+    # ========================================================
     # CAMERA LOOP
     # ========================================================
 
@@ -2546,106 +3092,132 @@ class MonitoringPage(QWidget):
             or
             self.is_stopping
         ):
-
             return
 
-        success, frame = (
+        # ========================================================
+        # 1. READ RAW CAMERA FRAME
+        # ========================================================
+
+        success, raw_frame = (
             self.capture.read()
         )
 
         if (
             not success
             or
-            frame is None
+            raw_frame is None
         ):
-
             self._finish_after_capture_error()
 
             QMessageBox.warning(
                 self,
                 "ข้อผิดพลาดของกล้อง",
-                "Unable to read camera frame.",
+                "ไม่สามารถอ่านภาพจากกล้องได้",
             )
 
             return
 
+        # ========================================================
+        # 2. CAMERA MOVEMENT GUARD
+        #
+        # IMPORTANT:
+        # - inspect RAW frame
+        # - before Camera Roll correction
+        # - before mirror
+        # - before Detection / Risk
+        # ========================================================
+
+        movement_result = (
+            self.camera_movement_guard.update(
+                raw_frame
+            )
+        )
+
+        if (
+            movement_result.get(
+                "status"
+            )
+            ==
+            STATUS_MOVED
+        ):
+            self._handle_camera_movement(
+                movement_result
+            )
+            return
+
+        # ========================================================
+        # 3. APPLY THE LOCKED CAMERA REFERENCE
+        #
+        # This is the SAME preprocessing contract used by
+        # Personal Baseline. Monitoring does not estimate a new
+        # Camera Roll. It reuses the locked Camera Reference.
+        # ========================================================
+
+        try:
+            corrected_frame = (
+                prepare_detection_frame(
+                    raw_frame,
+                    self.selected_camera,
+                )
+            )
+
+        except CameraReferenceError as error:
+            self._finish_after_capture_error()
+
+            QMessageBox.warning(
+                self,
+                "Camera Reference",
+                str(error),
+            )
+            return
+
         self.frame_count += 1
 
-        # ====================================================
-        # PROCESS EVERY 5 CAMERA FRAMES
+        # ========================================================
+        # 4. PROCESS EVERY 5 CAMERA FRAMES
         #
-        # ใช้ Detection result ชุดเดียวร่วมกันทั้งหมด
-        #
-        # Camera
-        #   ↓
-        # DetectionService
-        #   ├─ Detection Statistics
-        #   ├─ Baseline Comparison
-        #   ├─ Blink Detection
-        #   ├─ Risk Pipeline
-        #   └─ Live UI
-        # ====================================================
+        # Every feature below receives corrected_frame:
+        # Detection / Baseline Comparison / Blink /
+        # Screen Distance / Risk Pipeline.
+        # ========================================================
 
         if (
             self.detector is not None
             and
             self.frame_count % 5 == 0
         ):
-
             try:
-
-                # ============================================
-                # 1. DETECTION
-                # ============================================
-
                 result = (
                     self.detector.process_frame(
-                        frame
+                        corrected_frame
                     )
                 )
-
-                # ============================================
-                # 2. STATISTICS
-                # ============================================
 
                 self.record_detection_sample(
                     result
                 )
 
-                # ============================================
-                # 3. PERSONAL BASELINE
-                # ============================================
-
                 self.update_baseline_comparison(
                     result
                 )
-
-                # ============================================
-                # 4. BLINK
-                # ============================================
 
                 self.update_blink_detection(
                     result
                 )
 
-                # ============================================
-                # 5. POSTURE RISK PIPELINE
-                # ============================================
+                self.update_screen_distance(
+                    result
+                )
 
                 self.update_validated_risk(
                     result
                 )
-
-                # ============================================
-                # 6. LIVE DETECTION UI
-                # ============================================
 
                 self._update_detection_labels(
                     result
                 )
 
             except Exception as error:
-
                 self._finish_after_capture_error()
 
                 QMessageBox.warning(
@@ -2653,16 +3225,163 @@ class MonitoringPage(QWidget):
                     "ข้อผิดพลาดของระบบตรวจจับ",
                     str(error),
                 )
-
                 return
 
-        # ====================================================
-        # CAMERA PREVIEW
-        # ====================================================
+        # ========================================================
+        # 5. PREVIEW
+        #
+        # Preview receives the same corrected frame used by
+        # Detection. _update_preview() mirrors DISPLAY only.
+        # ========================================================
 
         self._update_preview(
-            frame
+            corrected_frame
         )
+
+    # ========================================================
+    # CAMERA MOVEMENT
+    # ========================================================
+
+    def _handle_camera_movement(
+        self,
+        movement_result: dict,
+    ) -> None:
+        """Stop the current session when physical camera placement changes."""
+
+        if self.camera_movement_triggered:
+            return
+
+        self.camera_movement_triggered = True
+
+        # Stop local frame processing immediately so no new
+        # posture/risk sample is produced with an invalid reference.
+        self.timer.stop()
+
+        translation_px = (
+            movement_result.get(
+                "translation_px"
+            )
+        )
+
+        rotation_deg = (
+            movement_result.get(
+                "rotation_deg"
+            )
+        )
+
+        scale_change = (
+            movement_result.get(
+                "scale_change"
+            )
+        )
+
+        details = []
+
+        if (
+            type(translation_px)
+            in
+            (int, float)
+            and
+            math.isfinite(
+                translation_px
+            )
+        ):
+            details.append(
+                "การเลื่อนภาพรวม: "
+                f"{translation_px:.1f} px"
+            )
+
+        if (
+            type(rotation_deg)
+            in
+            (int, float)
+            and
+            math.isfinite(
+                rotation_deg
+            )
+        ):
+            details.append(
+                "การหมุนภาพรวม: "
+                f"{rotation_deg:+.2f}°"
+            )
+
+        if (
+            type(scale_change)
+            in
+            (int, float)
+            and
+            math.isfinite(
+                scale_change
+            )
+        ):
+            details.append(
+                "การเปลี่ยนสเกล: "
+                f"{scale_change * 100.0:.1f}%"
+            )
+
+        detail_text = (
+            "\n".join(
+                details
+            )
+            if details
+            else
+            "ตรวจพบการเปลี่ยนตำแหน่งของกล้อง"
+        )
+
+        self.status_label.setText(
+            "สถานะ: ตรวจพบการขยับกล้อง "
+            "กำลังจบเซสชัน"
+        )
+
+        self.assessment_label.setText(
+            "Assessment: NOT_EVALUATED "
+            "(CAMERA_MOVED)"
+        )
+
+        self.factor_label.setText(
+            "Posture Factors: CAMERA_MOVED"
+        )
+
+        self.duration_label.setText(
+            "Longest Continuous Factor: 0.0 s"
+        )
+
+        self.risk_label.setText(
+            "Risk Level: N/A "
+            "(CAMERA_MOVED)"
+        )
+
+        self.event_label.setText(
+            "Risk Event: DATA_GAP"
+        )
+
+        self.alert_label.setText(
+            "Alert Policy: CAMERA_MOVED"
+        )
+
+        self.sound_player.notify(
+            False
+        )
+
+        self.close_posture_alert()
+
+        QMessageBox.warning(
+            self,
+            "ตรวจพบการขยับกล้อง",
+            "PostGuard ตรวจพบว่าตำแหน่งกล้องเปลี่ยน"
+            "ระหว่างการตรวจจับ\n\n"
+            f"{detail_text}\n\n"
+            "Camera Reference และ Personal Baseline เดิม"
+            "อาจไม่ตรงกับตำแหน่งกล้องปัจจุบัน "
+            "ระบบจึงจบเซสชันนี้เพื่อไม่ให้ประเมินความเสี่ยงต่อ"
+            "ด้วยข้อมูลอ้างอิงที่ไม่ถูกต้อง\n\n"
+            "กรุณาเริ่ม Monitoring ใหม่ แล้วทำ Camera Setup "
+            "และ Personal Baseline ใหม่",
+        )
+
+        # Existing validated session-finish path:
+        # backend COMPLETED -> summary persistence -> Summary page.
+        self.handle_stop()
 
     # ========================================================
     # DETECTION DISPLAY
@@ -2792,10 +3511,25 @@ class MonitoringPage(QWidget):
         self,
         frame,
     ) -> None:
+        """Show a mirror-style preview without changing detector input.
+
+        `frame` has already been through the shared camera preprocessing
+        (including confirmed Camera Roll correction). The validated
+        detection/risk pipeline continues to use that non-mirrored frame.
+
+        Only the UI preview is horizontally flipped so Monitoring behaves
+        like a normal webcam mirror and matches Camera Setup / Personal
+        Baseline from the user's point of view.
+        """
+
+        display_frame = cv2.flip(
+            frame,
+            1,
+        )
 
         frame_rgb = (
             cv2.cvtColor(
-                frame,
+                display_frame,
                 cv2.COLOR_BGR2RGB,
             )
         )
@@ -2909,6 +3643,13 @@ class MonitoringPage(QWidget):
         self.close_posture_alert()
 
         # ====================================================
+        # CAMERA MOVEMENT
+        # ====================================================
+
+        self.camera_movement_guard.reset()
+        self.camera_movement_triggered = False
+
+        # ====================================================
         # RISK PIPELINE
         # ====================================================
 
@@ -2920,6 +3661,17 @@ class MonitoringPage(QWidget):
 
         self.sound_player.notify(
             False
+        )
+
+        # ====================================================
+        # SCREEN DISTANCE
+        # ====================================================
+
+        self.screen_distance_policy.reset()
+        self.last_screen_distance_result = None
+
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: --"
         )
 
         # ====================================================
@@ -3201,6 +3953,16 @@ class MonitoringPage(QWidget):
             )
         )
 
+        # ====================================================
+        # SCREEN DISTANCE
+        # ====================================================
+
+        screen_distance = (
+            self.last_screen_distance_result
+            or
+            {}
+        )
+
         return {
             # =================================================
             # SESSION
@@ -3395,6 +4157,46 @@ class MonitoringPage(QWidget):
                 risk_score_summary.get(
                     "modified_rula_distribution",
                     {},
+                )
+            ),
+
+            # =================================================
+            # SCREEN DISTANCE
+            # =================================================
+
+            "screen_distance_state": (
+                screen_distance.get(
+                    "state"
+                )
+            ),
+
+            "screen_distance_stable_state": (
+                screen_distance.get(
+                    "stable_state"
+                )
+            ),
+
+            "screen_distance_ratio": (
+                screen_distance.get(
+                    "ratio"
+                )
+            ),
+
+            "screen_distance_percent_change": (
+                screen_distance.get(
+                    "percent_change"
+                )
+            ),
+
+            "screen_distance_reason": (
+                screen_distance.get(
+                    "reason"
+                )
+            ),
+
+            "screen_distance_threshold_status": (
+                screen_distance.get(
+                    "threshold_status"
                 )
             ),
         }
@@ -3648,6 +4450,7 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.reset_risk_tracking()
+        self.reset_screen_distance_tracking()
 
         # ====================================================
         # BLINK
@@ -3711,6 +4514,10 @@ class MonitoringPage(QWidget):
             "Alert Policy: PAUSED"
         )
 
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: PAUSED"
+        )
+
         self.status_label.setText(
             "สถานะ: หยุดชั่วคราว "
             f"(จำนวนครั้ง: "
@@ -3763,6 +4570,7 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.reset_risk_tracking()
+        self.reset_screen_distance_tracking()
 
         # ====================================================
         # BLINK
@@ -3787,6 +4595,10 @@ class MonitoringPage(QWidget):
         self.blink_count_label.setText(
             "จำนวนการกระพริบตา: "
             f"{self.blink_detector.total_blinks}"
+        )
+
+        self.screen_distance_label.setText(
+            "ระยะห่างหน้าจอ: กำลังประเมินใหม่"
         )
 
         # ====================================================
