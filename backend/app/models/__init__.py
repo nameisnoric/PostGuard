@@ -9,3 +9,5 @@ from app.models.register_otp import RegistrationOTP
 from app.models.user_settings import UserSettings
 from app.models.risk_event import RiskEvent
 from app.models.alert_notification import AlertNotification
+from app.models.eye_alert_notification import EyeAlertNotification
+from app.models.screen_distance_notification import ScreenDistanceNotification

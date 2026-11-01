@@ -103,12 +103,39 @@ class CameraSessionIntegrationTests(unittest.TestCase):
     def test_blink_statistics_waits_for_full_window(self):
         statistics = BlinkStatistics(window_seconds=60.0)
         statistics.start(timestamp=10.0)
-        early = statistics.update(blink_event=True, timestamp=20.0)
-        ready = statistics.update(blink_event=False, timestamp=70.0)
+        early = None
+        for second in range(11, 71):
+            early = statistics.update(
+                blink_event=second == 20,
+                timestamp=float(second),
+                observation_valid=True,
+            )
+        ready = early
 
-        self.assertIsNone(early["blink_rate"])
         self.assertTrue(ready["window_ready"])
         self.assertEqual(ready["blink_rate"], 1.0)
+
+    def test_blink_statistics_requires_valid_eye_observation(self):
+        statistics = BlinkStatistics(window_seconds=60.0, min_valid_seconds=45.0)
+        statistics.start(timestamp=0.0)
+        result = None
+        for second in range(1, 61):
+            result = statistics.update(
+                timestamp=float(second),
+                observation_valid=second <= 30,
+            )
+        self.assertFalse(result["window_ready"])
+        self.assertIsNone(result["blink_rate"])
+
+    def test_blink_statistics_restarts_after_long_eye_gap(self):
+        statistics = BlinkStatistics(window_seconds=60.0, min_valid_seconds=45.0)
+        statistics.start(timestamp=0.0)
+        for second in range(1, 11):
+            statistics.update(timestamp=float(second), observation_valid=True)
+        statistics.update(timestamp=13.1, observation_valid=False)
+        resumed = statistics.update(timestamp=14.0, observation_valid=True)
+        self.assertFalse(resumed["window_ready"])
+        self.assertEqual(resumed["valid_observation_seconds"], 0.0)
 
     def test_risk_mapper_does_not_publish_incomplete_risk(self):
         result = map_prototype_risk_level(

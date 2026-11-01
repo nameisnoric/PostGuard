@@ -63,6 +63,9 @@ class SessionSummaryResponse(BaseModel):
 
     total_alert_count: int
     most_frequent_alert_event: str | None
+    eye_alert_count: int
+    eye_first_alert_count: int
+    eye_repeat_alert_count: int
     blink_rate: float | None
     data_gap_duration: float
     camera_loss_count: int

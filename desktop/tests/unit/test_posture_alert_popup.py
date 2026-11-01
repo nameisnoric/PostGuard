@@ -77,6 +77,34 @@ class PostureAlertPopupTests(unittest.TestCase):
         self.assertIsNone(self.page.alert_popup)
         self.assertFalse(popup.isVisible())
 
+    def test_disabled_notifications_do_not_persist_or_show_eye_reminder(self):
+        self.page.session_id = 12
+        self.page.wellness_persistence = Mock()
+        self.page.apply_notification_settings({"notifications_enabled": False})
+        result = {
+            "wellness_alert": {
+                "active": True,
+                "events": [],
+                "notifications": [{
+                    "event_type": "LOW_BLINK_RATE",
+                    "alert_type": "FIRST",
+                    "value": 5.0,
+                    "window_blink_count": 5,
+                }],
+            }
+        }
+
+        with patch("app.ui.pages.monitoring_page.EyeAlertDialog") as dialog:
+            self.page._update_wellness_alert(result)
+
+        self.page.wellness_persistence.update.assert_called_once_with(
+            12,
+            result["wellness_alert"],
+            persist_notifications=False,
+        )
+        dialog.assert_not_called()
+        self.assertIsNone(self.page.eye_alert_popup)
+
 
 if __name__ == "__main__":
     unittest.main()

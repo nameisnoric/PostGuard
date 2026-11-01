@@ -143,6 +143,7 @@ class SessionSummaryPage(QWidget):
         self.data_gap_label = QLabel('ช่วงเวลาที่ไม่มีข้อมูล: 00:00:00')
         self.camera_loss_label = QLabel('จำนวนครั้งที่กล้องขาดการเชื่อมต่อ: 0')
         self.report_alert_count_label = QLabel('จำนวนการแจ้งเตือนที่บันทึก: --')
+        self.eye_alert_count_label = QLabel('Eye Reminders ที่บันทึก: --')
         self.frequent_event_label = QLabel('การแจ้งเตือนที่พบบ่อยที่สุด: N/A')
         self.risk_breakdown_label = QLabel('รายละเอียดความเสี่ยง: --')
         self.risk_breakdown_label.setWordWrap(True)
@@ -153,6 +154,7 @@ class SessionSummaryPage(QWidget):
             self.data_gap_label,
             self.camera_loss_label,
             self.report_alert_count_label,
+            self.eye_alert_count_label,
             self.frequent_event_label,
             self.risk_breakdown_label,
         ):
@@ -405,6 +407,15 @@ class SessionSummaryPage(QWidget):
         alert_count = report_metrics.get("total_alert_count")
         self.report_alert_count_label.setText(
             f"จำนวนการแจ้งเตือนที่บันทึก: {alert_count if alert_count is not None else 'N/A'}"
+        )
+        eye_total = report_metrics.get("eye_alert_count")
+        eye_first = report_metrics.get("eye_first_alert_count")
+        eye_repeat = report_metrics.get("eye_repeat_alert_count")
+        self.eye_alert_count_label.setText(
+            "Eye Reminders ที่บันทึก: "
+            f"{eye_total if eye_total is not None else 'N/A'} "
+            f"(FIRST {eye_first if eye_first is not None else 'N/A'}, "
+            f"REPEAT {eye_repeat if eye_repeat is not None else 'N/A'})"
         )
         frequent = report_metrics.get("most_frequent_alert_event")
         self.frequent_event_label.setText(

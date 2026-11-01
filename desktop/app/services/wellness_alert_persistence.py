@@ -1,6 +1,7 @@
 """Persist continuous non-RULA wellness alert episodes."""
 
 import time
+import uuid
 
 import requests
 
@@ -19,6 +20,8 @@ class WellnessAlertPersistence:
         self.event_ids: dict[str, int] = {}
         self.retry_after: dict[str, float] = {}
         self.last_error: str | None = None
+        self.pending_eye_notifications: list[dict] = []
+        self.pending_screen_notifications: list[dict] = []
 
     @staticmethod
     def _error(response) -> str:
@@ -71,8 +74,48 @@ class WellnessAlertPersistence:
             raise ValueError("Backend returned an invalid alert event ID")
         return event_id
 
-    def update(self, session_id: int, policy: dict) -> None:
+    def update(
+        self,
+        session_id: int,
+        policy: dict,
+        *,
+        persist_notifications: bool = True,
+    ) -> None:
         now = self.clock()
+        notifications = policy.get("notifications")
+        if not isinstance(notifications, list):
+            notifications = [policy.get("notification")]
+        for notification in notifications if persist_notifications else []:
+            if not isinstance(notification, dict):
+                continue
+            event_type = notification.get("event_type")
+            alert_type = notification.get("alert_type")
+            if alert_type not in {"FIRST", "REPEAT"}:
+                continue
+            if event_type == "LOW_BLINK_RATE":
+                value = notification.get("value")
+                count = notification.get("window_blink_count")
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    self.pending_eye_notifications.append({
+                        "runtime_notification_id": f"eye-{uuid.uuid4()}",
+                        "alert_type": alert_type,
+                        "blink_rate": float(value),
+                        "window_blink_count": count if type(count) is int and count >= 0 else 0,
+                        "reason": "LOW_BLINK_CONFIRMED",
+                        "retry_at": 0.0,
+                    })
+            elif event_type == "SCREEN_DISTANCE":
+                value = notification.get("value")
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    self.pending_screen_notifications.append({
+                        "runtime_notification_id": f"screen-{uuid.uuid4()}",
+                        "alert_type": alert_type,
+                        "distance_ratio": float(value),
+                        "reason": "SCREEN_DISTANCE_CONFIRMED",
+                        "retry_at": 0.0,
+                    })
+
+        errors = []
         for event in policy.get("events", []):
             if not isinstance(event, dict):
                 continue
@@ -91,7 +134,59 @@ class WellnessAlertPersistence:
                         raise RuntimeError(self._error(response))
                     self.event_ids.pop(event_type, None)
                 self.retry_after.pop(event_type, None)
-                self.last_error = None
             except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
-                self.last_error = str(error)
+                errors.append(str(error))
                 self.retry_after[event_type] = now + self.RETRY_SECONDS
+
+        remaining = []
+        for item in self.pending_eye_notifications:
+            if now < item.get("retry_at", 0.0):
+                remaining.append(item)
+                continue
+            try:
+                response = self.client.create_eye_alert_notification(
+                    session_id,
+                    item["runtime_notification_id"],
+                    item["alert_type"],
+                    item["blink_rate"],
+                    item["window_blink_count"],
+                    item["reason"],
+                )
+                if not response.ok:
+                    raise RuntimeError(self._error(response))
+            except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
+                item["retry_at"] = now + self.RETRY_SECONDS
+                remaining.append(item)
+                errors.append(str(error))
+        self.pending_eye_notifications = remaining
+
+        remaining_screen = []
+        for item in self.pending_screen_notifications:
+            if now < item.get("retry_at", 0.0):
+                remaining_screen.append(item)
+                continue
+            try:
+                response = self.client.create_screen_distance_notification(
+                    session_id,
+                    item["runtime_notification_id"],
+                    item["alert_type"],
+                    item["distance_ratio"],
+                    item["reason"],
+                )
+                if not response.ok:
+                    raise RuntimeError(self._error(response))
+            except (requests.RequestException, RuntimeError, ValueError, TypeError) as error:
+                item["retry_at"] = now + self.RETRY_SECONDS
+                remaining_screen.append(item)
+                errors.append(str(error))
+        self.pending_screen_notifications = remaining_screen
+        self.last_error = errors[0] if errors else None
+
+    def flush(self, session_id: int) -> bool:
+        """Retry queued eye reminders before pausing or ending the session."""
+        for item in self.pending_eye_notifications:
+            item["retry_at"] = 0.0
+        for item in self.pending_screen_notifications:
+            item["retry_at"] = 0.0
+        self.update(session_id, {"events": [], "notifications": []})
+        return not self.pending_eye_notifications and not self.pending_screen_notifications

@@ -33,6 +33,10 @@ class AlertHistoryDialogTests(unittest.TestCase):
             APIClient, "get_session_risk_events", return_value=response([], 404)
         ), patch.object(
             APIClient, "get_session_alert_notifications", return_value=response([], 404)
+        ), patch.object(
+            APIClient, "get_session_eye_alert_notifications", return_value=response([], 404)
+        ), patch.object(
+            APIClient, "get_session_screen_distance_notifications", return_value=response([], 404)
         ), patch.object(APIClient, "get_session_alerts", return_value=response(alerts)):
             dialog = AlertHistoryDialog(session_id=12)
         self.addCleanup(dialog.deleteLater)
@@ -82,6 +86,25 @@ class AlertHistoryDialogTests(unittest.TestCase):
             APIClient, "get_session_alert_notifications", return_value=response(notifications)
         ), patch.object(
             APIClient,
+            "get_session_eye_alert_notifications",
+            return_value=response([{
+                "eye_notification_id": 10,
+                "alert_type": "FIRST",
+                "blink_rate": 5.0,
+                "window_blink_count": 5,
+                "emitted_at": "2026-10-15T04:50:35Z",
+            }]),
+        ), patch.object(
+            APIClient,
+            "get_session_screen_distance_notifications",
+            return_value=response([{
+                "screen_notification_id": 11,
+                "alert_type": "FIRST",
+                "distance_ratio": 1.4,
+                "emitted_at": "2026-10-15T04:50:37Z",
+            }]),
+        ), patch.object(
+            APIClient,
             "get_session_alerts",
             return_value=response([{
                 "event_id": 9,
@@ -96,12 +119,16 @@ class AlertHistoryDialogTests(unittest.TestCase):
             dialog = AlertHistoryDialog(session_id=12)
         self.addCleanup(dialog.deleteLater)
 
-        self.assertEqual(dialog.table.rowCount(), 3)
-        self.assertEqual(dialog.table.item(0, 1).text(), "Risk event")
-        self.assertEqual(dialog.table.item(1, 1).text(), "Alert Escalation")
-        self.assertEqual(dialog.table.item(2, 1).text(), "Screen Distance")
+        self.assertEqual(dialog.table.rowCount(), 5)
+        self.assertEqual(dialog.table.item(0, 1).text(), "Risk Episode")
+        self.assertEqual(dialog.table.item(1, 1).text(), "Posture Reminder Escalation")
+        self.assertEqual(dialog.table.item(2, 1).text(), "Eye Reminder First")
+        self.assertEqual(dialog.table.item(3, 1).text(), "Distance Reminder First")
+        self.assertEqual(dialog.table.item(4, 1).text(), "Screen Distance Episode")
         self.assertIn("Notifications: 1", dialog.stats_label.text())
         self.assertIn("Wellness episodes: 1", dialog.stats_label.text())
+        self.assertIn("Eye reminders: 1", dialog.stats_label.text())
+        self.assertIn("Distance reminders: 1", dialog.stats_label.text())
 
 
 if __name__ == "__main__":

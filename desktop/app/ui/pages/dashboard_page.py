@@ -160,6 +160,32 @@ def rula_trend_points(sessions, summaries, limit=12):
     return points[-max(1, int(limit)):]
 
 
+def rula_latest_insight(points, deadband=5.0):
+    """Compare the latest two saved average scores in display percentages."""
+    valid = [
+        row for row in (points or [])
+        if isinstance(row, dict)
+        and _finite_number(row.get("average")) is not None
+    ]
+    if not valid:
+        return {"trend": "NO_DATA", "delta": None}
+    if len(valid) < 2:
+        return {"trend": "NO_COMPARISON", "delta": None}
+    delta = float(valid[-1]["average"]) - float(valid[-2]["average"])
+    if delta <= -float(deadband):
+        trend = "IMPROVING"
+    elif delta >= float(deadband):
+        trend = "WORSENING"
+    else:
+        trend = "STABLE"
+    return {
+        "trend": trend,
+        "delta": delta,
+        "session_id": valid[-1].get("session_id"),
+        "previous_session_id": valid[-2].get("session_id"),
+    }
+
+
 class RulaTrendChart(QWidget):
     """Dependency-free chart for persisted RULA-adapted session scores."""
 
@@ -626,9 +652,23 @@ class DashboardPage(QWidget):
                 "Saved report metrics are temporarily unavailable."
             )
         elif trend:
+            insight = rula_latest_insight(trend)
+            trend_text = {
+                "IMPROVING": "Improving",
+                "STABLE": "Stable",
+                "WORSENING": "Worsening",
+                "NO_COMPARISON": "No comparison yet",
+            }.get(insight["trend"], "N/A")
+            delta = insight.get("delta")
+            comparison = (
+                f" Latest trend: {trend_text} ({delta:+.1f} percentage points)."
+                if delta is not None
+                else f" Latest trend: {trend_text}."
+            )
             self.risk_trend_note.setText(
                 f"Oldest to newest across {len(trend)} session(s). "
                 "Blue = average, red = maximum; lower percentages indicate lower risk."
+                + comparison
             )
         else:
             self.risk_trend_note.setText(

@@ -25,6 +25,10 @@ from PySide6.QtWidgets import (
 
 from app.services.detection_service import DetectionService
 from app.services.camera_setup import adjust_camera_frame, mirror_camera_frame
+from app.services.camera_setup.camera_movement import (
+    CameraMovementGuard,
+    STATUS_MOVED,
+)
 from app.services.api_client import APIClient
 from app.services.risk_persistence_service import RiskPersistenceService
 from app.services.alert_sound import AlertSoundPlayer
@@ -32,6 +36,7 @@ from app.services.session_summary_service import save_session_summary
 from app.services.camera_loss_tracker import CameraLossTracker
 from app.services.wellness_alert_persistence import WellnessAlertPersistence
 from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
+from app.ui.dialogs.eye_alert_dialog import EyeAlertDialog
 from app.ui.utils.preview_sizing import fit_preview_label
 from app.ui.utils.risk_display import format_rula_percent
 
@@ -66,7 +71,10 @@ class MonitoringPage(QWidget):
         self.risk_persistence = RiskPersistenceService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
+        self.eye_alert_popup = None
         self.camera_loss = CameraLossTracker()
+        self.camera_movement_guard = CameraMovementGuard()
+        self.camera_movement_triggered = False
         self._camera_gap_suspended_for_pause = False
         self._last_camera_reconnect_attempt = float("-inf")
         self.wellness_persistence = WellnessAlertPersistence()
@@ -379,6 +387,8 @@ class MonitoringPage(QWidget):
         self.risk_samples.clear()
         self.latest_risk_result = None
         self.camera_loss.reset()
+        self.camera_movement_guard.reset()
+        self.camera_movement_triggered = False
         self._camera_gap_suspended_for_pause = False
         self._last_camera_reconnect_attempt = float("-inf")
         self.wellness_persistence.reset()
@@ -412,6 +422,12 @@ class MonitoringPage(QWidget):
         ):
             self.alert_popup.close()
             self.alert_popup = None
+        if (
+            not self.sound_player.settings["notifications_enabled"]
+            and self.eye_alert_popup is not None
+        ):
+            self.eye_alert_popup.close()
+            self.eye_alert_popup = None
 
     def update_partial_risk(self, result: dict) -> None:
         """Render integrated assessment, duration, risk, and alert state."""
@@ -617,6 +633,14 @@ class MonitoringPage(QWidget):
         if frame is None:
             return
 
+        # Inspect the physical camera stream before mirroring or roll
+        # correction. Global background motion means the saved camera
+        # reference and personal baseline are no longer trustworthy.
+        movement = self.camera_movement_guard.update(frame)
+        if movement.get("status") == STATUS_MOVED:
+            self._handle_camera_movement(movement)
+            return
+
         frame = mirror_camera_frame(frame)
         frame = adjust_camera_frame(
             frame,
@@ -637,6 +661,48 @@ class MonitoringPage(QWidget):
                 QMessageBox.warning(self, 'ข้อผิดพลาดของระบบตรวจจับ', str(error))
                 return
         self._update_preview(frame)
+
+    def _handle_camera_movement(self, movement: dict) -> None:
+        """End a session once a physical camera-placement change is confirmed."""
+        if self.camera_movement_triggered:
+            return
+        self.camera_movement_triggered = True
+        self.timer.stop()
+        if self.detector is not None:
+            gap_result = self.detector.process_data_gap(
+                "CAMERA_MOVED",
+                timestamp=time.monotonic(),
+            )
+            if isinstance(gap_result, dict):
+                self.update_partial_risk(gap_result)
+
+        details = []
+        translation = movement.get("translation_px")
+        rotation = movement.get("rotation_deg")
+        scale_change = movement.get("scale_change")
+        if isinstance(translation, (int, float)):
+            details.append(f"movement {float(translation):.1f} px")
+        if isinstance(rotation, (int, float)):
+            details.append(f"rotation {float(rotation):+.1f}°")
+        if isinstance(scale_change, (int, float)):
+            details.append(f"scale change {float(scale_change) * 100:.1f}%")
+        detail_text = " | ".join(details) or "global background movement"
+
+        self.status_label.setText(
+            "สถานะ: ตรวจพบการขยับกล้อง กำลังจบเซสชัน"
+        )
+        self.side_bending_label.setText("Assessment: NOT_EVALUATED (CAMERA_MOVED)")
+        self.alert_label.setText("Alert: Camera moved")
+        self.sound_player.notify(False)
+        QMessageBox.warning(
+            self,
+            "ตรวจพบการขยับกล้อง",
+            "ตำแหน่งกล้องเปลี่ยนระหว่าง Monitoring\n\n"
+            f"{detail_text}\n\n"
+            "ระบบจะจบเซสชันเพื่อไม่ให้ประเมินด้วย Camera Reference และ "
+            "Personal Baseline เดิม กรุณาเริ่ม Camera Setup ใหม่",
+        )
+        self.handle_stop()
 
     def _release_capture_only(self) -> None:
         if self.capture is None:
@@ -782,28 +848,51 @@ class MonitoringPage(QWidget):
         policy = result.get("wellness_alert")
         if not isinstance(policy, dict) or self.session_id is None:
             return
-        self.wellness_persistence.update(self.session_id, policy)
-        notification = policy.get("notification")
-        if isinstance(notification, dict):
+        notifications_enabled = self.sound_player.settings.get(
+            "notifications_enabled", True
+        )
+        self.wellness_persistence.update(
+            self.session_id,
+            policy,
+            persist_notifications=notifications_enabled,
+        )
+        notifications = policy.get("notifications")
+        if not isinstance(notifications, list):
+            notifications = [policy.get("notification")]
+        notifications = [item for item in notifications if isinstance(item, dict)]
+        if not notifications_enabled:
+            notifications = []
+        for notification in notifications:
             event_type = str(notification.get("event_type") or "WELLNESS")
             value = notification.get("value")
-            factor = None
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                factor = (
-                    f"ratio {float(value):.2f}x"
-                    if event_type == "SCREEN_DISTANCE"
-                    else f"{float(value):.1f} blinks/min"
+            if event_type == "LOW_BLINK_RATE":
+                if self.eye_alert_popup is not None:
+                    self.eye_alert_popup.close()
+                self.eye_alert_popup = EyeAlertDialog(
+                    blink_rate_per_minute=(
+                        float(value)
+                        if isinstance(value, (int, float)) and not isinstance(value, bool)
+                        else None
+                    ),
+                    alert_type=notification.get("alert_type"),
+                    window_blink_count=notification.get("window_blink_count"),
+                    parent=self.window(),
                 )
-            self.show_posture_alert({
-                "event_type": event_type,
-                "factor": factor,
-                "duration_seconds": 0.0,
-                "risk_level": "REMINDER",
-                "recorded": self.wellness_persistence.last_error is None,
-            })
+                self.eye_alert_popup.show_alert()
+            else:
+                factor = None
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    factor = f"ratio {float(value):.2f}x"
+                self.show_posture_alert({
+                    "event_type": event_type,
+                    "factor": factor,
+                    "duration_seconds": 0.0,
+                    "risk_level": "REMINDER",
+                    "recorded": self.wellness_persistence.last_error is None,
+                })
         self.sound_player.notify(
             policy.get("active") is True,
-            new_alert=isinstance(notification, dict),
+            new_alert=bool(notifications),
         )
 
     def _update_preview(self, frame) -> None:
@@ -849,6 +938,9 @@ class MonitoringPage(QWidget):
         if self.alert_popup is not None:
             self.alert_popup.close()
             self.alert_popup = None
+        if self.eye_alert_popup is not None:
+            self.eye_alert_popup.close()
+            self.eye_alert_popup = None
         self.frame_count = 0
         self.detection_label.setText('ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ')
         self.shoulder_label.setText('ความเอียงไหล่: --')
@@ -892,6 +984,8 @@ class MonitoringPage(QWidget):
         ended = True
         if self.session_id is not None:
             try:
+                if not self.wellness_persistence.flush(self.session_id):
+                    raise RuntimeError("Timed out while saving eye reminders.")
                 if not self.risk_persistence.flush():
                     raise RuntimeError("Timed out while saving risk events.")
                 self._end_remote_session()
@@ -1045,6 +1139,8 @@ class MonitoringPage(QWidget):
     def _pause_monitoring(self) -> None:
 
         try:
+            if not self.wellness_persistence.flush(self.session_id):
+                raise RuntimeError("Timed out while saving eye reminders.")
             if not self.risk_persistence.flush():
                 raise RuntimeError("Timed out while saving risk events.")
             remote = self._change_remote_session_status(
@@ -1161,6 +1257,8 @@ class MonitoringPage(QWidget):
         # 2. End the remote session
 
         try:
+            if not self.wellness_persistence.flush(self.session_id):
+                raise RuntimeError("Timed out while saving eye reminders.")
             if not self.risk_persistence.flush():
                 raise RuntimeError("Timed out while saving risk events.")
             remote = self._end_remote_session()

@@ -413,6 +413,56 @@ class APIClient:
         return APIClient.get(f"/sessions/{session_id}/alert-notifications")
 
     @staticmethod
+    def create_eye_alert_notification(
+        session_id: int,
+        runtime_notification_id: str,
+        alert_type: str,
+        blink_rate: float,
+        window_blink_count: int,
+        reason: str | None = None,
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/eye-alert-notifications",
+            {
+                "runtime_notification_id": runtime_notification_id,
+                "alert_type": alert_type,
+                "blink_rate": blink_rate,
+                "window_blink_count": window_blink_count,
+                "decision": "ALERT",
+                "reason": reason,
+            },
+        )
+
+    @staticmethod
+    def get_session_eye_alert_notifications(session_id: int):
+        return APIClient.get(f"/sessions/{session_id}/eye-alert-notifications")
+
+    @staticmethod
+    def create_screen_distance_notification(
+        session_id: int,
+        runtime_notification_id: str,
+        alert_type: str,
+        distance_ratio: float,
+        reason: str | None = None,
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/screen-distance-notifications",
+            {
+                "runtime_notification_id": runtime_notification_id,
+                "alert_type": alert_type,
+                "distance_ratio": distance_ratio,
+                "decision": "ALERT",
+                "reason": reason,
+            },
+        )
+
+    @staticmethod
+    def get_session_screen_distance_notifications(session_id: int):
+        return APIClient.get(
+            f"/sessions/{session_id}/screen-distance-notifications"
+        )
+
+    @staticmethod
     def pause_session(session_id: int):
         """Pause an existing RUNNING session."""
         if type(session_id) is not int or session_id <= 0:

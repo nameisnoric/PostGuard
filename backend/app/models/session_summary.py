@@ -77,6 +77,10 @@ class SessionSummary(Base):
         String(100), nullable=True
     )
 
+    eye_alert_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    eye_first_alert_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    eye_repeat_alert_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     blink_rate: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )

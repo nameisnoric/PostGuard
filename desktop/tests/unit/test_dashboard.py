@@ -12,6 +12,7 @@ from app.ui.pages.dashboard_page import (
     DashboardPage,
     active_seconds,
     rula_trend_points,
+    rula_latest_insight,
     summary_insights,
 )
 
@@ -110,6 +111,22 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(len(points), 12)
         self.assertEqual(points[0]["session_id"], 4)
         self.assertEqual(points[-1]["session_id"], 15)
+
+    def test_latest_rula_insight_uses_display_percentages(self):
+        self.assertEqual(
+            rula_latest_insight([]),
+            {"trend": "NO_DATA", "delta": None},
+        )
+        self.assertEqual(
+            rula_latest_insight([{"session_id": 1, "average": 20.0}])["trend"],
+            "NO_COMPARISON",
+        )
+        result = rula_latest_insight([
+            {"session_id": 1, "average": 50.0},
+            {"session_id": 2, "average": 33.0},
+        ])
+        self.assertEqual(result["trend"], "IMPROVING")
+        self.assertEqual(result["delta"], -17.0)
 
     def test_insights_ignore_missing_and_invalid_measurements(self):
         result = summary_insights([

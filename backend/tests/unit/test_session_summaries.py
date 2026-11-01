@@ -23,6 +23,8 @@ from app.models.session import PostureSession
 from app.models.session_summary import SessionSummary
 from app.models.alert_event import AlertEvent
 from app.models.alert_notification import AlertNotification
+from app.models.eye_alert_notification import EyeAlertNotification
+from app.models.screen_distance_notification import ScreenDistanceNotification
 from app.models.risk_event import RiskEvent
 from app.routers.auth import get_current_user
 from app.routers.session_summaries import router
@@ -172,6 +174,45 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertEqual(summary["high_risk_duration"], 18)
         self.assertEqual(summary["total_alert_count"], 2)
         self.assertEqual(summary["most_frequent_alert_event"], "neck")
+
+    def test_wellness_reminders_are_counted_without_episode_double_counting(self):
+        now = datetime.now(timezone.utc)
+        self.db.add_all([
+            AlertEvent(
+                session_id=1, event_type="LOW_BLINK_RATE", risk_level="MEDIUM",
+                started_at=now, ended_at=now, duration=15,
+            ),
+            AlertEvent(
+                session_id=1, event_type="SCREEN_DISTANCE", risk_level="MEDIUM",
+                started_at=now, ended_at=now, duration=20,
+            ),
+            EyeAlertNotification(
+                session_id=1, runtime_notification_id="eye-first",
+                alert_type="FIRST", blink_rate=5.0, window_blink_count=5,
+                decision="ALERT", reason="LOW_BLINK_CONFIRMED",
+            ),
+            EyeAlertNotification(
+                session_id=1, runtime_notification_id="eye-repeat",
+                alert_type="REPEAT", blink_rate=4.0, window_blink_count=4,
+                decision="ALERT", reason="LOW_BLINK_CONFIRMED",
+            ),
+            ScreenDistanceNotification(
+                session_id=1, runtime_notification_id="screen-first",
+                alert_type="FIRST", distance_ratio=1.4,
+                decision="ALERT", reason="SCREEN_DISTANCE_CONFIRMED",
+            ),
+        ])
+        self.db.commit()
+
+        response = self.client.post("/sessions/1/summary", json=self.payload)
+
+        self.assertEqual(response.status_code, 201, response.text)
+        summary = response.json()
+        self.assertEqual(summary["total_alert_count"], 3)
+        self.assertEqual(summary["eye_alert_count"], 2)
+        self.assertEqual(summary["eye_first_alert_count"], 1)
+        self.assertEqual(summary["eye_repeat_alert_count"], 1)
+        self.assertEqual(summary["most_frequent_alert_event"], "LOW_BLINK_RATE")
 
     def test_other_user_cannot_read_or_write(self):
         self.client.post("/sessions/1/summary", json=self.payload)

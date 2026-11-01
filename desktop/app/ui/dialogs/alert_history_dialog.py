@@ -129,6 +129,8 @@ class AlertHistoryDialog(QDialog):
     def _integrated_records(self, session_id):
         event_response = APIClient.get_session_risk_events(session_id)
         notification_response = APIClient.get_session_alert_notifications(session_id)
+        eye_response = APIClient.get_session_eye_alert_notifications(session_id)
+        screen_response = APIClient.get_session_screen_distance_notifications(session_id)
         legacy_response = APIClient.get_session_alerts(session_id)
         if not event_response.ok or not notification_response.ok:
             return None
@@ -137,7 +139,16 @@ class AlertHistoryDialog(QDialog):
         if not isinstance(events, list) or not isinstance(notifications, list):
             return None
         legacy = wellness_alerts(legacy_response.json()) if legacy_response.ok else []
-        if not events and not notifications and not legacy:
+        eye_notifications = eye_response.json() if eye_response.ok else []
+        if not isinstance(eye_notifications, list):
+            eye_notifications = []
+        screen_notifications = screen_response.json() if screen_response.ok else []
+        if not isinstance(screen_notifications, list):
+            screen_notifications = []
+        if (
+            not events and not notifications and not legacy
+            and not eye_notifications and not screen_notifications
+        ):
             return None
 
         rows = []
@@ -149,7 +160,7 @@ class AlertHistoryDialog(QDialog):
                 "sort_at": event.get("started_at"),
                 "values": [
                     f"R#{event.get('risk_event_id', '--')}",
-                    "Risk event",
+                    "Risk Episode",
                     str(event.get("max_risk_level") or event.get("current_risk_level") or "--").title(),
                     local_datetime(event.get("started_at")),
                     local_datetime(ended),
@@ -164,8 +175,34 @@ class AlertHistoryDialog(QDialog):
                 "sort_at": notification.get("emitted_at"),
                 "values": [
                     f"N#{notification.get('notification_id', '--')}",
-                    f"Alert {str(notification.get('alert_type', '--')).title()}",
+                    f"Posture Reminder {str(notification.get('alert_type', '--')).title()}",
                     str(notification.get("risk_level") or "--").title(),
+                    local_datetime(notification.get("emitted_at")),
+                    "--", "--", "SENT",
+                ],
+            })
+        for notification in eye_notifications:
+            if not isinstance(notification, dict):
+                continue
+            rows.append({
+                "sort_at": notification.get("emitted_at"),
+                "values": [
+                    f"E#{notification.get('eye_notification_id', '--')}",
+                    f"Eye Reminder {str(notification.get('alert_type', '--')).title()}",
+                    "Wellness",
+                    local_datetime(notification.get("emitted_at")),
+                    "--", "--", "SENT",
+                ],
+            })
+        for notification in screen_notifications:
+            if not isinstance(notification, dict):
+                continue
+            rows.append({
+                "sort_at": notification.get("emitted_at"),
+                "values": [
+                    f"S#{notification.get('screen_notification_id', '--')}",
+                    f"Distance Reminder {str(notification.get('alert_type', '--')).title()}",
+                    "Wellness",
                     local_datetime(notification.get("emitted_at")),
                     "--", "--", "SENT",
                 ],
@@ -176,7 +213,7 @@ class AlertHistoryDialog(QDialog):
                 "sort_at": alert.get("started_at"),
                 "values": [
                     f"W#{alert.get('event_id', '--')}",
-                    event_type_label(alert.get("event_type")),
+                    f"{event_type_label(alert.get('event_type'))} Episode",
                     "Wellness",
                     local_datetime(alert.get("started_at")),
                     local_datetime(ended),
@@ -196,6 +233,8 @@ class AlertHistoryDialog(QDialog):
         duration += sum(float(alert.get("duration") or 0) for alert in legacy)
         stats = (
             f"Risk events: {len(events)} | Notifications: {len(notifications)} | "
+            f"Eye reminders: {len(eye_notifications)} | "
+            f"Distance reminders: {len(screen_notifications)} | "
             f"Wellness episodes: {len(legacy)} | "
             f"Active: {active} | Incomplete: {incomplete} | "
             f"Recorded risk time: {duration_text(duration)}"

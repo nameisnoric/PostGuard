@@ -117,9 +117,16 @@ class DetectionService:
         timestamp = detection.get("timestamp")
         eye = detection.get("eye") if isinstance(detection.get("eye"), Mapping) else {}
         blink = eye.get("blink") if isinstance(eye.get("blink"), Mapping) else {}
+        eye_state = eye.get("state") if isinstance(eye.get("state"), Mapping) else {}
+        eye_observation_valid = (
+            eye.get("measurement_valid") is True
+            and eye_state.get("calibrated") is True
+            and eye_state.get("eye_state") in {"OPEN", "CLOSED"}
+        )
         blink_statistics = self.blink_statistics.update(
             blink_event=blink.get("blink_event") is True,
             timestamp=timestamp,
+            observation_valid=eye_observation_valid,
         )
 
         assessment = assess_current_posture(detection)

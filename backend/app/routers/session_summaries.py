@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.models.alert_event import AlertEvent
 from app.models.alert_notification import AlertNotification
+from app.models.eye_alert_notification import EyeAlertNotification
+from app.models.screen_distance_notification import ScreenDistanceNotification
 from app.models.risk_event import RiskEvent
 from app.models.session import PostureSession
 from app.models.session_summary import SessionSummary
@@ -83,9 +85,28 @@ def create_session_summary(
     notifications = db.scalars(
         select(AlertNotification).where(AlertNotification.session_id == session_id)
     ).all()
+    eye_notifications = db.scalars(
+        select(EyeAlertNotification).where(
+            EyeAlertNotification.session_id == session_id
+        )
+    ).all()
+    screen_notifications = db.scalars(
+        select(ScreenDistanceNotification).where(
+            ScreenDistanceNotification.session_id == session_id
+        )
+    ).all()
     wellness_events = [
         event for event in alert_events
         if event.event_type in {"SCREEN_DISTANCE", "LOW_BLINK_RATE"}
+    ]
+    # Explicit FIRST/REPEAT reminder rows represent user-visible alerts. Keep
+    # episodes for duration/history but do not count the same episode twice.
+    counted_wellness_events = [
+        event for event in wellness_events
+        if (
+            (event.event_type != "LOW_BLINK_RATE" or not eye_notifications)
+            and (event.event_type != "SCREEN_DISTANCE" or not screen_notifications)
+        )
     ]
 
     if risk_events:
@@ -107,7 +128,12 @@ def create_session_summary(
         high_risk_alert_count = sum(
             1 for item in notifications if item.risk_level == "HIGH"
         )
-        total_alert_count = len(notifications) + len(wellness_events)
+        total_alert_count = (
+            len(notifications)
+            + len(eye_notifications)
+            + len(screen_notifications)
+            + len(counted_wellness_events)
+        )
         risk_events_by_id = {
             event.risk_event_id: event for event in risk_events
         }
@@ -122,7 +148,9 @@ def create_session_summary(
                 event_counter.update(normalized_factors)
             else:
                 event_counter.update(["POSTURE_RISK"])
-        event_counter.update(event.event_type for event in wellness_events)
+        event_counter.update(event.event_type for event in counted_wellness_events)
+        event_counter.update("LOW_BLINK_RATE" for _ in eye_notifications)
+        event_counter.update("SCREEN_DISTANCE" for _ in screen_notifications)
     else:
         low_risk_duration = round(sum(
             alert.duration or 0 for alert in alert_events if alert.risk_level == "LOW"
@@ -142,11 +170,31 @@ def create_session_summary(
         high_risk_alert_count = sum(
             1 for alert in alert_events if alert.risk_level == "HIGH"
         )
-        total_alert_count = len(alert_events)
-        event_counter = Counter(alert.event_type for alert in alert_events)
+        counted_alert_events = [
+            event for event in alert_events
+            if (
+                (event.event_type != "LOW_BLINK_RATE" or not eye_notifications)
+                and (event.event_type != "SCREEN_DISTANCE" or not screen_notifications)
+            )
+        ]
+        total_alert_count = (
+            len(counted_alert_events)
+            + len(eye_notifications)
+            + len(screen_notifications)
+        )
+        event_counter = Counter(alert.event_type for alert in counted_alert_events)
+        event_counter.update("LOW_BLINK_RATE" for _ in eye_notifications)
+        event_counter.update("SCREEN_DISTANCE" for _ in screen_notifications)
 
     most_frequent_alert_event = (
         event_counter.most_common(1)[0][0] if event_counter else None
+    )
+    eye_alert_count = len(eye_notifications)
+    eye_first_alert_count = sum(
+        item.alert_type == "FIRST" for item in eye_notifications
+    )
+    eye_repeat_alert_count = sum(
+        item.alert_type == "REPEAT" for item in eye_notifications
     )
 
     # Build the stored report.
@@ -174,6 +222,9 @@ def create_session_summary(
         total_alert_count=total_alert_count,
 
         most_frequent_alert_event=most_frequent_alert_event,
+        eye_alert_count=eye_alert_count,
+        eye_first_alert_count=eye_first_alert_count,
+        eye_repeat_alert_count=eye_repeat_alert_count,
 
         blink_rate=request.blink_rate,
         data_gap_duration=request.data_gap_duration,

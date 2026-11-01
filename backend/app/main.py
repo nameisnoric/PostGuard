@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.database.database import SessionLocal, engine
-from app.routers import auth, health, cameras, personal_baselines, sessions, alert_events, session_summaries, settings, users, privacy, risk_persistence
+from app.routers import auth, health, cameras, personal_baselines, sessions, alert_events, session_summaries, settings, users, privacy, risk_persistence, eye_alert_notifications, screen_distance_notifications
 from app.services.account_deletion import purge_due_accounts
 from app.services.avatar_storage import get_avatar_storage
 
@@ -55,6 +55,8 @@ app.include_router(personal_baselines.router)
 app.include_router(sessions.router)
 app.include_router(alert_events.router)
 app.include_router(risk_persistence.router)
+app.include_router(eye_alert_notifications.router)
+app.include_router(screen_distance_notifications.router)
 app.include_router(session_summaries.router)
 app.include_router(users.router)
 app.include_router(settings.router)
