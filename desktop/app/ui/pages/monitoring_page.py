@@ -91,6 +91,9 @@ from app.vision.camera_setup.camera_reference_contract import (
     validate_locked_camera_reference,
     prepare_detection_frame,
 )
+from app.vision.mediapipe_detection.eye.blink_statistics import (
+    BlinkStatistics,
+)
 
 
 RISK_LEVELS = (
@@ -205,6 +208,22 @@ class MonitoringPage(QWidget):
         self.blink_detector = (
             BlinkDetectionService()
         )
+
+        self.last_blink_result = None
+
+        self.blink_statistics = (
+            BlinkStatistics(
+                window_seconds=60.0
+            )
+        )
+
+        self.last_blink_statistics = None
+
+        self.eye_alert_policy = (
+            EyeAlertPolicy()
+        )
+
+        self.last_eye_alert_result = None
 
         self.last_blink_result = None
 
@@ -2230,12 +2249,22 @@ class MonitoringPage(QWidget):
         # BLINK
         # ====================================================
 
+        blink_started_at = (
+            time.monotonic()
+        )
+
         self.blink_detector.reset(
             preserve_count=False,
-            now=time.monotonic(),
+            now=blink_started_at,
         )
 
         self.last_blink_result = None
+
+        self.blink_statistics.start(
+            timestamp=blink_started_at
+        )
+
+        self.last_blink_statistics = None
 
         self.eye_alert_policy.reset()
         self.last_eye_alert_result = None
@@ -3381,6 +3410,33 @@ class MonitoringPage(QWidget):
             blink_result
         )
 
+        blink_timestamp = (
+            blink_result.get(
+                "timestamp_monotonic"
+            )
+        )
+
+        if (
+            type(blink_timestamp)
+            in (int, float)
+            and
+            math.isfinite(
+                float(blink_timestamp)
+            )
+        ):
+            self.last_blink_statistics = (
+                self.blink_statistics.update(
+                    blink_event=bool(
+                        blink_result.get(
+                            "blink_event"
+                        )
+                    ),
+                    timestamp=float(
+                        blink_timestamp
+                    ),
+                )
+            )
+
         calibrated = (
             blink_result.get(
                 "calibrated"
@@ -4002,6 +4058,8 @@ class MonitoringPage(QWidget):
                     reason="CAMERA_DATA_GAP",
                 )
             )
+            self.blink_statistics.reset()
+            self.last_blink_statistics = None
 
             # ====================================================
             # INFORM VALIDATED PIPELINE
@@ -4683,7 +4741,15 @@ class MonitoringPage(QWidget):
         )
 
         self.last_blink_result = None
+        blink_started_at = (
+            time.monotonic()
+        )
 
+        self.blink_statistics.start(
+            timestamp=blink_started_at
+        )
+
+        self.last_blink_statistics = None
         # IMPORTANT:
         # Do not reset camera_movement_guard here. Keeping the
         # pre-gap reference allows the existing movement guard
