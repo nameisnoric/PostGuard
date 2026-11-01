@@ -503,6 +503,66 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertFalse(self.window.global_stop_button.isEnabled())
         self.assertFalse(monitor.pause_button.isEnabled())
 
+    def test_minimize_keeps_session_running_and_shows_compact_controls(self):
+        self.start_monitoring()
+        monitor = self.window.monitoring_page
+
+        self.window.showMinimized()
+        self.app.processEvents()
+        QTest.qWait(10)
+
+        mini = self.window.monitoring_mini_window
+        self.assertTrue(mini.isVisible())
+        self.assertEqual(monitor.session_id, 3)
+        self.assertFalse(monitor.is_paused)
+        self.assertTrue(monitor.timer.isActive())
+        self.assertIn("Session 3", mini.session_label.text())
+        self.assertEqual(mini.pause_button.text(), "Pause")
+        self.end.assert_not_called()
+
+        mini.restore_button.click()
+        self.app.processEvents()
+        self.assertFalse(self.window.isMinimized())
+        self.assertFalse(mini.isVisible())
+        self.assertIs(self.window.pages.currentWidget(), monitor)
+
+    def test_compact_controls_pause_resume_and_stop_the_same_session(self):
+        self.start_monitoring()
+        monitor = self.window.monitoring_page
+        mini = self.window.monitoring_mini_window
+        self.window.showMinimized()
+        self.app.processEvents()
+        QTest.qWait(10)
+
+        with patch.object(
+            APIClient,
+            "pause_session",
+            return_value=response({"session_id": 3, "status": "PAUSED", "pause_count": 1}),
+        ):
+            mini.pause_button.click()
+        self.assertTrue(monitor.is_paused)
+        self.assertEqual(monitor.session_id, 3)
+        self.assertEqual(mini.pause_button.text(), "Resume")
+
+        with patch.object(
+            APIClient,
+            "resume_session",
+            return_value=response({"session_id": 3, "status": "RUNNING", "paused_duration": 2}),
+        ):
+            mini.pause_button.click()
+        self.assertFalse(monitor.is_paused)
+        self.assertEqual(monitor.session_id, 3)
+
+        mini.stop_button.click()
+        self.app.processEvents()
+        self.assertFalse(self.window.isMinimized())
+        self.assertFalse(mini.isVisible())
+        self.assertIs(
+            self.window.pages.currentWidget(),
+            self.window.session_summary_page,
+        )
+        self.end.assert_called_once()
+
     def test_close_saves_before_clearing_credentials(self):
         self.start_monitoring()
         TokenStore.set_token("test-token")

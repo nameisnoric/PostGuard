@@ -47,6 +47,7 @@ class APITokenRefreshTests(unittest.TestCase):
             result = APIClient.login("user@ku.th", "wrong-password")
         self.assertIs(result, unauthorized)
         request.assert_called_once()
+        self.assertNotIn("Authorization", request.call_args.kwargs["headers"])
 
     def test_invalid_refresh_clears_credentials(self):
         TokenStore.set_session("expired-access", "expired-refresh", 1800)

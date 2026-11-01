@@ -129,6 +129,33 @@ class SessionRecoveryTests(unittest.TestCase):
         main_window.assert_not_called()
         login.deleteLater()
 
+    def test_login_reports_server_failure_separately_from_wrong_password(self):
+        login = LoginWindow()
+        login.email_input.setText("test@ku.th")
+        login.password_input.setText("correct-password")
+        with patch.object(
+            APIClient, "login", return_value=response({}, status=500)
+        ), patch.object(login, "show_error") as show_error:
+            login.handle_login()
+
+        show_error.assert_called_once_with(
+            "The PostGuard server is temporarily unavailable. Please try again."
+        )
+        self.assertTrue(login.login_button.isEnabled())
+        login.deleteLater()
+
+    def test_login_401_still_reports_invalid_credentials(self):
+        login = LoginWindow()
+        login.email_input.setText("test@ku.th")
+        login.password_input.setText("wrong-password")
+        with patch.object(
+            APIClient, "login", return_value=response({}, status=401)
+        ), patch.object(login, "show_error") as show_error:
+            login.handle_login()
+
+        show_error.assert_called_once_with("Invalid email or password.")
+        login.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()

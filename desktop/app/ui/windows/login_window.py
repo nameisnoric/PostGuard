@@ -89,25 +89,30 @@ class LoginWindow(QWidget):
             )
             return
 
+        self.login_button.setEnabled(False)
+        self.login_button.setText("Signing in...")
         try:
-            response = APIClient.login(
-                email,
-                password
-            )
+            try:
+                response = APIClient.login(email, password)
+            except requests.RequestException:
+                self.show_error("Cannot connect to the PostGuard server.")
+                return
 
-        except requests.RequestException:
-            self.show_error(
-                "Cannot connect to the PostGuard server."
-            )
-            return
+            if response.status_code != 200:
+                self.show_error(self._login_error(response))
+                return
 
-        if response.status_code != 200:
-            self.show_error(
-                "Invalid email or password."
-            )
-            return
-
-        login_data = response.json()
+            try:
+                login_data = response.json()
+            except (ValueError, AttributeError):
+                self.show_error("The server returned an invalid login response.")
+                return
+            if not isinstance(login_data, dict):
+                self.show_error("The server returned an invalid login response.")
+                return
+        finally:
+            self.login_button.setEnabled(True)
+            self.login_button.setText("เข้าสู่ระบบ")
 
         access_token = login_data.get(
             "access_token"
@@ -163,6 +168,22 @@ class LoginWindow(QWidget):
         self.close()
         self.main_window.check_previous_sessions()
         self.main_window.dashboard_page.refresh()
+
+    @staticmethod
+    def _login_error(response) -> str:
+        """Translate login HTTP failures without calling every error invalid credentials."""
+        if response.status_code == 401:
+            return "Invalid email or password."
+        if response.status_code == 429:
+            return "Too many login attempts. Please wait and try again."
+        if response.status_code >= 500:
+            return "The PostGuard server is temporarily unavailable. Please try again."
+        try:
+            payload = response.json()
+            detail = payload.get("detail") if isinstance(payload, dict) else None
+        except (ValueError, AttributeError):
+            detail = None
+        return str(detail or "Unable to sign in. Please try again.")
 
     def open_password_reset(self):
         from app.ui.dialogs.password_reset_dialog import PasswordResetDialog

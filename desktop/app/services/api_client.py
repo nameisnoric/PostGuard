@@ -44,10 +44,10 @@ class APIClient:
         return APIClient.post(f"/sessions/{session_id}/interrupt")
 
     @staticmethod
-    def _get_headers() -> dict:
+    def _get_headers(*, include_auth: bool = True) -> dict:
         headers = {"Content-Type": "application/json"}
         token = TokenStore.get_token()
-        if token:
+        if include_auth and token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
 
@@ -93,7 +93,8 @@ class APIClient:
     @staticmethod
     def _request(method: str, endpoint: str, **kwargs):
         token = TokenStore.get_token()
-        authenticated = bool(token and endpoint not in APIClient._public_auth_endpoints)
+        public_endpoint = endpoint in APIClient._public_auth_endpoints
+        authenticated = bool(token and not public_endpoint)
         if authenticated and TokenStore.should_refresh():
             try:
                 APIClient._refresh_access_token()
@@ -101,7 +102,7 @@ class APIClient:
                 pass
 
         token = TokenStore.get_token()
-        kwargs["headers"] = APIClient._get_headers()
+        kwargs["headers"] = APIClient._get_headers(include_auth=not public_endpoint)
         response = getattr(requests, method)(
             f"{API_BASE_URL}{endpoint}",
             **kwargs,

@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -97,14 +98,14 @@ class MonitoringPage(QWidget):
         content = QWidget()
         content.setProperty("page", True)
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(24, 20, 24, 24)
-        layout.setSpacing(12)
+        layout.setContentsMargins(28, 20, 28, 28)
+        layout.setSpacing(10)
         scroll.setWidget(content)
 
         self.title_label = QLabel("Real-time Monitoring")
         self.title_label.setProperty("role", "title")
         self.description_label = QLabel(
-            "กล้องจะตรวจจับต่อเนื่องขณะเปิดหน้า Dashboard หรือ History"
+            "Live camera, posture measurements, and alert status."
         )
         self.description_label.setProperty("role", "muted")
 
@@ -151,19 +152,23 @@ class MonitoringPage(QWidget):
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
-        info_layout = QVBoxLayout(info_group)
+        info_layout = QGridLayout(info_group)
+        info_layout.setHorizontalSpacing(20)
+        info_layout.setVerticalSpacing(6)
         self.camera_label = QLabel('กล้อง: -')
         self.baseline_label = QLabel('Baseline ID: -')
         self.session_label = QLabel('Session ID: -')
         self.baseline_shoulder_label = QLabel('ค่าอ้างอิงความเอียงไหล่: -')
         self.baseline_neck_label = QLabel('ค่าอ้างอิงความเอียงคอด้านข้าง: -')
         self.status_label = QLabel('สถานะ: ยังไม่เริ่ม')
-        for label in (
-            self.camera_label, self.baseline_label, self.session_label,
-            self.baseline_shoulder_label, self.baseline_neck_label,
-            self.status_label,
-        ):
-            info_layout.addWidget(label)
+        info_layout.addWidget(self.camera_label, 0, 0)
+        info_layout.addWidget(self.session_label, 0, 1)
+        info_layout.addWidget(self.baseline_label, 1, 0)
+        info_layout.addWidget(self.status_label, 1, 1)
+        info_layout.addWidget(self.baseline_shoulder_label, 2, 0)
+        info_layout.addWidget(self.baseline_neck_label, 2, 1)
+        info_layout.setColumnStretch(0, 1)
+        info_layout.setColumnStretch(1, 1)
 
         return info_group
 
@@ -218,9 +223,7 @@ class MonitoringPage(QWidget):
         self.alert_label = QLabel("Alert: Waiting")
         self.alert_label.setWordWrap(True)
         self.risk_note_label = QLabel(
-            "คะแนนแสดงเป็น 0–100% โดยแปลงจากค่า RULA-adapted ภายใน 1–7 "
-            "สำหรับกล้องด้านหน้า โดยใช้มุมคอ "
-            "การเอียงคอ ความไม่สมดุลของไหล่ และระยะเวลาค้างท่า ไม่ใช่ Full RULA"
+            "RULA-adapted estimate from neck angle, shoulder balance, and posture duration."
         )
         self.risk_note_label.setWordWrap(True)
         for label in (
@@ -245,10 +248,9 @@ class MonitoringPage(QWidget):
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.handle_stop)
 
-        button_layout.addWidget(self.stop_button)
         button_layout.addWidget(self.pause_button)
-        button_layout.setStretch(0, 1)
-        button_layout.setStretch(1, 1)
+        button_layout.addStretch()
+        button_layout.addWidget(self.stop_button)
 
         return button_layout
 

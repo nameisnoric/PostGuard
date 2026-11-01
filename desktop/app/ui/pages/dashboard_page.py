@@ -353,48 +353,47 @@ class DashboardPage(QWidget):
         content = QWidget()
         content.setProperty("page", True)
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(32, 24, 32, 32)
-        layout.setSpacing(16)
+        layout.setContentsMargins(28, 20, 28, 28)
+        layout.setSpacing(14)
         scroll.setWidget(content)
 
-        welcome, welcome_layout = self._card("welcome")
-        welcome_row = QHBoxLayout()
-        welcome_copy = QVBoxLayout()
+        header = QHBoxLayout()
+        header_copy = QVBoxLayout()
+        header_copy.setSpacing(2)
         name = user_data.get("full_name") or user_data.get("username") or "User"
-        welcome_copy.addWidget(self._label(f"Welcome back, {name}", "title"))
-        welcome_copy.addWidget(self._label(
-            "ตรวจสอบ Session ที่บันทึกไว้ หรือทำ Session ปัจจุบันต่อ", "muted"
-        ))
-        welcome_row.addLayout(welcome_copy, 1)
-        welcome_row.addWidget(
-            self._label("POSTGUARD DESKTOP", "eyebrow"),
-            0,
-            Qt.AlignmentFlag.AlignTop,
-        )
-        welcome_layout.addLayout(welcome_row)
-        layout.addWidget(welcome)
+        header_copy.addWidget(self._label("Dashboard", "title"))
+        header_copy.addWidget(self._label(f"Welcome back, {name}", "muted"))
+        header.addLayout(header_copy, 1)
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.refresh)
+        header.addWidget(self.refresh_button, 0, Qt.AlignmentFlag.AlignBottom)
+        layout.addLayout(header)
 
-        self.live_label = self._label("พร้อมเมื่อคุณพร้อม", "heading")
+        session_card, session_layout = self._card()
+        session_row = QHBoxLayout()
+        session_copy = QVBoxLayout()
+        session_copy.setSpacing(3)
+        self.live_label = self._label("No monitoring session", "heading")
         self.live_note = self._label(
-            "เลือกกล้อง ตรวจสอบ Camera Preview และบันทึก Personal Baseline",
+            "Start a session to check your camera and create a personal baseline.",
             "muted",
         )
-        layout.addWidget(self.live_label)
-        layout.addWidget(self.live_note)
+        session_copy.addWidget(self.live_label)
+        session_copy.addWidget(self.live_note)
+        session_row.addLayout(session_copy, 1)
 
         actions = QHBoxLayout()
+        actions.setSpacing(8)
         self.monitor_button = QPushButton("Start Monitoring")
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.clicked.connect(self.monitor_requested.emit)
         self.history_button = QPushButton("View History")
         self.history_button.clicked.connect(self.history_requested.emit)
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.clicked.connect(self.refresh)
-        actions.addWidget(self.monitor_button)
         actions.addWidget(self.history_button)
-        actions.addStretch()
-        actions.addWidget(self.refresh_button)
-        layout.addLayout(actions)
+        actions.addWidget(self.monitor_button)
+        session_row.addLayout(actions)
+        session_layout.addLayout(session_row)
+        layout.addWidget(session_card)
 
         summary_grid = QGridLayout()
         summary_grid.setHorizontalSpacing(12)
@@ -440,6 +439,8 @@ class DashboardPage(QWidget):
             QHeaderView.ResizeMode.Stretch
         )
         self.recent_table.verticalHeader().setVisible(False)
+        self.recent_table.verticalHeader().setDefaultSectionSize(40)
+        self.recent_table.setShowGrid(False)
         self.recent_table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )

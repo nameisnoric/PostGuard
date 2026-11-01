@@ -1,6 +1,6 @@
 import requests
 
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QEvent, QSize, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -30,6 +30,7 @@ from app.ui.pages.profile_page import ProfilePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import APP_QSS, polish, set_centered_window
 from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
+from app.ui.windows.monitoring_mini_window import MonitoringMiniWindow
 
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import (
@@ -60,10 +61,10 @@ class MainWindow(QMainWindow):
 
         navigation = QWidget()
         navigation.setObjectName("topNavigation")
-        navigation.setFixedHeight(72)
+        navigation.setFixedHeight(64)
         navigation_layout = QHBoxLayout(navigation)
-        navigation_layout.setContentsMargins(32, 0, 24, 0)
-        navigation_layout.setSpacing(6)
+        navigation_layout.setContentsMargins(28, 0, 20, 0)
+        navigation_layout.setSpacing(4)
 
         app_title = QLabel("PostGuard")
         app_title.setObjectName("brandLabel")
@@ -81,6 +82,7 @@ class MainWindow(QMainWindow):
         self.account_button.setText(self._account_initials())
         self.account_button.setProperty("account", True)
         self.account_button.setProperty("accountActive", False)
+        self.account_button.setToolTip("Account")
         self.account_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         account_menu = QMenu(self.account_button)
         self.profile_action = account_menu.addAction("Profile")
@@ -143,6 +145,16 @@ class MainWindow(QMainWindow):
 
         self.profile_page = ProfilePage(self.user_data)
         self.settings_page = SettingsPage(self.monitoring_page.sound_player)
+        self.monitoring_mini_window = MonitoringMiniWindow()
+        self.monitoring_mini_window.restore_requested.connect(
+            self.restore_from_monitoring_mini_window
+        )
+        self.monitoring_mini_window.pause_requested.connect(
+            self.monitoring_page.handle_pause_resume
+        )
+        self.monitoring_mini_window.stop_requested.connect(
+            self.stop_from_monitoring_mini_window
+        )
         self._update_account_avatar()
 
         # ========================================
@@ -540,6 +552,53 @@ class MainWindow(QMainWindow):
             monitor.session_id, monitor.is_paused, monitor.is_stopping,
             monitor.capture is not None,
         )
+        self.monitoring_mini_window.sync_state(
+            monitor.session_id,
+            paused=monitor.is_paused,
+            stopping=monitor.is_stopping,
+            camera_available=monitor.capture is not None,
+        )
+        if active and self.isMinimized():
+            self.monitoring_mini_window.show_near_screen_corner(self.screen())
+        elif not self.isMinimized():
+            self.monitoring_mini_window.hide()
+
+    def restore_from_monitoring_mini_window(self) -> None:
+        """Return to the running session from the compact controller."""
+
+        self.monitoring_mini_window.hide()
+        self.showNormal()
+        self.show()
+        if self.monitoring_page.session_id is not None:
+            self.pages.setCurrentWidget(self.monitoring_page)
+        self.raise_()
+        self.activateWindow()
+
+    def stop_from_monitoring_mini_window(self) -> None:
+        """Show the app, then use the normal end-and-save session workflow."""
+
+        self.restore_from_monitoring_mini_window()
+        self.monitoring_page.handle_stop()
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() != QEvent.Type.WindowStateChange:
+            return
+        # Defer until the platform has completed minimizing the main window.
+        QTimer.singleShot(0, self._sync_monitoring_mini_window_visibility)
+
+    def _sync_monitoring_mini_window_visibility(self) -> None:
+        monitor = self.monitoring_page
+        if self.isMinimized() and monitor.session_id is not None:
+            self.monitoring_mini_window.sync_state(
+                monitor.session_id,
+                paused=monitor.is_paused,
+                stopping=monitor.is_stopping,
+                camera_available=monitor.capture is not None,
+            )
+            self.monitoring_mini_window.show_near_screen_corner(self.screen())
+            return
+        self.monitoring_mini_window.hide()
 
     def check_previous_sessions(self) -> bool:
         if self.monitoring_page.session_id is not None:
@@ -615,6 +674,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self._exit_ready = True
+        self.monitoring_mini_window.shutdown()
         TokenStore.clear_token()
         event.accept()
 
