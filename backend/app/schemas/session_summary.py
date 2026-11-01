@@ -128,6 +128,10 @@ class SessionSummaryCreate(
         allow_inf_nan=False
     )
 
+    # ========================================================
+    # POSTGUARD RISK SCORE
+    # ========================================================
+
     average_risk_score: (
         float | None
     ) = Field(
@@ -152,10 +156,12 @@ class SessionSummaryCreate(
         le=100.0,
     )
 
-    risk_score_method: str | None = Field(
+    risk_score_method: (
+        str | None
+    ) = Field(
         default=None,
         max_length=40,
-    )   
+    )
 
     risk_score_buckets: list[
         SessionRiskScoreBucketCreate
@@ -163,8 +169,35 @@ class SessionSummaryCreate(
         default_factory=list
     )
 
-    
-    blink_rate: float | None = None
+    # ========================================================
+    # BLINK SUMMARY
+    # ========================================================
+
+    blink_rate: (
+        float | None
+    ) = Field(
+        default=None,
+        ge=0.0,
+    )
+
+    # ========================================================
+    # CAMERA / DATA GAP SUMMARY
+    # ========================================================
+
+    data_gap_duration: float = Field(
+        default=0.0,
+        ge=0.0,
+    )
+
+    camera_loss_count: int = Field(
+        default=0,
+        ge=0,
+        strict=True,
+    )
+
+    # ========================================================
+    # DETECTION SUMMARY
+    # ========================================================
 
     detection_count: int = Field(
         default=0,
@@ -184,8 +217,17 @@ class SessionSummaryCreate(
         strict=True,
     )
 
-    average_shoulder: float | None = None
-    average_neck: float | None = None
+    average_shoulder: (
+        float | None
+    ) = None
+
+    average_neck: (
+        float | None
+    ) = None
+
+    # ========================================================
+    # VALIDATION
+    # ========================================================
 
     @model_validator(
         mode="after"
@@ -299,22 +341,53 @@ class SessionSummaryResponse(
     summary_id: int
     session_id: int
 
-    average_risk_score: float | None
-    minimum_risk_score: float | None
-    maximum_risk_score: float | None
+    # ========================================================
+    # POSTGUARD RISK SCORE
+    # ========================================================
 
-    risk_score_method: str | None
+    average_risk_score: (
+        float | None
+    )
+
+    minimum_risk_score: (
+        float | None
+    )
+
+    maximum_risk_score: (
+        float | None
+    )
+
+    risk_score_method: (
+        str | None
+    )
+
+    # ========================================================
+    # DETECTION SUMMARY
+    # ========================================================
 
     detection_count: int
     pose_detected_count: int
     face_detected_count: int
 
-    average_shoulder: float | None
-    average_neck: float | None
+    average_shoulder: (
+        float | None
+    )
+
+    average_neck: (
+        float | None
+    )
+
+    # ========================================================
+    # RISK EVENT DURATION
+    # ========================================================
 
     low_risk_duration: int
     medium_risk_duration: int
     high_risk_duration: int
+
+    # ========================================================
+    # POSTURE ALERT COUNTS
+    # ========================================================
 
     low_risk_alert_count: int
     medium_risk_alert_count: int
@@ -326,11 +399,28 @@ class SessionSummaryResponse(
         str | None
     )
 
+    # ========================================================
+    # EYE REMINDER COUNTS
+    # ========================================================
+
     eye_alert_count: int
     eye_first_alert_count: int
     eye_repeat_alert_count: int
 
-    blink_rate: float | None
+    # ========================================================
+    # BLINK SUMMARY
+    # ========================================================
+
+    blink_rate: (
+        float | None
+    )
+
+    # ========================================================
+    # CAMERA / DATA GAP SUMMARY
+    # ========================================================
+
+    data_gap_duration: float
+    camera_loss_count: int
 
     model_config = ConfigDict(
         from_attributes=True

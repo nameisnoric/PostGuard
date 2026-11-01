@@ -492,6 +492,23 @@ def build_summary_payload(
             )
         ),
 
+        "data_gap_duration": (
+            _optional_float(
+                summary.get(
+                    "data_gap_duration",
+                    0.0,
+                )
+            )
+           ),
+        "camera_loss_count": (
+            _count(
+                summary.get(
+                    "camera_loss_count",
+                    0,
+                )
+            )
+        ),
+
         # ----------------------------------------------------
         # Detection Summary
         # ----------------------------------------------------

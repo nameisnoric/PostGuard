@@ -94,6 +94,9 @@ from app.vision.camera_setup.camera_reference_contract import (
 from app.vision.mediapipe_detection.eye.blink_statistics import (
     BlinkStatistics,
 )
+from app.services.camera_loss_tracker import (
+    CameraLossTracker,
+)
 
 
 RISK_LEVELS = (
@@ -191,10 +194,20 @@ class MonitoringPage(QWidget):
                 CameraMovementConfig(
                     analysis_width=640,
                     sample_every_frames=3,
-                    translation_ratio_threshold=0.008,
-                    rotation_threshold_deg=1.20,
-                    scale_change_threshold=0.025,
-                    consecutive_hits=2,
+                    warmup_samples=20,
+
+                    min_tracked_points=18,
+                    min_inlier_ratio=0.55,
+
+                    translation_ratio_threshold=0.012,
+                    rotation_threshold_deg=1.50,
+                    scale_change_threshold=0.030,
+
+                    min_region_inliers=2,
+                    min_active_regions=3,
+
+                    confirmation_window=5,
+                    confirmation_hits=3,
                 )
             )
         )
@@ -348,6 +361,10 @@ class MonitoringPage(QWidget):
         )
 
         self._setup_ui()
+
+        self.camera_loss_tracker = (
+            CameraLossTracker()
+        )
 
     # ========================================================
     # TEMPORARY OLD TEST COMPATIBILITY
@@ -1935,6 +1952,8 @@ class MonitoringPage(QWidget):
             )
 
             return False
+
+        self.camera_loss_tracker.reset()
 
         # ====================================================
         # LOAD BASELINE
@@ -3974,6 +3993,9 @@ class MonitoringPage(QWidget):
     ) -> None:
 
         now = time.monotonic()
+        self.camera_loss_tracker.begin(
+            now
+        )
 
         # ====================================================
         # FIRST FAILED FRAME
@@ -4507,6 +4529,10 @@ class MonitoringPage(QWidget):
             "กำลังประเมินใหม่"
         )
 
+        self.camera_loss_tracker.recover(
+            time.monotonic()
+        )
+
 
     # ========================================================
     # CAMERA GAP TIMEOUT
@@ -4902,6 +4928,97 @@ class MonitoringPage(QWidget):
             )
         )
 
+        if movement_result.get("status") in {
+            "STABLE",
+            "MOVED",
+            "UNAVAILABLE",
+        }:
+            print(
+                "[CAMERA_MOVEMENT]",
+                "status=",
+                movement_result.get("status"),
+                "| reason=",
+                movement_result.get("reason"),
+                "| translation_px=",
+                round(
+                    float(
+                        movement_result.get(
+                            "translation_px",
+                            0.0,
+                        )
+                    ),
+                    2,
+                ),
+                "| ratio=",
+                round(
+                    float(
+                        movement_result.get(
+                            "translation_ratio",
+                            0.0,
+                        )
+                    ),
+                    5,
+                ),
+                "| rotation=",
+                round(
+                    float(
+                        movement_result.get(
+                            "rotation_deg",
+                            0.0,
+                        )
+                    ),
+                    2,
+                ),
+                "| scale_change=",
+                round(
+                    float(
+                        movement_result.get(
+                            "scale_change",
+                            0.0,
+                        )
+                    )
+                    * 100.0,
+                    2,
+                ),
+                "%",
+                "| inliers=",
+                movement_result.get(
+                    "inlier_count"
+                ),
+                "| inlier_ratio=",
+                movement_result.get(
+                    "inlier_ratio"
+                ),
+                "| spatial=",
+                movement_result.get(
+                    "spatial_support_valid"
+                ),
+                "| regions=",
+                movement_result.get(
+                    "active_regions"
+                ),
+                "| TL/TR/BL/BR=",
+                movement_result.get(
+                    "top_left_inliers"
+                ),
+                movement_result.get(
+                    "top_right_inliers"
+                ),
+                movement_result.get(
+                    "bottom_left_inliers"
+                ),
+                movement_result.get(
+                    "bottom_right_inliers"
+                ),
+                "| votes=",
+                movement_result.get(
+                    "movement_votes"
+                ),
+                "/",
+                movement_result.get(
+                    "movement_window"
+                ),
+            )
         if (
             movement_result.get(
                 "status"
@@ -5785,6 +5902,12 @@ class MonitoringPage(QWidget):
             self.last_screen_distance_result
             or
             {}
+        )
+
+        camera_gap_duration = (
+            self.camera_loss_tracker.duration(
+                time.monotonic()
+            )
         )
 
         return {

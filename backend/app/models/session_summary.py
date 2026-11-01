@@ -40,10 +40,6 @@ class SessionSummary(Base):
     # available for this Session.
     # ========================================================
 
-    # ========================================================
-    # POSTGUARD RISK SCORE
-    # ========================================================
-
     average_risk_score: Mapped[
         float | None
     ] = mapped_column(
@@ -76,19 +72,25 @@ class SessionSummary(Base):
     # DETECTION SUMMARY
     # ========================================================
 
-    detection_count: Mapped[int] = mapped_column(
+    detection_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    pose_detected_count: Mapped[int] = mapped_column(
+    pose_detected_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    face_detected_count: Mapped[int] = mapped_column(
+    face_detected_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -115,19 +117,25 @@ class SessionSummary(Base):
     # Validated pipeline calls this MODERATE.
     # ========================================================
 
-    low_risk_duration: Mapped[int] = mapped_column(
+    low_risk_duration: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    medium_risk_duration: Mapped[int] = mapped_column(
+    medium_risk_duration: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    high_risk_duration: Mapped[int] = mapped_column(
+    high_risk_duration: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -137,25 +145,33 @@ class SessionSummary(Base):
     # ALERT NOTIFICATION COUNTS
     # ========================================================
 
-    low_risk_alert_count: Mapped[int] = mapped_column(
+    low_risk_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    medium_risk_alert_count: Mapped[int] = mapped_column(
+    medium_risk_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    high_risk_alert_count: Mapped[int] = mapped_column(
+    high_risk_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    total_alert_count: Mapped[int] = mapped_column(
+    total_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -172,19 +188,25 @@ class SessionSummary(Base):
     # EYE REMINDER COUNTS
     # ========================================================
 
-    eye_alert_count: Mapped[int] = mapped_column(
+    eye_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    eye_first_alert_count: Mapped[int] = mapped_column(
+    eye_first_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    eye_repeat_alert_count: Mapped[int] = mapped_column(
+    eye_repeat_alert_count: Mapped[
+        int
+    ] = mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -199,4 +221,24 @@ class SessionSummary(Base):
     ] = mapped_column(
         Float,
         nullable=True,
+    )
+
+    # ========================================================
+    # CAMERA / DATA GAP SUMMARY
+    # ========================================================
+
+    data_gap_duration: Mapped[
+        float
+    ] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.0,
+    )
+
+    camera_loss_count: Mapped[
+        int
+    ] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
     )
