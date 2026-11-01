@@ -25,6 +25,7 @@ from app.routers import (
     users,
     privacy,
     risk_persistence,
+    eye_alert_notifications,
 )
 
 from app.services.account_deletion import (
@@ -169,6 +170,14 @@ app.include_router(
 
 app.include_router(
     risk_persistence.router
+)
+
+# ------------------------------------------------------------
+# Eye Reminder persistence
+# ------------------------------------------------------------
+
+app.include_router(
+    eye_alert_notifications.router
 )
 
 # ------------------------------------------------------------

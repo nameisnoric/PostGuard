@@ -169,7 +169,29 @@ class SessionSummary(Base):
     )
 
     # ========================================================
-    # FUTURE BLINK SUMMARY
+    # EYE REMINDER COUNTS
+    # ========================================================
+
+    eye_alert_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    eye_first_alert_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    eye_repeat_alert_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    # ========================================================
+    # BLINK SUMMARY
     # ========================================================
 
     blink_rate: Mapped[

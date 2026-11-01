@@ -418,7 +418,11 @@ class SessionSummaryPage(
         )
 
         self.report_alert_count_label = QLabel(
-            "จำนวนการแจ้งเตือนที่บันทึก: --"
+            "Posture Alerts ที่บันทึก: --"
+        )
+
+        self.eye_alert_count_label = QLabel(
+            "Eye Reminders ที่บันทึก: --"
         )
 
         self.frequent_event_label = QLabel(
@@ -436,6 +440,7 @@ class SessionSummaryPage(
         for widget in (
             self.blink_rate_label,
             self.report_alert_count_label,
+            self.eye_alert_count_label,
             self.frequent_event_label,
             self.risk_breakdown_label,
         ):
@@ -1268,7 +1273,7 @@ class SessionSummaryPage(
 
         self.report_alert_count_label.setText(
             (
-                "จำนวนการแจ้งเตือนที่บันทึก: "
+                "Posture Alerts ที่บันทึก: "
                 +
                 (
                     str(
@@ -1277,6 +1282,25 @@ class SessionSummaryPage(
                     if alert_count is not None
                     else "N/A"
                 )
+            )
+        )
+
+        eye_alert_count = report_metrics.get(
+            "eye_alert_count"
+        )
+        eye_first_count = report_metrics.get(
+            "eye_first_alert_count"
+        )
+        eye_repeat_count = report_metrics.get(
+            "eye_repeat_alert_count"
+        )
+
+        self.eye_alert_count_label.setText(
+            (
+                "Eye Reminders ที่บันทึก: "
+                f"{eye_alert_count if eye_alert_count is not None else 'N/A'} "
+                f"(FIRST {eye_first_count if eye_first_count is not None else 'N/A'}, "
+                f"REPEAT {eye_repeat_count if eye_repeat_count is not None else 'N/A'})"
             )
         )
 
@@ -1648,6 +1672,29 @@ class SessionSummaryPage(
                     )
                 )
 
+            eye_response = (
+                APIClient
+                .get_session_eye_alert_notifications(
+                    session_id
+                )
+            )
+
+            if not eye_response.ok:
+                raise RuntimeError(
+                    "GET eye-alert-notifications returned "
+                    f"HTTP {eye_response.status_code}"
+                )
+
+            eye_notifications = eye_response.json()
+
+            if not isinstance(
+                eye_notifications,
+                list,
+            ):
+                raise ValueError(
+                    "Invalid Eye Alert Notification response."
+                )
+
         except (
             requests.RequestException,
             RuntimeError,
@@ -1732,6 +1779,30 @@ class SessionSummaryPage(
             notifications
         )
 
+        eye_notification_count = len(
+            eye_notifications
+        )
+
+        eye_first_count = sum(
+            1
+            for notification
+            in eye_notifications
+            if (
+                isinstance(notification, dict)
+                and notification.get("alert_type") == "FIRST"
+            )
+        )
+
+        eye_repeat_count = sum(
+            1
+            for notification
+            in eye_notifications
+            if (
+                isinstance(notification, dict)
+                and notification.get("alert_type") == "REPEAT"
+            )
+        )
+
         first_count = sum(
             1
             for notification
@@ -1788,12 +1859,16 @@ class SessionSummaryPage(
 
         self.alert_total_label.setText(
             (
-                "การแจ้งเตือนทั้งหมด: "
+                "Posture Alerts: "
                 f"{notification_count} ครั้ง "
                 f"(ครั้งแรก {first_count}, "
                 f"ซ้ำ {repeat_count}, "
                 "ระดับความเสี่ยงเพิ่มขึ้น "
-                f"{escalation_count})"
+                f"{escalation_count}) "
+                "| Eye Reminders: "
+                f"{eye_notification_count} ครั้ง "
+                f"(FIRST {eye_first_count}, "
+                f"REPEAT {eye_repeat_count})"
             )
         )
 

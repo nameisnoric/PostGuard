@@ -42,16 +42,27 @@ class AlertHistoryDialogTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def make_dialog(self, notifications):
+    def make_dialog(
+        self,
+        notifications,
+        eye_notifications=None,
+    ):
         """
-        สร้าง Dialog โดย mock API ทั้งสองจุดที่ constructor ใช้งานจริง
+        สร้าง AlertHistoryDialog โดย mock API ที่ constructor ใช้งานจริง
 
         1. get_sessions()
-           ใช้สร้าง Session Selector
+        ใช้สร้าง Session Selector
 
         2. get_session_alert_notifications()
-           ใช้โหลด AlertNotification ของ session ที่เลือก
+        ใช้โหลด Posture Alert Notifications
+
+        3. get_session_eye_alert_notifications()
+        ใช้โหลด Eye Reminder Notifications
         """
+
+        if eye_notifications is None:
+            eye_notifications = []
+
         sessions = [
             {
                 "session_id": 11,
@@ -65,18 +76,30 @@ class AlertHistoryDialogTests(unittest.TestCase):
             },
         ]
 
-        with patch.object(
-            APIClient,
-            "get_sessions",
-            return_value=response(sessions),
-        ), patch.object(
-            APIClient,
-            "get_session_alert_notifications",
-            return_value=response(notifications),
+        with (
+            patch.object(
+                APIClient,
+                "get_sessions",
+                return_value=response(sessions),
+            ),
+            patch.object(
+                APIClient,
+                "get_session_alert_notifications",
+                return_value=response(notifications),
+            ),
+            patch.object(
+                APIClient,
+                "get_session_eye_alert_notifications",
+                return_value=response(eye_notifications),
+            ),
         ):
-            dialog = AlertHistoryDialog(session_id=12)
+            dialog = AlertHistoryDialog(
+                session_id=12
+            )
 
-        self.addCleanup(dialog.deleteLater)
+        self.addCleanup(
+            dialog.deleteLater
+        )
 
         return dialog
 
@@ -247,6 +270,57 @@ class AlertHistoryDialogTests(unittest.TestCase):
             stats,
         )
 
+    def test_eye_reminder_row_is_rendered(self):
+        eye_notifications = [
+            {
+                "eye_notification_id": 5,
+                "session_id": 12,
+                "alert_type": "REPEAT",
+                "blink_rate": 3.0,
+                "window_blink_count": 3,
+                "decision": "ALERT",
+                "reason": "LOW_BLINK_REPEAT_READY",
+                "emitted_at": "2026-11-01T08:12:41Z",
+                "created_at": "2026-11-01T08:12:41Z",
+            }
+        ]
+
+        dialog = self.make_dialog(
+            notifications=[],
+            eye_notifications=eye_notifications,
+        )
+
+        self.assertEqual(
+            dialog.table.rowCount(),
+            1,
+        )
+
+        self.assertEqual(
+            dialog.table.item(0, 0).text(),
+            "EYE-5",
+        )
+
+        self.assertEqual(
+            dialog.table.item(0, 2).text(),
+            "REPEAT",
+        )
+
+        self.assertEqual(
+            dialog.table.item(0, 3).text(),
+            "EYE",
+        )
+
+        self.assertIn(
+            "LOW_BLINK_REPEAT_READY",
+            dialog.table.item(0, 5).text(),
+        )
+
+        stats = dialog.stats_label.text()
+
+        self.assertIn(
+            "Eye: 1",
+            stats,
+        )
 
 if __name__ == "__main__":
     unittest.main()

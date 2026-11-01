@@ -19,6 +19,10 @@ from app.services.personal_baseline_service import (
     PersonalBaselineConfig,
 )
 from app.ui.windows.main_window import MainWindow
+from app.vision.camera_setup.camera_reference_contract import (
+    ROLL_CORRECTION_USER_CONFIRMED,
+    lock_camera_reference,
+)
 
 
 def response(data, status=200):
@@ -35,9 +39,23 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.addCleanup(self.stack.close)
         self.stack.enter_context(redirect_stdout(StringIO()))
         for method in ("information", "warning", "critical"):
-            self.stack.enter_context(patch("PySide6.QtWidgets.QMessageBox." + method))
+            self.stack.enter_context(
+                patch(
+                    "PySide6.QtWidgets.QMessageBox." + method
+                )
+            )
         self.camera = dict(camera_id=1, device_index=0, camera_name="Test", resolution_width=640, resolution_height=360)
-        self.baseline = dict(baseline_id=2, camera_id=1, shoulder_angle=1.0, lateral_tilt_baseline=2.0)
+        self.baseline = dict(
+            baseline_id=2,
+            camera_id=1,
+            shoulder_angle=1.0,
+            lateral_tilt_baseline=2.0,
+            # Resolution Compatibility contract:
+            # Monitoring must use the same actual frame resolution
+            # that was stored when the Personal Baseline was created.
+            camera_frame_width=640,
+            camera_frame_height=360,
+        )
         self.camera_reference = {
             "status": "VALID",
             "frame_width": 640,
@@ -48,12 +66,22 @@ class DesktopWorkflowTests(unittest.TestCase):
             "scale_y": 3.50,
             "scale_avg": 3.50,
             "card_roll_deg": 0.5,
-            "roll_correction_deg": 2.5,
-            "roll_correction_source": "AUTO_CONFIRMED",
             "horizontal_perspective": 0.02,
             "vertical_perspective": 0.03,
             "captured_at": "2026-10-15T12:00:00+00:00",
         }
+        # Helper-based monitoring tests skip the interactive Camera Setup page.
+        # Give those tests a separately locked Camera Reference that matches
+        # the production camera-reference-v2 contract. Keep self.camera raw so
+        # the full Preview -> Camera Setup -> Baseline -> Monitoring test still
+        # exercises the real locking flow.
+        self.monitoring_camera = self.camera.copy()
+        self.monitoring_camera["camera_calibration"] = lock_camera_reference(
+            self.monitoring_camera,
+            self.camera_reference,
+            roll_correction_deg=0.0,
+            roll_correction_source=ROLL_CORRECTION_USER_CONFIRMED,
+        )
         self.result = dict(
             contract_version="1.0",
             timestamp=1.0,
@@ -138,6 +166,16 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.start = self.stack.enter_context(patch.object(APIClient, "start_session", return_value=response({"session_id": 3, "status": "RUNNING"}, 201)))
         self.end = self.stack.enter_context(patch.object(APIClient, "end_session", return_value=response({"session_id": 3, "status": "COMPLETED", "total_duration": 100})))
         self.save = self.stack.enter_context(patch.object(APIClient, "post", return_value=response({"session_id": 3}, 201)))
+
+        self.find_unclosed_sessions = (
+            self.stack.enter_context(
+                patch(
+                    "app.ui.windows.main_window.find_unclosed_sessions",
+                    return_value=[],
+                )
+            )
+        )
+
         self.window = MainWindow({"username": "test"})
         self.stack.enter_context(patch.object(self.window.dashboard_page, "refresh"))
         self.window.show()
@@ -154,7 +192,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.window.deleteLater()
 
     def start_monitoring(self):
-        self.window.show_monitoring_page(self.camera, 2)
+        self.window.show_monitoring_page(self.monitoring_camera, 2)
         self.assertEqual(self.window.monitoring_page.session_id, 3)
 
     def test_detected_camera_selection_opens_preview(self):
@@ -272,8 +310,17 @@ class DesktopWorkflowTests(unittest.TestCase):
         camera_preparation = self.window.camera_calibration_page
         self.assertIs(self.window.pages.currentWidget(), camera_preparation)
         self.assertFalse(camera_preparation.continue_button.isEnabled())
-        camera_preparation.calibration_reference = self.camera_reference.copy()
-        camera_preparation.continue_button.setEnabled(True)
+        locked_reference = lock_camera_reference(
+            camera_preparation.selected_camera,
+            self.camera_reference,
+            roll_correction_deg=0.0,
+            roll_correction_source=ROLL_CORRECTION_USER_CONFIRMED,
+        )
+
+        camera_preparation._complete_preparation(
+            locked_reference
+        )
+
         camera_preparation.handle_continue()
         baseline = self.window.baseline_page
         self.assertIs(self.window.pages.currentWidget(), baseline)
@@ -311,6 +358,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         baseline.saved_dialog.accept()
         baseline.handle_start_monitoring()
         monitor = self.window.monitoring_page
+
         self.assertIs(self.window.pages.currentWidget(), monitor)
         for _ in range(10):
             monitor.update_frame()
@@ -530,9 +578,23 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.end.return_value = response({}, 503)
         self.window.show_dashboard()
         monitor.update_frame()
-        self.assertFalse(monitor.timer.isActive())
-        self.assertEqual(monitor.detection_count, 1)
-        self.assertIsNone(monitor.capture)
+
+        self.assertTrue(
+            monitor.timer.isActive()
+        )
+
+        self.assertIsNotNone(
+            monitor.camera_gap_started_at
+        )
+
+        self.assertEqual(
+            monitor.detection_count,
+            1,
+        )
+
+        self.assertIsNone(
+            monitor.capture
+        )
         self.assertFalse(self.window.global_pause_button.isEnabled())
         self.assertTrue(self.window.global_stop_button.isEnabled())
         self.end.return_value = response({"session_id": 3, "status": "COMPLETED"})

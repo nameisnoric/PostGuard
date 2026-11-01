@@ -1003,6 +1003,33 @@ class APIClient:
         )
 
     @staticmethod
+    def create_eye_alert_notification(
+        session_id: int,
+        alert_type: str,
+        blink_rate: float,
+        window_blink_count: int,
+        reason: str | None,
+    ):
+        return APIClient.post(
+            f"/sessions/{session_id}/eye-alert-notifications",
+            {
+                "alert_type": alert_type,
+                "blink_rate": blink_rate,
+                "window_blink_count": window_blink_count,
+                "decision": "ALERT",
+                "reason": reason,
+            },
+        )
+
+    @staticmethod
+    def get_session_eye_alert_notifications(
+        session_id: int,
+    ):
+        return APIClient.get(
+            f"/sessions/{session_id}/eye-alert-notifications"
+        )
+
+    @staticmethod
     def get_session_risk_events(
         session_id: int,
     ):

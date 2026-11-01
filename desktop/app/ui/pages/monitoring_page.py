@@ -57,6 +57,14 @@ from app.ui.utils.preview_sizing import (
 from app.services.blink_detection_service import (
     BlinkDetectionService,
 )
+
+from app.services.eye_alert_policy import (
+    EyeAlertPolicy,
+)
+
+from app.ui.dialogs.eye_alert_dialog import (
+    EyeAlertDialog,
+)
 from app.services.camera_setup.camera_movement import (
     CameraMovementConfig,
     CameraMovementGuard,
@@ -96,12 +104,12 @@ CAMERA_RECONNECT_INTERVAL_SECONDS = 2.0
 
 
 FACTOR_THAI = {
-    "LEFT_SHOULDER_HIGH": "ไหล่ซ้ายสูง",
-    "RIGHT_SHOULDER_HIGH": "ไหล่ขวาสูง",
-    "TILT_LEFT": "คอเอียงซ้าย",
-    "TILT_RIGHT": "คอเอียงขวา",
-    "FLEXION": "ก้มคอ",
-    "EXTENSION": "เงยคอ",
+    "LEFT_SHOULDER_HIGH": "à¹„à¸«à¸¥à¹ˆà¸‹à¹‰à¸²à¸¢à¸ªà¸¹à¸‡",
+    "RIGHT_SHOULDER_HIGH": "à¹„à¸«à¸¥à¹ˆà¸‚à¸§à¸²à¸ªà¸¹à¸‡",
+    "TILT_LEFT": "à¸„à¸­à¹€à¸­à¸µà¸¢à¸‡à¸‹à¹‰à¸²à¸¢",
+    "TILT_RIGHT": "à¸„à¸­à¹€à¸­à¸µà¸¢à¸‡à¸‚à¸§à¸²",
+    "FLEXION": "à¸à¹‰à¸¡à¸„à¸­",
+    "EXTENSION": "à¹€à¸‡à¸¢à¸„à¸­",
 }
 
 
@@ -200,15 +208,23 @@ class MonitoringPage(QWidget):
 
         self.last_blink_result = None
 
+        self.eye_alert_policy = (
+            EyeAlertPolicy()
+        )
+
+        self.last_eye_alert_result = None
+
+        self.eye_alert_popup = None
+
         # ====================================================
         # SCREEN DISTANCE POLICY
         # ====================================================
         #
-        # Screen Distance เป็น monitoring feature แยกจาก
+        # Screen Distance à¹€à¸›à¹‡à¸™ monitoring feature à¹à¸¢à¸à¸ˆà¸²à¸
         # Posture Risk / RULA
         #
-        # Threshold ปัจจุบันเป็น candidate engineering policy
-        # ไม่ใช่ ergonomic / physical-distance threshold
+        # Threshold à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¹€à¸›à¹‡à¸™ candidate engineering policy
+        # à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆ ergonomic / physical-distance threshold
         # ====================================================
 
         self.screen_distance_policy = (
@@ -261,8 +277,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # SESSION-LEVEL RISK SCORE ANALYTICS
         #
-        # Collector นี้อยู่ตลอดทั้ง Session
-        # Pause/Resume ห้าม reset
+        # Collector à¸™à¸µà¹‰à¸­à¸¢à¸¹à¹ˆà¸•à¸¥à¸­à¸”à¸—à¸±à¹‰à¸‡ Session
+        # Pause/Resume à¸«à¹‰à¸²à¸¡ reset
         # ====================================================
 
         self.risk_score_collector = (
@@ -481,8 +497,8 @@ class MonitoringPage(QWidget):
         )
 
         self.description_label = QLabel(
-            "Detection → Assessment → Temporal → "
-            "Risk Evaluation → Risk Event → Alert Policy"
+            "Detection â†’ Assessment â†’ Temporal â†’ "
+            "Risk Evaluation â†’ Risk Event â†’ Alert Policy"
         )
 
         self.description_label.setProperty(
@@ -635,7 +651,7 @@ class MonitoringPage(QWidget):
         )
 
         self.camera_label = QLabel(
-            "กล้อง: -"
+            "à¸à¸¥à¹‰à¸­à¸‡: -"
         )
 
         self.baseline_label = QLabel(
@@ -659,7 +675,7 @@ class MonitoringPage(QWidget):
         )
 
         self.status_label = QLabel(
-            "สถานะ: ยังไม่เริ่ม"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¹€à¸£à¸´à¹ˆà¸¡"
         )
 
         for label in (
@@ -686,7 +702,7 @@ class MonitoringPage(QWidget):
     ) -> None:
 
         self.preview_label = QLabel(
-            "ภาพการตรวจจับจะแสดงที่นี่"
+            "à¸ à¸²à¸žà¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸ˆà¸°à¹à¸ªà¸”à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ"
         )
 
         self.preview_label.setAlignment(
@@ -730,22 +746,22 @@ class MonitoringPage(QWidget):
         )
 
         self.detection_label = QLabel(
-            "ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ"
+            "à¸—à¹ˆà¸²à¸—à¸²à¸‡: à¸à¸³à¸¥à¸±à¸‡à¸£à¸­ | à¹ƒà¸šà¸«à¸™à¹‰à¸²: à¸à¸³à¸¥à¸±à¸‡à¸£à¸­"
         )
 
         self.shoulder_label = QLabel(
-            "ความเอียงไหล่: --"
+            "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¹„à¸«à¸¥à¹ˆ: --"
         )
 
         self.neck_label = QLabel(
-            "ความเอียงคอด้านข้าง: --"
+            "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
         )
 
         self.flexion_label = QLabel(
-            "มุมก้ม/เงยคอ: --"
+            "à¸¡à¸¸à¸¡à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
         )
         self.screen_distance_label = QLabel(
-            "ระยะห่างหน้าจอ: --"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: --"
         )
 
         self.screen_distance_label.setWordWrap(
@@ -757,19 +773,19 @@ class MonitoringPage(QWidget):
         # ========================================================
 
         self.right_eye_state_label = QLabel(
-            "ตาขวา: --"
+            "à¸•à¸²à¸‚à¸§à¸²: --"
         )
 
         self.left_eye_state_label = QLabel(
-            "ตาซ้าย: --"
+            "à¸•à¸²à¸‹à¹‰à¸²à¸¢: --"
         )
 
         self.eye_state_label = QLabel(
-            "สถานะตารวม: --"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²à¸£à¸§à¸¡: --"
         )
 
         self.eye_pattern_label = QLabel(
-            "รูปแบบตา: --"
+            "à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²: --"
         )
 
         self.eye_openness_label = QLabel(
@@ -777,7 +793,7 @@ class MonitoringPage(QWidget):
         )
 
         self.blink_count_label = QLabel(
-            "จำนวนการกระพริบตา: 0"
+            "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: 0"
         )
 
         # ========================================================
@@ -785,15 +801,15 @@ class MonitoringPage(QWidget):
         # ========================================================
 
         self.shoulder_difference_label = QLabel(
-            "ผลต่างจาก Baseline ไหล่: --"
+            "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¹„à¸«à¸¥à¹ˆ: --"
         )
 
         self.neck_difference_label = QLabel(
-            "ผลต่างจาก Baseline คอด้านข้าง: --"
+            "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
         )
 
         self.flexion_difference_label = QLabel(
-            "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
+            "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
         )
 
         for label in (
@@ -875,9 +891,9 @@ class MonitoringPage(QWidget):
         )
 
         self.risk_note_label = QLabel(
-            "ระดับความเสี่ยงนี้เป็น PostGuard Prototype "
-            "Engineering Policy ไม่ใช่ Full RULA, "
-            "RULA Action Level หรือการวินิจฉัยทางการแพทย์"
+            "à¸£à¸°à¸”à¸±à¸šà¸„à¸§à¸²à¸¡à¹€à¸ªà¸µà¹ˆà¸¢à¸‡à¸™à¸µà¹‰à¹€à¸›à¹‡à¸™ PostGuard Prototype "
+            "Engineering Policy à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆ Full RULA, "
+            "RULA Action Level à¸«à¸£à¸·à¸­à¸à¸²à¸£à¸§à¸´à¸™à¸´à¸ˆà¸‰à¸±à¸¢à¸—à¸²à¸‡à¸à¸²à¸£à¹à¸žà¸—à¸¢à¹Œ"
         )
 
         self.risk_note_label.setWordWrap(
@@ -1014,22 +1030,22 @@ class MonitoringPage(QWidget):
         if self.network_stop_pending:
 
             self.status_label.setText(
-                "สถานะ: NETWORK GAP | "
-                "หยุดตรวจจับในเครื่องแล้ว "
-                "| รอ Backend ยืนยันการจบ Session"
+                "à¸ªà¸–à¸²à¸™à¸°: NETWORK GAP | "
+                "à¸«à¸¢à¸¸à¸”à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¹à¸¥à¹‰à¸§ "
+                "| à¸£à¸­ Backend à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸ˆà¸š Session"
             )
 
         elif self.is_paused:
 
             self.status_label.setText(
-                "สถานะ: PAUSED | NETWORK GAP "
-                "| รอเชื่อมต่อ Backend"
+                "à¸ªà¸–à¸²à¸™à¸°: PAUSED | NETWORK GAP "
+                "| à¸£à¸­à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­ Backend"
             )
 
         else:
 
             self.status_label.setText(
-                "สถานะ: กำลังตรวจจับในเครื่อง "
+                "à¸ªà¸–à¸²à¸™à¸°: à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡ "
                 "(LOCAL RUNNING) | NETWORK GAP"
             )
 
@@ -1069,14 +1085,14 @@ class MonitoringPage(QWidget):
             if self.is_paused:
 
                 self.status_label.setText(
-                    "สถานะ: หยุดชั่วคราว "
+                    "à¸ªà¸–à¸²à¸™à¸°: à¸«à¸¢à¸¸à¸”à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§ "
                     "(PAUSED)"
                 )
 
             else:
 
                 self.status_label.setText(
-                    "สถานะ: กำลังตรวจจับ "
+                    "à¸ªà¸–à¸²à¸™à¸°: à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š "
                     "(RUNNING)"
                 )
 
@@ -1301,8 +1317,8 @@ class MonitoringPage(QWidget):
         # Backend is reachable, but state does not agree with
         # Desktop. Do not silently overwrite local state.
         self.status_label.setText(
-            "สถานะ: Backend กลับมาแล้ว "
-            "แต่สถานะ Session ไม่ตรงกัน "
+            "à¸ªà¸–à¸²à¸™à¸°: Backend à¸à¸¥à¸±à¸šà¸¡à¸²à¹à¸¥à¹‰à¸§ "
+            "à¹à¸•à¹ˆà¸ªà¸–à¸²à¸™à¸° Session à¹„à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸™ "
             f"(Local={expected_status}, "
             f"Backend={remote_status})"
         )
@@ -1341,6 +1357,7 @@ class MonitoringPage(QWidget):
         self._close_capture_resources()
 
         self.close_posture_alert()
+        self.close_eye_alert()
 
         self.sound_player.notify(
             False
@@ -1361,16 +1378,16 @@ class MonitoringPage(QWidget):
 
         QMessageBox.warning(
             self,
-            "รอยืนยันการจบเซสชัน",
+            "à¸£à¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™",
             (
-                "PostGuard หยุดการตรวจจับในเครื่องแล้ว "
-                "แต่ Backend ยังไม่สามารถยืนยันการจบ "
-                "Session ได้\n\n"
+                "PostGuard à¸«à¸¢à¸¸à¸”à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¹à¸¥à¹‰à¸§ "
+                "à¹à¸•à¹ˆ Backend à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸ˆà¸š "
+                "Session à¹„à¸”à¹‰\n\n"
                 f"Session ID: {self.session_id}\n"
                 f"{error}\n\n"
-                "ระบบจะลองเชื่อมต่อและจบ Session "
-                "ให้อัตโนมัติเมื่อ Backend กลับมา\n"
-                "ระหว่างนี้จะไม่สร้าง Session ใหม่ทับ"
+                "à¸£à¸°à¸šà¸šà¸ˆà¸°à¸¥à¸­à¸‡à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹à¸¥à¸°à¸ˆà¸š Session "
+                "à¹ƒà¸«à¹‰à¸­à¸±à¸•à¹‚à¸™à¸¡à¸±à¸•à¸´à¹€à¸¡à¸·à¹ˆà¸­ Backend à¸à¸¥à¸±à¸šà¸¡à¸²\n"
+                "à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡à¸™à¸µà¹‰à¸ˆà¸°à¹„à¸¡à¹ˆà¸ªà¸£à¹‰à¸²à¸‡ Session à¹ƒà¸«à¸¡à¹ˆà¸—à¸±à¸š"
             ),
         )
 
@@ -1544,9 +1561,9 @@ class MonitoringPage(QWidget):
                 "unexpected session_id."
             )
 
-        # สำคัญ:
-        # Backend ยืนยันว่า session จบแล้ว
-        # จึง clear local session id
+        # à¸ªà¸³à¸„à¸±à¸:
+        # Backend à¸¢à¸·à¸™à¸¢à¸±à¸™à¸§à¹ˆà¸² session à¸ˆà¸šà¹à¸¥à¹‰à¸§
+        # à¸ˆà¸¶à¸‡ clear local session id
         self.session_id = None
 
         return data
@@ -1659,12 +1676,12 @@ class MonitoringPage(QWidget):
 
         self.baseline_shoulder_label.setText(
             "Baseline Shoulder Tilt: "
-            f"{shoulder:+.2f}°"
+            f"{shoulder:+.2f}Â°"
         )
 
         self.baseline_neck_label.setText(
             "Baseline Neck Lateral Tilt: "
-            f"{neck:+.2f}°"
+            f"{neck:+.2f}Â°"
         )
 
         if (
@@ -1679,7 +1696,7 @@ class MonitoringPage(QWidget):
 
             self.baseline_flexion_label.setText(
                 "Baseline Neck Flexion: "
-                f"{flexion:+.2f}°"
+                f"{flexion:+.2f}Â°"
             )
 
         else:
@@ -1694,7 +1711,7 @@ class MonitoringPage(QWidget):
         )
 
         return baseline
-    
+
     # ========================================================
     # CAMERA RESOLUTION COMPATIBILITY
     # ========================================================
@@ -1821,12 +1838,12 @@ class MonitoringPage(QWidget):
         baseline_id: int,
     ) -> bool:
 
-        # ปิด session เก่าก่อน
+        # à¸›à¸´à¸” session à¹€à¸à¹ˆà¸²à¸à¹ˆà¸­à¸™
         if not self.stop_monitoring():
 
             QMessageBox.warning(
                 self,
-                "ข้อผิดพลาดของเซสชัน",
+                "à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸‚à¸­à¸‡à¹€à¸‹à¸ªà¸Šà¸±à¸™",
                 "The previous database session "
                 "could not be ended. "
                 "Check your connection and retry.",
@@ -1879,8 +1896,8 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "การตรวจจับ",
-                "ไม่พบหมายเลขอุปกรณ์กล้อง",
+                "à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š",
+                "à¹„à¸¡à¹ˆà¸žà¸šà¸«à¸¡à¸²à¸¢à¹€à¸¥à¸‚à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¸à¸¥à¹‰à¸­à¸‡",
             )
 
             return False
@@ -1894,8 +1911,8 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "การตรวจจับ",
-                "ต้องมี Baseline ID ที่บันทึกแล้ว",
+                "à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š",
+                "à¸•à¹‰à¸­à¸‡à¸¡à¸µ Baseline ID à¸—à¸µà¹ˆà¸šà¸±à¸™à¸—à¸¶à¸à¹à¸¥à¹‰à¸§",
             )
 
             return False
@@ -1914,7 +1931,7 @@ class MonitoringPage(QWidget):
             ):
 
                 raise ValueError(
-                    "Camera ID ไม่ถูกต้อง"
+                    "Camera ID à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡"
                 )
 
             self.load_personal_baseline(
@@ -1931,7 +1948,7 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "ข้อผิดพลาดของค่าอ้างอิง",
+                "à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸‚à¸­à¸‡à¸„à¹ˆà¸²à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡",
                 str(error),
             )
 
@@ -2037,8 +2054,8 @@ class MonitoringPage(QWidget):
             # RESOLUTION COMPATIBILITY GATE
             #
             # IMPORTANT:
-            # ต้องตรวจจาก frame จริงก่อนสร้าง Detector
-            # และก่อนสร้าง Backend Session
+            # à¸•à¹‰à¸­à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸²à¸ frame à¸ˆà¸£à¸´à¸‡à¸à¹ˆà¸­à¸™à¸ªà¸£à¹‰à¸²à¸‡ Detector
+            # à¹à¸¥à¸°à¸à¹ˆà¸­à¸™à¸ªà¸£à¹‰à¸²à¸‡ Backend Session
             # =================================================
 
             resolution_result = (
@@ -2057,7 +2074,7 @@ class MonitoringPage(QWidget):
             # =================================================
             # DETECTOR
             #
-            # สร้างหลังจาก Resolution ผ่านแล้วเท่านั้น
+            # à¸ªà¸£à¹‰à¸²à¸‡à¸«à¸¥à¸±à¸‡à¸ˆà¸²à¸ Resolution à¸œà¹ˆà¸²à¸™à¹à¸¥à¹‰à¸§à¹€à¸—à¹ˆà¸²à¸™à¸±à¹‰à¸™
             # =================================================
 
             self.detector = (
@@ -2067,7 +2084,7 @@ class MonitoringPage(QWidget):
             # =================================================
             # BACKEND SESSION
             #
-            # ห้ามสร้าง Session ก่อน Resolution ผ่าน
+            # à¸«à¹‰à¸²à¸¡à¸ªà¸£à¹‰à¸²à¸‡ Session à¸à¹ˆà¸­à¸™ Resolution à¸œà¹ˆà¸²à¸™
             # =================================================
 
             response = (
@@ -2144,7 +2161,7 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "ข้อผิดพลาดในการตรวจจับ",
+                "à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š",
                 str(error),
             )
 
@@ -2220,12 +2237,16 @@ class MonitoringPage(QWidget):
 
         self.last_blink_result = None
 
+        self.eye_alert_policy.reset()
+        self.last_eye_alert_result = None
+        self.close_eye_alert()
+
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: à¸à¸³à¸¥à¸±à¸‡ Calibration"
         )
 
         self.blink_count_label.setText(
-            "จำนวนการกระพริบตา: 0"
+            "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: 0"
         )
 
         # ====================================================
@@ -2237,7 +2258,7 @@ class MonitoringPage(QWidget):
         )
 
         self.status_label.setText(
-            "สถานะ: กำลังตรวจจับ (RUNNING)"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š (RUNNING)"
         )
 
         self.is_paused = False
@@ -2344,6 +2365,7 @@ class MonitoringPage(QWidget):
         ):
 
             self.close_posture_alert()
+            self.close_eye_alert()
 
     # ========================================================
     # PIPELINE UI HELPERS
@@ -2356,7 +2378,7 @@ class MonitoringPage(QWidget):
 
         if not factors:
 
-            return "ไม่มี"
+            return "à¹„à¸¡à¹ˆà¸¡à¸µ"
 
         names = []
 
@@ -2970,6 +2992,114 @@ class MonitoringPage(QWidget):
         return True
 
     # ========================================================
+    # EYE ALERT TOAST
+    # ========================================================
+
+    def _handle_eye_alert_finished(
+        self,
+        _result: int,
+    ) -> None:
+        """
+        Closing Eye Reminder affects presentation only.
+
+        It must NOT:
+        - reset Eye Alert Policy,
+        - reset Blink Detection,
+        - pause Monitoring.
+        """
+
+        self.sound_player.stop_alert()
+
+        popup = self.sender()
+
+        if self.eye_alert_popup is popup:
+
+            self.eye_alert_popup = None
+
+        if popup is not None:
+
+            delete_later = getattr(
+                popup,
+                "deleteLater",
+                None,
+            )
+
+            if callable(
+                delete_later
+            ):
+
+                delete_later()
+
+
+    def close_eye_alert(
+        self,
+    ) -> None:
+
+        popup = (
+            self.eye_alert_popup
+        )
+
+        self.eye_alert_popup = None
+
+        self.sound_player.stop_alert()
+
+        if popup is None:
+
+            return
+
+        popup.close()
+
+
+    def show_eye_alert(
+        self,
+        *,
+        blink_rate_per_minute: float | None,
+        alert_type: str | None,
+        window_blink_count: int | None,
+    ) -> bool:
+
+        notifications_enabled = (
+            self.sound_player.settings.get(
+                "notifications_enabled",
+                True,
+            )
+        )
+
+        if not notifications_enabled:
+
+            self.close_eye_alert()
+
+            return False
+
+        # Do not stack Eye Reminder notifications.
+        self.close_eye_alert()
+
+        popup = EyeAlertDialog(
+            blink_rate_per_minute=(
+                blink_rate_per_minute
+            ),
+            alert_type=(
+                alert_type
+            ),
+            window_blink_count=(
+                window_blink_count
+            ),
+            parent=None,
+        )
+
+        popup.finished.connect(
+            self._handle_eye_alert_finished
+        )
+
+        self.eye_alert_popup = (
+            popup
+        )
+
+        popup.show_alert()
+
+        return True
+
+    # ========================================================
     # BASELINE COMPARISON
     # ========================================================
 
@@ -3060,13 +3190,13 @@ class MonitoringPage(QWidget):
 
             self.shoulder_difference_label.setText(
                 "Shoulder Difference: "
-                f"{difference:+.2f}°"
+                f"{difference:+.2f}Â°"
             )
 
         else:
 
             self.shoulder_difference_label.setText(
-                "ผลต่างจาก Baseline ไหล่: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¹„à¸«à¸¥à¹ˆ: --"
             )
 
         # ====================================================
@@ -3099,13 +3229,13 @@ class MonitoringPage(QWidget):
 
             self.neck_difference_label.setText(
                 "Neck Difference: "
-                f"{difference:+.2f}°"
+                f"{difference:+.2f}Â°"
             )
 
         else:
 
             self.neck_difference_label.setText(
-                "ผลต่างจาก Baseline คอด้านข้าง: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
             )
 
         # ====================================================
@@ -3138,13 +3268,13 @@ class MonitoringPage(QWidget):
 
             self.flexion_difference_label.setText(
                 "Neck Flexion Difference: "
-                f"{difference:+.2f}°"
+                f"{difference:+.2f}Â°"
             )
 
         else:
 
             self.flexion_difference_label.setText(
-                "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
             )
 
     # ========================================================
@@ -3238,10 +3368,12 @@ class MonitoringPage(QWidget):
         detection_result: dict,
     ) -> dict:
 
+        now = time.monotonic()
+
         blink_result = (
             self.blink_detector.process_detection(
                 detection_result,
-                now=time.monotonic(),
+                now=now,
             )
         )
 
@@ -3254,6 +3386,17 @@ class MonitoringPage(QWidget):
                 "calibrated"
             )
             is True
+        )
+
+        eye_alert_result = (
+            self.eye_alert_policy.update(
+                blink_result,
+                now=now,
+            )
+        )
+
+        self.last_eye_alert_result = (
+            eye_alert_result
         )
 
         # ========================================================
@@ -3271,24 +3414,24 @@ class MonitoringPage(QWidget):
             )
 
             calibration_text = (
-                f"กำลัง Calibration "
+                f"à¸à¸³à¸¥à¸±à¸‡ Calibration "
                 f"{progress * 100:.0f}%"
             )
 
             self.right_eye_state_label.setText(
-                f"ตาขวา: {calibration_text}"
+                f"à¸•à¸²à¸‚à¸§à¸²: {calibration_text}"
             )
 
             self.left_eye_state_label.setText(
-                f"ตาซ้าย: {calibration_text}"
+                f"à¸•à¸²à¸‹à¹‰à¸²à¸¢: {calibration_text}"
             )
 
             self.eye_state_label.setText(
-                f"สถานะตารวม: {calibration_text}"
+                f"à¸ªà¸–à¸²à¸™à¸°à¸•à¸²à¸£à¸§à¸¡: {calibration_text}"
             )
 
             self.eye_pattern_label.setText(
-                "รูปแบบตา: CALIBRATING"
+                "à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²: CALIBRATING"
             )
 
         else:
@@ -3326,36 +3469,36 @@ class MonitoringPage(QWidget):
             )
 
             self.right_eye_state_label.setText(
-                f"ตาขวา: {right_state}"
+                f"à¸•à¸²à¸‚à¸§à¸²: {right_state}"
             )
 
             self.left_eye_state_label.setText(
-                f"ตาซ้าย: {left_state}"
+                f"à¸•à¸²à¸‹à¹‰à¸²à¸¢: {left_state}"
             )
 
             self.eye_state_label.setText(
-                f"สถานะตารวม: {combined_state}"
+                f"à¸ªà¸–à¸²à¸™à¸°à¸•à¸²à¸£à¸§à¸¡: {combined_state}"
             )
 
             pattern_text = {
                 "BOTH_OPEN": (
-                    "ตาทั้งสองเปิด"
+                    "à¸•à¸²à¸—à¸±à¹‰à¸‡à¸ªà¸­à¸‡à¹€à¸›à¸´à¸”"
                 ),
 
                 "BOTH_CLOSED": (
-                    "ตาทั้งสองปิด"
+                    "à¸•à¸²à¸—à¸±à¹‰à¸‡à¸ªà¸­à¸‡à¸›à¸´à¸”"
                 ),
 
                 "RIGHT_ONLY_CLOSED": (
-                    "ปิดเฉพาะตาขวา"
+                    "à¸›à¸´à¸”à¹€à¸‰à¸žà¸²à¸°à¸•à¸²à¸‚à¸§à¸²"
                 ),
 
                 "LEFT_ONLY_CLOSED": (
-                    "ปิดเฉพาะตาซ้าย"
+                    "à¸›à¸´à¸”à¹€à¸‰à¸žà¸²à¸°à¸•à¸²à¸‹à¹‰à¸²à¸¢"
                 ),
 
                 "UNKNOWN": (
-                    "ไม่สามารถระบุได้"
+                    "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸£à¸°à¸šà¸¸à¹„à¸”à¹‰"
                 ),
             }.get(
                 eye_pattern,
@@ -3363,7 +3506,7 @@ class MonitoringPage(QWidget):
             )
 
             self.eye_pattern_label.setText(
-                "รูปแบบตา: "
+                "à¸£à¸¹à¸›à¹à¸šà¸šà¸•à¸²: "
                 f"{pattern_text}"
             )
 
@@ -3447,7 +3590,7 @@ class MonitoringPage(QWidget):
             ):
 
                 self.blink_count_label.setText(
-                    "จำนวนการกระพริบตา: "
+                    "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: "
                     f"{blink_count} "
                     f"| Blink {duration:.2f}s"
                 )
@@ -3455,16 +3598,83 @@ class MonitoringPage(QWidget):
             else:
 
                 self.blink_count_label.setText(
-                    "จำนวนการกระพริบตา: "
+                    "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: "
                     f"{blink_count}"
                 )
 
         else:
 
             self.blink_count_label.setText(
-                "จำนวนการกระพริบตา: "
+                "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: "
                 f"{blink_count}"
             )
+        if eye_alert_result.get(
+            "should_notify"
+        ) is True:
+
+            if self.session_id is not None:
+                try:
+                    response = (
+                        APIClient
+                        .create_eye_alert_notification(
+                            session_id=self.session_id,
+                            alert_type=eye_alert_result.get(
+                                "alert_type"
+                            ),
+                            blink_rate=float(
+                                eye_alert_result.get(
+                                    "blink_rate_per_minute"
+                                )
+                                or 0.0
+                            ),
+                            window_blink_count=int(
+                                eye_alert_result.get(
+                                    "window_blink_count"
+                                )
+                                or 0
+                            ),
+                            reason=eye_alert_result.get(
+                                "reason"
+                            ),
+                        )
+                    )
+
+                    if not response.ok:
+                        raise RuntimeError(
+                            "Persist Eye Reminder failed: "
+                            f"HTTP {response.status_code} "
+                            f"{response.text}"
+                        )
+
+                except requests.RequestException as error:
+                    print(
+                        "EYE ALERT PERSISTENCE NETWORK ERROR:",
+                        error,
+                    )
+                    self._mark_network_gap(
+                        error
+                    )
+
+                except Exception as error:
+                    print(
+                        "EYE ALERT PERSISTENCE ERROR:",
+                        error,
+                    )
+
+            popup_shown = self.show_eye_alert(
+                blink_rate_per_minute=eye_alert_result.get(
+                    "blink_rate_per_minute"
+                ),
+                alert_type=eye_alert_result.get(
+                    "alert_type"
+                ),
+                window_blink_count=eye_alert_result.get(
+                    "window_blink_count"
+                ),
+            )
+
+            if popup_shown:
+                self.sound_player.play_alert()
 
         return blink_result
 
@@ -3478,14 +3688,14 @@ class MonitoringPage(QWidget):
         """
         Reset Screen Distance temporal continuity.
 
-        ใช้เมื่อ:
-        - เริ่ม Session
+        à¹ƒà¸Šà¹‰à¹€à¸¡à¸·à¹ˆà¸­:
+        - à¹€à¸£à¸´à¹ˆà¸¡ Session
         - Pause
         - Resume
-        - จบ Session
+        - à¸ˆà¸š Session
 
-        Personal Baseline ไม่ถูก reset เพราะ baseline เป็น
-        reference ของ Session ไม่ใช่ temporal runtime state.
+        Personal Baseline à¹„à¸¡à¹ˆà¸–à¸¹à¸ reset à¹€à¸žà¸£à¸²à¸° baseline à¹€à¸›à¹‡à¸™
+        reference à¸‚à¸­à¸‡ Session à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆ temporal runtime state.
         """
 
         self.screen_distance_policy.reset()
@@ -3493,7 +3703,7 @@ class MonitoringPage(QWidget):
         self.last_screen_distance_result = None
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: --"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: --"
         )
 
 
@@ -3509,13 +3719,13 @@ class MonitoringPage(QWidget):
             DetectionService.eye_distance
                         +
             Personal Baseline
-                        ↓
+                        â†“
             ScreenDistancePolicy
-                        ↓
+                        â†“
             NORMAL / PENDING /
             TOO_CLOSE / NOT_EVALUATED
 
-        Screen Distance ไม่ถูกส่งเข้า Risk/RULA.
+        Screen Distance à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸ªà¹ˆà¸‡à¹€à¸‚à¹‰à¸² Risk/RULA.
         """
 
         baseline = (
@@ -3559,8 +3769,8 @@ class MonitoringPage(QWidget):
             )
 
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: N/A "
-                "(ไม่มี Eye Distance Baseline)"
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: N/A "
+                "(à¹„à¸¡à¹ˆà¸¡à¸µ Eye Distance Baseline)"
             )
 
             return result
@@ -3656,7 +3866,7 @@ class MonitoringPage(QWidget):
 
         if state == STATE_NORMAL:
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: ปกติ "
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: à¸›à¸à¸•à¸´ "
                 f"(Ratio {ratio:.2f}x)"
             )
 
@@ -3669,28 +3879,28 @@ class MonitoringPage(QWidget):
             )
 
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: "
-                "กำลังตรวจสอบว่าใกล้เกินไป "
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+                "à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸§à¹ˆà¸²à¹ƒà¸à¸¥à¹‰à¹€à¸à¸´à¸™à¹„à¸› "
                 f"(Ratio {ratio:.2f}x, "
                 f"{seconds:.1f}s)"
             )
 
         elif state == STATE_TOO_CLOSE:
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: "
-                "ใกล้กว่าค่าอ้างอิงมาก "
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+                "à¹ƒà¸à¸¥à¹‰à¸à¸§à¹ˆà¸²à¸„à¹ˆà¸²à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡à¸¡à¸²à¸ "
                 f"(Ratio {ratio:.2f}x)"
             )
 
         elif state == STATE_NOT_EVALUATED:
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: "
-                "ไม่สามารถประเมินได้"
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+                "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¹„à¸”à¹‰"
             )
 
         else:
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: --"
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: --"
             )
 
         return result
@@ -3723,23 +3933,24 @@ class MonitoringPage(QWidget):
                 None
             )
 
-            # ระหว่างกล้องหลุด
-            # ไม่อนุญาตให้ Pause/Resume
-            # เพราะระบบกำลังอยู่ใน automatic recovery
+            # à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡à¸à¸¥à¹‰à¸­à¸‡à¸«à¸¥à¸¸à¸”
+            # à¹„à¸¡à¹ˆà¸­à¸™à¸¸à¸à¸²à¸•à¹ƒà¸«à¹‰ Pause/Resume
+            # à¹€à¸žà¸£à¸²à¸°à¸£à¸°à¸šà¸šà¸à¸³à¸¥à¸±à¸‡à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™ automatic recovery
             self.pause_button.setEnabled(
                 False
             )
+            self.state_changed.emit()
 
             self.preview_label.clear()
 
             self.preview_label.setText(
-                "กล้องขาดการเชื่อมต่อ\n"
-                "กำลังพยายามเชื่อมต่อใหม่..."
+                "à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­\n"
+                "à¸à¸³à¸¥à¸±à¸‡à¸žà¸¢à¸²à¸¢à¸²à¸¡à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹ƒà¸«à¸¡à¹ˆ..."
             )
 
             self.status_label.setText(
-                "สถานะ: DATA GAP "
-                "(กล้องขาดการเชื่อมต่อ)"
+                "à¸ªà¸–à¸²à¸™à¸°: DATA GAP "
+                "(à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­)"
             )
 
             self.assessment_label.setText(
@@ -3769,31 +3980,39 @@ class MonitoringPage(QWidget):
             )
 
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: DATA_GAP"
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: DATA_GAP"
             )
 
             self.eye_state_label.setText(
-                "สถานะตา: DATA_GAP"
+                "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: DATA_GAP"
             )
 
-            # หยุด alert presentation
-            # ระหว่างที่ไม่มีข้อมูลใหม่
+            # à¸«à¸¢à¸¸à¸” alert presentation
+            # à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸«à¸¡à¹ˆ
             self.sound_player.notify(
                 False
             )
 
             self.close_posture_alert()
+            self.close_eye_alert()
+
+            self.last_eye_alert_result = (
+                self.eye_alert_policy.process_data_gap(
+                    now=now,
+                    reason="CAMERA_DATA_GAP",
+                )
+            )
 
             # ====================================================
             # INFORM VALIDATED PIPELINE
             #
-            # สำคัญ:
+            # à¸ªà¸³à¸„à¸±à¸:
             #
-            # DATA_GAP ไม่ใช่ LOW/NONE
-            # และไม่ใช่ posture ปกติ
+            # DATA_GAP à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆ LOW/NONE
+            # à¹à¸¥à¸°à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆ posture à¸›à¸à¸•à¸´
             #
-            # Temporal ถูกตัด continuity
-            # แต่ Risk Event เดิมยังคงอยู่
+            # Temporal à¸–à¸¹à¸à¸•à¸±à¸” continuity
+            # à¹à¸•à¹ˆ Risk Event à¹€à¸”à¸´à¸¡à¸¢à¸±à¸‡à¸„à¸‡à¸­à¸¢à¸¹à¹ˆ
             # ====================================================
 
             try:
@@ -3862,8 +4081,8 @@ class MonitoringPage(QWidget):
         )
 
         self.status_label.setText(
-            "สถานะ: กล้องขาดการเชื่อมต่อ "
-            f"| รอเชื่อมต่อใหม่ "
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­ "
+            f"| à¸£à¸­à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹ƒà¸«à¸¡à¹ˆ "
             f"{remaining:.0f}s"
         )
 
@@ -3943,8 +4162,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # REOPEN WITH BASELINE RESOLUTION
         #
-        # Personal Baseline resolution เป็น source of truth
-        # สำหรับ Monitoring Session นี้
+        # Personal Baseline resolution à¹€à¸›à¹‡à¸™ source of truth
+        # à¸ªà¸³à¸«à¸£à¸±à¸š Monitoring Session à¸™à¸µà¹‰
         # ====================================================
 
         width = (
@@ -4068,8 +4287,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # RESOLUTION COMPATIBILITY
         #
-        # ห้าม resume ด้วย resolution
-        # ที่ไม่ตรง Personal Baseline
+        # à¸«à¹‰à¸²à¸¡ resume à¸”à¹‰à¸§à¸¢ resolution
+        # à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸•à¸£à¸‡ Personal Baseline
         # ====================================================
 
         try:
@@ -4144,15 +4363,15 @@ class MonitoringPage(QWidget):
         # ====================================================
         # TEMPORAL CONTINUITY
         #
-        # process_data_gap() ตัด Temporal ไปแล้ว
+        # process_data_gap() à¸•à¸±à¸” Temporal à¹„à¸›à¹à¸¥à¹‰à¸§
         #
-        # Risk Event เดิม intentionally preserve
+        # Risk Event à¹€à¸”à¸´à¸¡ intentionally preserve
         # ====================================================
 
         # ====================================================
         # SCREEN DISTANCE
         #
-        # ห้ามเอาเวลา/ratio ก่อน gap มาต่อ
+        # à¸«à¹‰à¸²à¸¡à¹€à¸­à¸²à¹€à¸§à¸¥à¸²/ratio à¸à¹ˆà¸­à¸™ gap à¸¡à¸²à¸•à¹ˆà¸­
         # ====================================================
 
         self.screen_distance_policy.reset()
@@ -4164,8 +4383,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # BLINK
         #
-        # เก็บจำนวน Blink ของ Session เดิม
-        # แต่ recalibrate หลัง stream กลับมา
+        # à¹€à¸à¹‡à¸šà¸ˆà¸³à¸™à¸§à¸™ Blink à¸‚à¸­à¸‡ Session à¹€à¸”à¸´à¸¡
+        # à¹à¸•à¹ˆ recalibrate à¸«à¸¥à¸±à¸‡ stream à¸à¸¥à¸±à¸šà¸¡à¸²
         # ====================================================
 
         self.blink_detector.reset(
@@ -4177,20 +4396,24 @@ class MonitoringPage(QWidget):
             None
         )
 
+        self.eye_alert_policy.reset()
+        self.last_eye_alert_result = None
+        self.close_eye_alert()
+
         # ====================================================
         # CAMERA MOVEMENT GUARD
         #
-        # Camera stream ถูกสร้างใหม่
+        # Camera stream à¸–à¸¹à¸à¸ªà¸£à¹‰à¸²à¸‡à¹ƒà¸«à¸¡à¹ˆ
         #
-        # ห้ามเอา optical-flow frame ก่อน disconnect
-        # มาเทียบกับ frame หลัง reconnect เพราะ driver /
-        # exposure / autofocus / timing อาจเปลี่ยนทันที
-        # และทำให้เกิด false CAMERA_MOVED
+        # à¸«à¹‰à¸²à¸¡à¹€à¸­à¸² optical-flow frame à¸à¹ˆà¸­à¸™ disconnect
+        # à¸¡à¸²à¹€à¸—à¸µà¸¢à¸šà¸à¸±à¸š frame à¸«à¸¥à¸±à¸‡ reconnect à¹€à¸žà¸£à¸²à¸° driver /
+        # exposure / autofocus / timing à¸­à¸²à¸ˆà¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸—à¸±à¸™à¸—à¸µ
+        # à¹à¸¥à¸°à¸—à¸³à¹ƒà¸«à¹‰à¹€à¸à¸´à¸” false CAMERA_MOVED
         #
-        # Reset เฉพาะ runtime movement reference
+        # Reset à¹€à¸‰à¸žà¸²à¸° runtime movement reference
         #
-        # Camera Reference และ Personal Baseline เดิม
-        # ยังอยู่เหมือนเดิม
+        # Camera Reference à¹à¸¥à¸° Personal Baseline à¹€à¸”à¸´à¸¡
+        # à¸¢à¸±à¸‡à¸­à¸¢à¸¹à¹ˆà¹€à¸«à¸¡à¸·à¸­à¸™à¹€à¸”à¸´à¸¡
         # ====================================================
 
         self.camera_movement_guard.reset()
@@ -4208,22 +4431,22 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.preview_label.setText(
-            "เชื่อมต่อกล้องกลับมาแล้ว "
-            "กำลังตรวจจับต่อ..."
+            "à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹à¸¥à¹‰à¸§ "
+            "à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸•à¹ˆà¸­..."
         )
 
         self.status_label.setText(
-            "สถานะ: กล้องกลับมาแล้ว "
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹à¸¥à¹‰à¸§ "
             "(RUNNING)"
         )
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: à¸à¸³à¸¥à¸±à¸‡ Calibration"
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: "
-            "กำลังประเมินใหม่"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+            "à¸à¸³à¸¥à¸±à¸‡à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¹ƒà¸«à¸¡à¹ˆ"
         )
 
 
@@ -4238,9 +4461,9 @@ class MonitoringPage(QWidget):
         self.timer.stop()
 
         self.status_label.setText(
-            "สถานะ: กล้องขาดการเชื่อมต่อ "
-            "เกิน 60 วินาที "
-            "กำลังจบเซสชัน"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­ "
+            "à¹€à¸à¸´à¸™ 60 à¸§à¸´à¸™à¸²à¸—à¸µ "
+            "à¸à¸³à¸¥à¸±à¸‡à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™"
         )
 
         if self.capture is not None:
@@ -4257,13 +4480,13 @@ class MonitoringPage(QWidget):
 
         QMessageBox.warning(
             self,
-            "กล้องขาดการเชื่อมต่อ",
+            "à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­",
             (
-                "PostGuard ไม่สามารถเชื่อมต่อ"
-                "กล้องกลับมาได้ภายใน 60 วินาที\n\n"
-                "ระบบจะจบ Session ปัจจุบัน "
-                "เพื่อป้องกันการประเมินจาก"
-                "ข้อมูลที่ไม่ต่อเนื่อง"
+                "PostGuard à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­"
+                "à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹„à¸”à¹‰à¸ à¸²à¸¢à¹ƒà¸™ 60 à¸§à¸´à¸™à¸²à¸—à¸µ\n\n"
+                "à¸£à¸°à¸šà¸šà¸ˆà¸°à¸ˆà¸š Session à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™ "
+                "à¹€à¸žà¸·à¹ˆà¸­à¸›à¹‰à¸­à¸‡à¸à¸±à¸™à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸ˆà¸²à¸"
+                "à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸•à¹ˆà¸­à¹€à¸™à¸·à¹ˆà¸­à¸‡"
             ),
         )
 
@@ -4472,24 +4695,25 @@ class MonitoringPage(QWidget):
         self.pause_button.setEnabled(
             True
         )
+        self.state_changed.emit()
 
         self.preview_label.setText(
-            "เชื่อมต่อกล้องกลับมาแล้ว "
-            "กำลังตรวจจับต่อ..."
+            "à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹à¸¥à¹‰à¸§ "
+            "à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸•à¹ˆà¸­..."
         )
 
         self.status_label.setText(
-            "สถานะ: กล้องกลับมาแล้ว "
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹à¸¥à¹‰à¸§ "
             "(RUNNING)"
         )
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: à¸à¸³à¸¥à¸±à¸‡ Calibration"
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: "
-            "กำลังประเมินใหม่"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+            "à¸à¸³à¸¥à¸±à¸‡à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¹ƒà¸«à¸¡à¹ˆ"
         )
 
 
@@ -4500,8 +4724,8 @@ class MonitoringPage(QWidget):
         self.timer.stop()
 
         self.status_label.setText(
-            "สถานะ: กล้องขาดการเชื่อมต่อ "
-            "เกิน 60 วินาที กำลังจบเซสชัน"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­ "
+            "à¹€à¸à¸´à¸™ 60 à¸§à¸´à¸™à¸²à¸—à¸µ à¸à¸³à¸¥à¸±à¸‡à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™"
         )
 
         if self.capture is not None:
@@ -4516,11 +4740,11 @@ class MonitoringPage(QWidget):
 
         QMessageBox.warning(
             self,
-            "กล้องขาดการเชื่อมต่อ",
-            "PostGuard ไม่สามารถเชื่อมต่อกล้องกลับมาได้"
-            "ภายใน 60 วินาที\n\n"
-            "ระบบจะจบ Session ปัจจุบันเพื่อป้องกัน"
-            "การประเมินจากข้อมูลที่ไม่ต่อเนื่อง",
+            "à¸à¸¥à¹‰à¸­à¸‡à¸‚à¸²à¸”à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­",
+            "PostGuard à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸à¸¥à¹‰à¸­à¸‡à¸à¸¥à¸±à¸šà¸¡à¸²à¹„à¸”à¹‰"
+            "à¸ à¸²à¸¢à¹ƒà¸™ 60 à¸§à¸´à¸™à¸²à¸—à¸µ\n\n"
+            "à¸£à¸°à¸šà¸šà¸ˆà¸°à¸ˆà¸š Session à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™à¹€à¸žà¸·à¹ˆà¸­à¸›à¹‰à¸­à¸‡à¸à¸±à¸™"
+            "à¸à¸²à¸£à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸ˆà¸²à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸•à¹ˆà¸­à¹€à¸™à¸·à¹ˆà¸­à¸‡",
         )
 
         self.handle_stop()
@@ -4548,15 +4772,15 @@ class MonitoringPage(QWidget):
         # ====================================================
         # ACTIVE CAMERA DATA GAP
         #
-        # สำคัญ:
+        # à¸ªà¸³à¸„à¸±à¸:
         #
-        # Timer ต้องยังทำงานต่อระหว่าง DATA_GAP
-        # เพื่อให้:
+        # Timer à¸•à¹‰à¸­à¸‡à¸¢à¸±à¸‡à¸—à¸³à¸‡à¸²à¸™à¸•à¹ˆà¸­à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡ DATA_GAP
+        # à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰:
         #
-        # - retry camera ทุก 2 วินาที
-        # - timeout 60 วินาทีทำงาน
+        # - retry camera à¸—à¸¸à¸ 2 à¸§à¸´à¸™à¸²à¸—à¸µ
+        # - timeout 60 à¸§à¸´à¸™à¸²à¸—à¸µà¸—à¸³à¸‡à¸²à¸™
         #
-        # ห้าม return เพียงเพราะ capture=None
+        # à¸«à¹‰à¸²à¸¡ return à¹€à¸žà¸µà¸¢à¸‡à¹€à¸žà¸£à¸²à¸° capture=None
         # ====================================================
 
         if (
@@ -4629,8 +4853,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # 3. APPLY LOCKED CAMERA REFERENCE
         #
-        # Personal Baseline และ Monitoring
-        # ต้องใช้ preprocessing contract เดียวกัน
+        # Personal Baseline à¹à¸¥à¸° Monitoring
+        # à¸•à¹‰à¸­à¸‡à¹ƒà¸Šà¹‰ preprocessing contract à¹€à¸”à¸µà¸¢à¸§à¸à¸±à¸™
         # ====================================================
 
         try:
@@ -4730,7 +4954,7 @@ class MonitoringPage(QWidget):
 
                 QMessageBox.warning(
                     self,
-                    "ข้อผิดพลาดของระบบตรวจจับ",
+                    "à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸‚à¸­à¸‡à¸£à¸°à¸šà¸šà¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š",
                     str(error),
                 )
 
@@ -4739,8 +4963,8 @@ class MonitoringPage(QWidget):
         # ====================================================
         # 5. PREVIEW
         #
-        # Preview ใช้ corrected frame เดียวกับ Detection
-        # แต่ mirror เฉพาะใน _update_preview()
+        # Preview à¹ƒà¸Šà¹‰ corrected frame à¹€à¸”à¸µà¸¢à¸§à¸à¸±à¸š Detection
+        # à¹à¸•à¹ˆ mirror à¹€à¸‰à¸žà¸²à¸°à¹ƒà¸™ _update_preview()
         # ====================================================
 
         self._update_preview(
@@ -4796,7 +5020,7 @@ class MonitoringPage(QWidget):
             )
         ):
             details.append(
-                "การเลื่อนภาพรวม: "
+                "à¸à¸²à¸£à¹€à¸¥à¸·à¹ˆà¸­à¸™à¸ à¸²à¸žà¸£à¸§à¸¡: "
                 f"{translation_px:.1f} px"
             )
 
@@ -4810,8 +5034,8 @@ class MonitoringPage(QWidget):
             )
         ):
             details.append(
-                "การหมุนภาพรวม: "
-                f"{rotation_deg:+.2f}°"
+                "à¸à¸²à¸£à¸«à¸¡à¸¸à¸™à¸ à¸²à¸žà¸£à¸§à¸¡: "
+                f"{rotation_deg:+.2f}Â°"
             )
 
         if (
@@ -4824,7 +5048,7 @@ class MonitoringPage(QWidget):
             )
         ):
             details.append(
-                "การเปลี่ยนสเกล: "
+                "à¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸ªà¹€à¸à¸¥: "
                 f"{scale_change * 100.0:.1f}%"
             )
 
@@ -4834,12 +5058,12 @@ class MonitoringPage(QWidget):
             )
             if details
             else
-            "ตรวจพบการเปลี่ยนตำแหน่งของกล้อง"
+            "à¸•à¸£à¸§à¸ˆà¸žà¸šà¸à¸²à¸£à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™à¸•à¸³à¹à¸«à¸™à¹ˆà¸‡à¸‚à¸­à¸‡à¸à¸¥à¹‰à¸­à¸‡"
         )
 
         self.status_label.setText(
-            "สถานะ: ตรวจพบการขยับกล้อง "
-            "กำลังจบเซสชัน"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸•à¸£à¸§à¸ˆà¸žà¸šà¸à¸²à¸£à¸‚à¸¢à¸±à¸šà¸à¸¥à¹‰à¸­à¸‡ "
+            "à¸à¸³à¸¥à¸±à¸‡à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™"
         )
 
         self.assessment_label.setText(
@@ -4876,16 +5100,16 @@ class MonitoringPage(QWidget):
 
         QMessageBox.warning(
             self,
-            "ตรวจพบการขยับกล้อง",
-            "PostGuard ตรวจพบว่าตำแหน่งกล้องเปลี่ยน"
-            "ระหว่างการตรวจจับ\n\n"
+            "à¸•à¸£à¸§à¸ˆà¸žà¸šà¸à¸²à¸£à¸‚à¸¢à¸±à¸šà¸à¸¥à¹‰à¸­à¸‡",
+            "PostGuard à¸•à¸£à¸§à¸ˆà¸žà¸šà¸§à¹ˆà¸²à¸•à¸³à¹à¸«à¸™à¹ˆà¸‡à¸à¸¥à¹‰à¸­à¸‡à¹€à¸›à¸¥à¸µà¹ˆà¸¢à¸™"
+            "à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š\n\n"
             f"{detail_text}\n\n"
-            "Camera Reference และ Personal Baseline เดิม"
-            "อาจไม่ตรงกับตำแหน่งกล้องปัจจุบัน "
-            "ระบบจึงจบเซสชันนี้เพื่อไม่ให้ประเมินความเสี่ยงต่อ"
-            "ด้วยข้อมูลอ้างอิงที่ไม่ถูกต้อง\n\n"
-            "กรุณาเริ่ม Monitoring ใหม่ แล้วทำ Camera Setup "
-            "และ Personal Baseline ใหม่",
+            "Camera Reference à¹à¸¥à¸° Personal Baseline à¹€à¸”à¸´à¸¡"
+            "à¸­à¸²à¸ˆà¹„à¸¡à¹ˆà¸•à¸£à¸‡à¸à¸±à¸šà¸•à¸³à¹à¸«à¸™à¹ˆà¸‡à¸à¸¥à¹‰à¸­à¸‡à¸›à¸±à¸ˆà¸ˆà¸¸à¸šà¸±à¸™ "
+            "à¸£à¸°à¸šà¸šà¸ˆà¸¶à¸‡à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™à¸™à¸µà¹‰à¹€à¸žà¸·à¹ˆà¸­à¹„à¸¡à¹ˆà¹ƒà¸«à¹‰à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¸„à¸§à¸²à¸¡à¹€à¸ªà¸µà¹ˆà¸¢à¸‡à¸•à¹ˆà¸­"
+            "à¸”à¹‰à¸§à¸¢à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡\n\n"
+            "à¸à¸£à¸¸à¸“à¸²à¹€à¸£à¸´à¹ˆà¸¡ Monitoring à¹ƒà¸«à¸¡à¹ˆ à¹à¸¥à¹‰à¸§à¸—à¸³ Camera Setup "
+            "à¹à¸¥à¸° Personal Baseline à¹ƒà¸«à¸¡à¹ˆ",
         )
 
         # Existing validated session-finish path:
@@ -4902,27 +5126,27 @@ class MonitoringPage(QWidget):
     ) -> None:
 
         pose_text = (
-            "ตรวจพบ"
+            "à¸•à¸£à¸§à¸ˆà¸žà¸š"
             if result.get(
                 "pose_points"
             )
             is not None
             else
-            "ไม่พบ"
+            "à¹„à¸¡à¹ˆà¸žà¸š"
         )
 
         face_text = (
-            "ตรวจพบ"
+            "à¸•à¸£à¸§à¸ˆà¸žà¸š"
             if result.get(
                 "face_detected"
             )
             else
-            "ไม่พบ"
+            "à¹„à¸¡à¹ˆà¸žà¸š"
         )
 
         self.detection_label.setText(
-            f"ท่าทาง: {pose_text} | "
-            f"ใบหน้า: {face_text}"
+            f"à¸—à¹ˆà¸²à¸—à¸²à¸‡: {pose_text} | "
+            f"à¹ƒà¸šà¸«à¸™à¹‰à¸²: {face_text}"
         )
 
         # ====================================================
@@ -4936,7 +5160,7 @@ class MonitoringPage(QWidget):
         )
 
         self.shoulder_label.setText(
-            f"ความเอียงไหล่: {shoulder:+.2f}°"
+            f"à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¹„à¸«à¸¥à¹ˆ: {shoulder:+.2f}Â°"
             if (
                 type(shoulder)
                 in
@@ -4947,7 +5171,7 @@ class MonitoringPage(QWidget):
                 )
             )
             else
-            "ความเอียงไหล่: --"
+            "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¹„à¸«à¸¥à¹ˆ: --"
         )
 
         # ====================================================
@@ -4973,7 +5197,7 @@ class MonitoringPage(QWidget):
         )
 
         self.neck_label.setText(
-            f"ความเอียงคอด้านข้าง: {neck:+.2f}°"
+            f"à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: {neck:+.2f}Â°"
             if (
                 type(neck)
                 in
@@ -4984,7 +5208,7 @@ class MonitoringPage(QWidget):
                 )
             )
             else
-            "ความเอียงคอด้านข้าง: --"
+            "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
         )
 
         # ====================================================
@@ -4998,7 +5222,7 @@ class MonitoringPage(QWidget):
         )
 
         self.flexion_label.setText(
-            f"มุมก้ม/เงยคอ: {flexion:+.2f}°"
+            f"à¸¡à¸¸à¸¡à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: {flexion:+.2f}Â°"
             if (
                 type(flexion)
                 in
@@ -5009,7 +5233,7 @@ class MonitoringPage(QWidget):
                 )
             )
             else
-            "มุมก้ม/เงยคอ: --"
+            "à¸¡à¸¸à¸¡à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
         )
 
     # ========================================================
@@ -5096,8 +5320,8 @@ class MonitoringPage(QWidget):
         )
 
         self.status_label.setText(
-            "สถานะ: หยุดตรวจจับ "
-            "กำลังจบเซสชัน"
+            "à¸ªà¸–à¸²à¸™à¸°: à¸«à¸¢à¸¸à¸”à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š "
+            "à¸à¸³à¸¥à¸±à¸‡à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™"
         )
 
         self.handle_stop()
@@ -5150,6 +5374,7 @@ class MonitoringPage(QWidget):
             self._close_capture_resources()
 
             self.close_posture_alert()
+            self.close_eye_alert()
 
             # ====================================================
             # CAMERA DATA GAP
@@ -5190,7 +5415,7 @@ class MonitoringPage(QWidget):
             )
 
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: --"
+                "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: --"
             )
 
             # ====================================================
@@ -5206,12 +5431,15 @@ class MonitoringPage(QWidget):
                 None
             )
 
+            self.eye_alert_policy.reset()
+            self.last_eye_alert_result = None
+
             self.eye_state_label.setText(
-                "สถานะตา: --"
+                "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: --"
             )
 
             self.blink_count_label.setText(
-                "จำนวนการกระพริบตา: 0"
+                "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: 0"
             )
 
             # ====================================================
@@ -5225,32 +5453,32 @@ class MonitoringPage(QWidget):
             # ====================================================
 
             self.detection_label.setText(
-                "ท่าทาง: กำลังรอ | "
-                "ใบหน้า: กำลังรอ"
+                "à¸—à¹ˆà¸²à¸—à¸²à¸‡: à¸à¸³à¸¥à¸±à¸‡à¸£à¸­ | "
+                "à¹ƒà¸šà¸«à¸™à¹‰à¸²: à¸à¸³à¸¥à¸±à¸‡à¸£à¸­"
             )
 
             self.shoulder_label.setText(
-                "ความเอียงไหล่: --"
+                "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¹„à¸«à¸¥à¹ˆ: --"
             )
 
             self.neck_label.setText(
-                "ความเอียงคอด้านข้าง: --"
+                "à¸„à¸§à¸²à¸¡à¹€à¸­à¸µà¸¢à¸‡à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
             )
 
             self.flexion_label.setText(
-                "มุมก้ม/เงยคอ: --"
+                "à¸¡à¸¸à¸¡à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
             )
 
             self.shoulder_difference_label.setText(
-                "ผลต่างจาก Baseline ไหล่: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¹„à¸«à¸¥à¹ˆ: --"
             )
 
             self.neck_difference_label.setText(
-                "ผลต่างจาก Baseline คอด้านข้าง: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸„à¸­à¸”à¹‰à¸²à¸™à¸‚à¹‰à¸²à¸‡: --"
             )
 
             self.flexion_difference_label.setText(
-                "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
+                "à¸œà¸¥à¸•à¹ˆà¸²à¸‡à¸ˆà¸²à¸ Baseline à¸à¹‰à¸¡/à¹€à¸‡à¸¢à¸„à¸­: --"
             )
 
             # ====================================================
@@ -5260,7 +5488,7 @@ class MonitoringPage(QWidget):
             self.preview_label.clear()
 
             self.preview_label.setText(
-                "ภาพการตรวจจับจะแสดงที่นี่"
+                "à¸ à¸²à¸žà¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸ˆà¸°à¹à¸ªà¸”à¸‡à¸—à¸µà¹ˆà¸™à¸µà¹ˆ"
             )
 
             # ====================================================
@@ -5359,7 +5587,7 @@ class MonitoringPage(QWidget):
 
             self.alert_label.setText(
                 "Alert Policy: Waiting"
-            )   
+            )
 
     # ========================================================
     # STOP MONITORING
@@ -5392,7 +5620,7 @@ class MonitoringPage(QWidget):
 
                 QMessageBox.warning(
                     self,
-                    "ยังไม่สามารถจบเซสชัน",
+                    "à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™",
                     f"Session {self.session_id} "
                     "may still be RUNNING "
                     "on the server.\n"
@@ -5406,7 +5634,7 @@ class MonitoringPage(QWidget):
         if ended:
 
             self.status_label.setText(
-                "สถานะ: หยุดแล้ว"
+                "à¸ªà¸–à¸²à¸™à¸°: à¸«à¸¢à¸¸à¸”à¹à¸¥à¹‰à¸§"
             )
 
             self.session_label.setText(
@@ -5416,8 +5644,8 @@ class MonitoringPage(QWidget):
         else:
 
             self.status_label.setText(
-                "สถานะ: รอยืนยันการจบเซสชัน"
-                "จากฐานข้อมูล"
+                "à¸ªà¸–à¸²à¸™à¸°: à¸£à¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸à¸²à¸£à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™"
+                "à¸ˆà¸²à¸à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥"
             )
 
             self.session_label.setText(
@@ -5607,8 +5835,8 @@ class MonitoringPage(QWidget):
                 blink_count
             ),
 
-            # คำนวณตอน Stop หลังได้
-            # total_duration / paused_duration จาก Backend
+            # à¸„à¸³à¸™à¸§à¸“à¸•à¸­à¸™ Stop à¸«à¸¥à¸±à¸‡à¹„à¸”à¹‰
+            # total_duration / paused_duration à¸ˆà¸²à¸ Backend
             "blink_rate": (
                 None
             ),
@@ -5922,11 +6150,11 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Backend ยังไม่พร้อม",
+                "Backend à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸žà¸£à¹‰à¸­à¸¡",
                 (
-                    "ยังไม่สามารถ Pause / Resume ได้ "
-                    "จนกว่า PostGuard จะยืนยันสถานะ Session "
-                    "กับ Backend อีกครั้ง"
+                    "à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸– Pause / Resume à¹„à¸”à¹‰ "
+                    "à¸ˆà¸™à¸à¸§à¹ˆà¸² PostGuard à¸ˆà¸°à¸¢à¸·à¸™à¸¢à¸±à¸™à¸ªà¸–à¸²à¸™à¸° Session "
+                    "à¸à¸±à¸š Backend à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡"
                 ),
             )
 
@@ -5985,12 +6213,12 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "หยุดชั่วคราวไม่สำเร็จ",
+                "à¸«à¸¢à¸¸à¸”à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ",
                 (
-                    "ไม่สามารถติดต่อ Backend "
-                    "เพื่อยืนยันสถานะ PAUSED ได้\n\n"
-                    "Local Monitoring จะยังทำงานต่อ "
-                    "จนกว่า Backend จะกลับมา"
+                    "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸•à¸´à¸”à¸•à¹ˆà¸­ Backend "
+                    "à¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸ªà¸–à¸²à¸™à¸° PAUSED à¹„à¸”à¹‰\n\n"
+                    "Local Monitoring à¸ˆà¸°à¸¢à¸±à¸‡à¸—à¸³à¸‡à¸²à¸™à¸•à¹ˆà¸­ "
+                    "à¸ˆà¸™à¸à¸§à¹ˆà¸² Backend à¸ˆà¸°à¸à¸¥à¸±à¸šà¸¡à¸²"
                 ),
             )
 
@@ -6004,10 +6232,10 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "หยุดชั่วคราวไม่สำเร็จ",
+                "à¸«à¸¢à¸¸à¸”à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ",
                 (
-                    "ไม่สามารถยืนยันสถานะ "
-                    "PAUSED ได้\n"
+                    "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¸·à¸™à¸¢à¸±à¸™à¸ªà¸–à¸²à¸™à¸° "
+                    "PAUSED à¹„à¸”à¹‰\n"
                     f"{error}"
                 ),
             )
@@ -6041,8 +6269,12 @@ class MonitoringPage(QWidget):
             None
         )
 
+        self.eye_alert_policy.reset()
+        self.last_eye_alert_result = None
+        self.close_eye_alert()
+
         self.eye_state_label.setText(
-            "สถานะตา: PAUSED"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: PAUSED"
         )
 
         # ====================================================
@@ -6052,7 +6284,7 @@ class MonitoringPage(QWidget):
         self.preview_label.clear()
 
         self.preview_label.setText(
-            "หยุดการตรวจจับชั่วคราว"
+            "à¸«à¸¢à¸¸à¸”à¸à¸²à¸£à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§"
         )
 
         self.assessment_label.setText(
@@ -6080,12 +6312,12 @@ class MonitoringPage(QWidget):
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: PAUSED"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: PAUSED"
         )
 
         self.status_label.setText(
-            "สถานะ: หยุดชั่วคราว "
-            f"(จำนวนครั้ง: "
+            "à¸ªà¸–à¸²à¸™à¸°: à¸«à¸¢à¸¸à¸”à¸Šà¸±à¹ˆà¸§à¸„à¸£à¸²à¸§ "
+            f"(à¸ˆà¸³à¸™à¸§à¸™à¸„à¸£à¸±à¹‰à¸‡: "
             f"{remote['pause_count']})"
         )
 
@@ -6118,12 +6350,12 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "ตรวจจับต่อไม่สำเร็จ",
+                "à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸•à¹ˆà¸­à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ",
                 (
-                    "ไม่สามารถติดต่อ Backend "
-                    "เพื่อยืนยันสถานะ RUNNING ได้\n\n"
-                    "Session จะยังคง PAUSED "
-                    "จนกว่า Backend จะกลับมา"
+                    "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸•à¸´à¸”à¸•à¹ˆà¸­ Backend "
+                    "à¹€à¸žà¸·à¹ˆà¸­à¸¢à¸·à¸™à¸¢à¸±à¸™à¸ªà¸–à¸²à¸™à¸° RUNNING à¹„à¸”à¹‰\n\n"
+                    "Session à¸ˆà¸°à¸¢à¸±à¸‡à¸„à¸‡ PAUSED "
+                    "à¸ˆà¸™à¸à¸§à¹ˆà¸² Backend à¸ˆà¸°à¸à¸¥à¸±à¸šà¸¡à¸²"
                 ),
             )
 
@@ -6137,10 +6369,10 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "ตรวจจับต่อไม่สำเร็จ",
+                "à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸•à¹ˆà¸­à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ",
                 (
-                    "ไม่สามารถยืนยันสถานะ "
-                    "RUNNING ได้\n"
+                    "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸¢à¸·à¸™à¸¢à¸±à¸™à¸ªà¸–à¸²à¸™à¸° "
+                    "RUNNING à¹„à¸”à¹‰\n"
                     f"{error}"
                 ),
             )
@@ -6168,18 +6400,22 @@ class MonitoringPage(QWidget):
 
         self.last_blink_result = None
 
+        self.eye_alert_policy.reset()
+        self.last_eye_alert_result = None
+        self.close_eye_alert()
+
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "à¸ªà¸–à¸²à¸™à¸°à¸•à¸²: à¸à¸³à¸¥à¸±à¸‡ Calibration"
         )
 
         self.blink_count_label.setText(
-            "จำนวนการกระพริบตา: "
+            "à¸ˆà¸³à¸™à¸§à¸™à¸à¸²à¸£à¸à¸£à¸°à¸žà¸£à¸´à¸šà¸•à¸²: "
             f"{self.blink_detector.total_blinks}"
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: "
-            "กำลังประเมินใหม่"
+            "à¸£à¸°à¸¢à¸°à¸«à¹ˆà¸²à¸‡à¸«à¸™à¹‰à¸²à¸ˆà¸­: "
+            "à¸à¸³à¸¥à¸±à¸‡à¸›à¸£à¸°à¹€à¸¡à¸´à¸™à¹ƒà¸«à¸¡à¹ˆ"
         )
 
         # ====================================================
@@ -6187,15 +6423,15 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.preview_label.setText(
-            "กำลังตรวจจับต่อ..."
+            "à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¸•à¹ˆà¸­..."
         )
 
         self.status_label.setText(
-            "สถานะ: กำลังตรวจจับ "
+            "à¸ªà¸–à¸²à¸™à¸°: à¸à¸³à¸¥à¸±à¸‡à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸š "
             "(RUNNING) "
-            "| เวลาหยุดรวม: "
+            "| à¹€à¸§à¸¥à¸²à¸«à¸¢à¸¸à¸”à¸£à¸§à¸¡: "
             f"{remote['paused_duration']} "
-            "วินาที"
+            "à¸§à¸´à¸™à¸²à¸—à¸µ"
         )
 
         self.pause_button.setText(
@@ -6296,13 +6532,13 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "ไม่สามารถจบเซสชัน",
+                "à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸ˆà¸šà¹€à¸‹à¸ªà¸Šà¸±à¸™",
                 (
-                    "Backend ยังไม่ยืนยันว่า "
-                    "Session สิ้นสุด\n"
+                    "Backend à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¢à¸·à¸™à¸¢à¸±à¸™à¸§à¹ˆà¸² "
+                    "Session à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”\n"
                     f"{error}\n\n"
-                    "กรุณาตรวจสอบ Backend "
-                    "แล้วกด Stop อีกครั้ง"
+                    "à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š Backend "
+                    "à¹à¸¥à¹‰à¸§à¸à¸” Stop à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡"
                 ),
             )
 
@@ -6608,14 +6844,14 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "เกิดข้อผิดพลาดในการบันทึกสรุป",
+                "à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¹ƒà¸™à¸à¸²à¸£à¸šà¸±à¸™à¸—à¸¶à¸à¸ªà¸£à¸¸à¸›",
                 (
-                    "Session สิ้นสุดแล้ว "
-                    "แต่ยังบันทึก Summary "
-                    "ไม่สำเร็จ\n\n"
+                    "Session à¸ªà¸´à¹‰à¸™à¸ªà¸¸à¸”à¹à¸¥à¹‰à¸§ "
+                    "à¹à¸•à¹ˆà¸¢à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸ Summary "
+                    "à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ\n\n"
                     f"{error}\n\n"
-                    "สามารถกด Retry "
-                    "ที่หน้า Summary ได้"
+                    "à¸ªà¸²à¸¡à¸²à¸£à¸–à¸à¸” Retry "
+                    "à¸—à¸µà¹ˆà¸«à¸™à¹‰à¸² Summary à¹„à¸”à¹‰"
                 ),
             )
 

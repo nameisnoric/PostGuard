@@ -14,6 +14,9 @@ from app.database.database import get_db
 from app.models.alert_notification import (
     AlertNotification,
 )
+from app.models.eye_alert_notification import (
+    EyeAlertNotification,
+)
 from app.models.risk_event_record import (
     RiskEventRecord,
 )
@@ -135,6 +138,10 @@ def _summary_request_values(
 
         "total_alert_count",
         "most_frequent_alert_event",
+
+        "eye_alert_count",
+        "eye_first_alert_count",
+        "eye_repeat_alert_count",
     }
 
     return {
@@ -276,6 +283,24 @@ def create_session_summary(
         ).all()
     )
 
+    eye_notifications = list(
+        db.scalars(
+            select(
+                EyeAlertNotification
+            )
+            .where(
+                EyeAlertNotification.session_id
+                ==
+                session_id
+            )
+            .order_by(
+                EyeAlertNotification
+                .emitted_at
+                .asc()
+            )
+        ).all()
+    )
+
     # --------------------------------------------------------
     # 6. Risk Event durations
     # --------------------------------------------------------
@@ -360,6 +385,24 @@ def create_session_summary(
         notifications
     )
 
+    eye_alert_count = len(
+        eye_notifications
+    )
+
+    eye_first_alert_count = sum(
+        1
+        for notification
+        in eye_notifications
+        if notification.alert_type == "FIRST"
+    )
+
+    eye_repeat_alert_count = sum(
+        1
+        for notification
+        in eye_notifications
+        if notification.alert_type == "REPEAT"
+    )
+
     # --------------------------------------------------------
     # 8. Most frequent notification type
     # --------------------------------------------------------
@@ -435,6 +478,18 @@ def create_session_summary(
 
             most_frequent_alert_event=(
                 most_frequent_alert_event
+            ),
+
+            eye_alert_count=(
+                eye_alert_count
+            ),
+
+            eye_first_alert_count=(
+                eye_first_alert_count
+            ),
+
+            eye_repeat_alert_count=(
+                eye_repeat_alert_count
             ),
         )
     )

@@ -326,6 +326,10 @@ class SessionSummaryResponse(
         str | None
     )
 
+    eye_alert_count: int
+    eye_first_alert_count: int
+    eye_repeat_alert_count: int
+
     blink_rate: float | None
 
     model_config = ConfigDict(

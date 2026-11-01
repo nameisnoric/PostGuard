@@ -133,9 +133,8 @@ class AlertHistoryDialog(QDialog):
         # ==================================================
 
         self.description = QLabel(
-            "ประวัติการแจ้งเตือนที่เกิดจาก PostGuard Alert Policy "
-            "โดยหนึ่ง Risk Event สามารถมีการแจ้งเตือนได้หลายครั้ง "
-            "เช่น FIRST, REPEAT และ ESCALATION"
+            "ประวัติการแจ้งเตือนของ Session ทั้ง Posture Alert และ "
+            "Eye Reminder โดย Eye Reminder แยกจาก Posture Risk Event"
         )
         self.description.setWordWrap(
             True
@@ -583,6 +582,72 @@ class AlertHistoryDialog(QDialog):
                     "Invalid alert notifications response"
                 )
 
+            for notification in notifications:
+                if isinstance(notification, dict):
+                    notification["alert_category"] = "POSTURE"
+
+            eye_response = (
+                APIClient
+                .get_session_eye_alert_notifications(
+                    session_id
+                )
+            )
+
+            if not eye_response.ok:
+                raise RuntimeError(
+                    (
+                        f"GET /sessions/{session_id}"
+                        "/eye-alert-notifications "
+                        f"HTTP {eye_response.status_code}: "
+                        f"{self._message(eye_response)}"
+                    )
+                )
+
+            eye_rows = eye_response.json()
+
+            if not isinstance(
+                eye_rows,
+                list,
+            ):
+                raise ValueError(
+                    "Invalid eye alert notifications response"
+                )
+
+            for eye in eye_rows:
+                if not isinstance(eye, dict):
+                    continue
+
+                rate = eye.get("blink_rate")
+                count = eye.get("window_blink_count")
+                reason = eye.get("reason") or "LOW_BLINK_REMINDER"
+
+                notifications.append(
+                    {
+                        "notification_id": (
+                            "EYE-"
+                            + str(
+                                eye.get(
+                                    "eye_notification_id",
+                                    "--",
+                                )
+                            )
+                        ),
+                        "risk_event_id": "--",
+                        "alert_category": "EYE",
+                        "alert_type": eye.get("alert_type", "--"),
+                        "risk_level": "EYE",
+                        "decision": eye.get("decision", "ALERT"),
+                        "reason": (
+                            f"{reason} | Blink Rate "
+                            f"{rate if rate is not None else 'N/A'}/min "
+                            f"| Window Blinks "
+                            f"{count if count is not None else 'N/A'}"
+                        ),
+                        "emitted_at": eye.get("emitted_at"),
+                        "created_at": eye.get("created_at"),
+                    }
+                )
+
         except (
             requests.RequestException,
             ValueError,
@@ -621,6 +686,9 @@ class AlertHistoryDialog(QDialog):
             notifications
         )
 
+        posture_count = 0
+        eye_count = 0
+
         first_count = 0
         repeat_count = 0
         escalation_count = 0
@@ -634,6 +702,18 @@ class AlertHistoryDialog(QDialog):
             ):
                 other_count += 1
                 continue
+
+            category = str(
+                notification.get(
+                    "alert_category",
+                    "POSTURE",
+                )
+            ).upper()
+
+            if category == "EYE":
+                eye_count += 1
+            else:
+                posture_count += 1
 
             alert_type = str(
                 notification.get(
@@ -656,6 +736,8 @@ class AlertHistoryDialog(QDialog):
 
         stats_text = (
             f"ทั้งหมด: {total_count} | "
+            f"Posture: {posture_count} | "
+            f"Eye: {eye_count} | "
             f"ครั้งแรก: {first_count} | "
             f"ซ้ำ: {repeat_count} | "
             f"ระดับความเสี่ยงเพิ่มขึ้น: "

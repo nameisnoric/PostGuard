@@ -86,10 +86,6 @@ class SessionRecoveryTests(
 
     # ========================================================
     # REUSE DESKTOP WORKFLOW FIXTURES
-    #
-    # We reuse the heavy MainWindow setup, but response()
-    # above remains local so module import does not depend on
-    # fixtures.response existing during discovery.
     # ========================================================
 
     setUp = (
@@ -118,15 +114,14 @@ class SessionRecoveryTests(
         self,
     ):
         with (
-            patch.object(
-                APIClient,
-                "get_sessions",
-                return_value=response([
+            patch(
+                "app.ui.windows.main_window.find_unclosed_sessions",
+                return_value=[
                     {
                         "session_id": 9,
                         "status": "RUNNING",
                     }
-                ]),
+                ],
             ),
             patch(
                 "PySide6.QtWidgets.QMessageBox.question",
@@ -136,9 +131,8 @@ class SessionRecoveryTests(
                     .No
                 ),
             ),
-            patch.object(
-                APIClient,
-                "interrupt_session",
+            patch(
+                "app.ui.windows.main_window.interrupt_previous_session",
             ) as interrupt,
         ):
             self.window.show_monitor()
@@ -160,15 +154,14 @@ class SessionRecoveryTests(
         self,
     ):
         with (
-            patch.object(
-                APIClient,
-                "get_sessions",
-                return_value=response([
+            patch(
+                "app.ui.windows.main_window.find_unclosed_sessions",
+                return_value=[
                     {
                         "session_id": 9,
                         "status": "PAUSED",
                     }
-                ]),
+                ],
             ),
             patch(
                 "PySide6.QtWidgets.QMessageBox.question",
@@ -178,13 +171,8 @@ class SessionRecoveryTests(
                     .Yes
                 ),
             ),
-            patch.object(
-                APIClient,
-                "interrupt_session",
-                return_value=response({
-                    "session_id": 9,
-                    "status": "INTERRUPTED",
-                }),
+            patch(
+                "app.ui.windows.main_window.interrupt_previous_session",
             ) as interrupt,
         ):
             self.window.show_monitor()
@@ -247,20 +235,11 @@ class SessionRecoveryTests(
     def test_lost_interrupt_response_reconciles_with_get(
         self,
     ):
-        # ========================================================
-        # CASE 1:
-        #
+        # ----------------------------------------------------
+        # CASE 1
         # Interrupt request times out.
-        #
-        # The write may already have reached Backend, so service
-        # must confirm the authoritative state using GET.
-        #
-        # Successful confirmation is represented by:
-        #
-        #     no exception
-        #
-        # interrupt_previous_session() intentionally returns None.
-        # ========================================================
+        # Backend state is checked afterward.
+        # ----------------------------------------------------
 
         with (
             patch.object(
@@ -283,7 +262,6 @@ class SessionRecoveryTests(
                 )
             )
 
-        # Current service contract returns None on success.
         self.assertIsNone(
             result
         )
@@ -296,14 +274,10 @@ class SessionRecoveryTests(
             9
         )
 
-        # ========================================================
-        # CASE 2:
-        #
-        # Backend answers successfully but confirms a different
-        # Session ID.
-        #
-        # That must never be treated as successful recovery.
-        # ========================================================
+        # ----------------------------------------------------
+        # CASE 2
+        # Backend returns wrong Session ID.
+        # ----------------------------------------------------
 
         with patch.object(
             APIClient,
@@ -320,11 +294,10 @@ class SessionRecoveryTests(
                     9
                 )
 
-        # ========================================================
-        # CASE 3:
-        #
+        # ----------------------------------------------------
+        # CASE 3
         # Correct Session ID but wrong final status.
-        # ========================================================
+        # ----------------------------------------------------
 
         with patch.object(
             APIClient,
@@ -340,6 +313,7 @@ class SessionRecoveryTests(
                 interrupt_previous_session(
                     9
                 )
+
     # ========================================================
     # MALFORMED SESSION LIST
     # ========================================================
@@ -480,7 +454,11 @@ class SessionRecoveryTests(
         login_response = response({
             "access_token": (
                 "secret-token"
-            )
+            ),
+            "refresh_token": (
+                "secret-refresh-token"
+            ),
+            "expires_in": 1800,
         })
 
         login_response.text = (
@@ -568,7 +546,9 @@ class SessionRecoveryTests(
                 APIClient,
                 "login",
                 return_value=response({
-                    "access_token": "token"
+                    "access_token": "token",
+                    "refresh_token": "refresh-token",
+                    "expires_in": 1800,
                 }),
             ),
             patch.object(

@@ -26,3 +26,6 @@ from app.models.risk_event_record import (
 from app.models.alert_notification import (
     AlertNotification,
 )
+from app.models.eye_alert_notification import (
+    EyeAlertNotification,
+)
