@@ -17,6 +17,8 @@ EVENT_LABELS = {
     "SHOULDER_TILT": "Shoulder asymmetry",
     "NECK_LATERAL_TILT": "Neck side-bending",
     "NECK_FLEXION": "Neck flexion/extension",
+    "SCREEN_DISTANCE": "Screen distance",
+    "LOW_BLINK_RATE": "Low blink rate",
 }
 
 
@@ -32,6 +34,7 @@ class PostureAlertDialog(QDialog):
         event_type="NECK_LATERAL_TILT",
         factor=None,
         risk_level="MEDIUM",
+        recorded=True,
     ):
         super().__init__(parent)
         self.setWindowTitle("PostGuard - Posture Alert")
@@ -57,14 +60,19 @@ class PostureAlertDialog(QDialog):
         icon.setProperty("role", "warningIcon")
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon.setFixedSize(48, 48)
-        heading = QLabel("Posture Alert")
+        heading = QLabel("PostGuard Alert")
         heading.setProperty("role", "title")
         heading_row.addWidget(icon)
         heading_row.addWidget(heading, 1)
 
-        message = QLabel(
-            "ตรวจพบท่าทางที่ควรปรับต่อเนื่อง กรุณากลับสู่ท่าทางที่ผ่อนคลายและเหมาะสม"
-        )
+        messages = {
+            "SCREEN_DISTANCE": "คุณอยู่ใกล้หน้าจอกว่าค่าตั้งต้นต่อเนื่อง กรุณาปรับระยะห่างให้เหมาะสม",
+            "LOW_BLINK_RATE": "ตรวจพบอัตราการกะพริบตาต่ำ กรุณาพักสายตาและกะพริบตาตามธรรมชาติ",
+        }
+        message = QLabel(messages.get(
+            event_type,
+            "ตรวจพบท่าทางที่ควรปรับต่อเนื่อง กรุณากลับสู่ท่าทางที่ผ่อนคลายและเหมาะสม",
+        ))
         message.setWordWrap(True)
 
         details = QFrame()
@@ -79,7 +87,11 @@ class PostureAlertDialog(QDialog):
         self.duration_label = QLabel(
             f"ระยะเวลาต่อเนื่อง: {max(0.0, float(duration_seconds)):.1f} วินาที"
         )
-        saved_label = QLabel("บันทึกเหตุการณ์นี้ใน Alert Events แล้ว")
+        saved_label = QLabel(
+            "บันทึกเหตุการณ์นี้ใน Alert Events แล้ว"
+            if recorded
+            else "กำลังรอบันทึกเหตุการณ์เมื่อเชื่อมต่อ Backend ได้"
+        )
         saved_label.setProperty("role", "muted")
         for widget in (
             self.event_label,

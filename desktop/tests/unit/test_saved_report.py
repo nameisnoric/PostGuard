@@ -113,7 +113,11 @@ class SavedReportTests(unittest.TestCase):
             APIClient,
             "get_session_alert_notifications",
             return_value=notifications,
-        ), patch.object(APIClient, "get_session_alerts") as legacy:
+        ), patch.object(
+            APIClient,
+            "get_session_alerts",
+            return_value=Mock(ok=True, json=lambda: []),
+        ) as legacy:
             page = SessionSummaryPage()
             page.set_saved_report(self.session, self.saved)
 
@@ -121,7 +125,7 @@ class SavedReportTests(unittest.TestCase):
         self.assertTrue(page.alert_closed_label.text().endswith("3"))
         self.assertTrue(page.alert_active_label.text().endswith("0"))
         self.assertIn("6 seconds", page.alert_duration_label.text())
-        legacy.assert_not_called()
+        legacy.assert_called_once_with(7)
         page.deleteLater()
 
     def test_history_load_select_and_open(self):

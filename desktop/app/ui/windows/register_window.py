@@ -14,6 +14,7 @@ import requests
 
 from app.services.api_client import APIClient
 from app.ui.theme import APP_QSS, set_centered_window
+from app.ui.utils.password_visibility import attach_password_visibility
 
 
 class RegisterWindow(QWidget):
@@ -83,17 +84,13 @@ class RegisterWindow(QWidget):
             "รหัสผ่าน"
         )
 
-        self.password_input.setEchoMode(
-            QLineEdit.EchoMode.Password
-        )
+        attach_password_visibility(self.password_input)
 
         self.confirm_password_input = QLineEdit()
         self.confirm_password_input.setPlaceholderText(
             "ยืนยันรหัสผ่าน"
         )
-        self.confirm_password_input.setEchoMode(
-            QLineEdit.EchoMode.Password
-        )
+        attach_password_visibility(self.confirm_password_input)
 
         # -------------------------
         # Buttons

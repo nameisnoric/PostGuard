@@ -7,6 +7,20 @@ It is NOT total posture exposure duration.
 from datetime import datetime
 
 
+WELLNESS_EVENT_TYPES = {"SCREEN_DISTANCE", "LOW_BLINK_RATE"}
+
+
+def wellness_alerts(alerts):
+    """Return non-RULA wellness episodes from the legacy alert endpoint."""
+    if not isinstance(alerts, list):
+        raise ValueError("Alert API must return a list")
+    return [
+        alert for alert in alerts
+        if isinstance(alert, dict)
+        and alert.get("event_type") in WELLNESS_EVENT_TYPES
+    ]
+
+
 def validate_session_id(session_id):
     if type(session_id) is not int or session_id <= 0:
         raise ValueError("session_id must be a positive integer")
@@ -104,6 +118,23 @@ def summarize_integrated_alerts(risk_events, notifications):
         "closed_alerts": resolved,
         "incomplete_alerts": incomplete,
         "closed_alert_seconds": round(resolved_duration),
+    }
+
+
+def summarize_combined_alerts(risk_events, notifications, legacy_alerts):
+    """Combine RULA notifications with separate wellness alert episodes."""
+    integrated = summarize_integrated_alerts(risk_events, notifications)
+    wellness = summarize_alerts(wellness_alerts(legacy_alerts))
+    return {
+        "total_alerts": integrated["total_alerts"] + wellness["total_alerts"],
+        "active_alerts": integrated["active_alerts"] + wellness["active_alerts"],
+        "closed_alerts": integrated["closed_alerts"] + wellness["closed_alerts"],
+        "incomplete_alerts": (
+            integrated["incomplete_alerts"] + wellness["incomplete_alerts"]
+        ),
+        "closed_alert_seconds": (
+            integrated["closed_alert_seconds"] + wellness["closed_alert_seconds"]
+        ),
     }
 
 

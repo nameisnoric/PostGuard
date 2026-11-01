@@ -46,7 +46,8 @@ FEATURE_SPECS = {
     "eye_distance": {
         "label": "Relative Eye Distance",
         "unit": "px",
-        "baseline_key": "eye_distance_baseline_px",
+        "baseline_key": "ipd_baseline",
+        "legacy_baseline_key": "eye_distance_baseline_px",
     },
 }
 
@@ -673,16 +674,16 @@ def build_session_monitoring_snapshot(
         # Baseline
         # ----------------------------------------------------
 
-        baseline_value = (
-            _finite_number(
-                _read_value(
-                    baseline,
-                    spec[
-                        "baseline_key"
-                    ],
-                )
-            )
+        raw_baseline_value = _read_value(
+            baseline,
+            spec["baseline_key"],
         )
+        if raw_baseline_value is None and spec.get("legacy_baseline_key"):
+            raw_baseline_value = _read_value(
+                baseline,
+                spec["legacy_baseline_key"],
+            )
+        baseline_value = _finite_number(raw_baseline_value)
 
         # ----------------------------------------------------
         # Current Detection

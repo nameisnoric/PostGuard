@@ -24,7 +24,7 @@ from app.services.alert_history_service import (
     event_type_label,
     local_datetime,
     summarize_alerts,
-    summarize_integrated_alerts,
+    summarize_combined_alerts,
 )
 from app.services.session_summary_service import (
     save_session_summary,
@@ -140,6 +140,8 @@ class SessionSummaryPage(QWidget):
         self.average_risk_label = QLabel('คะแนนความเสี่ยงเฉลี่ย: N/A')
         self.maximum_risk_label = QLabel('คะแนนความเสี่ยงสูงสุด: N/A')
         self.blink_rate_label = QLabel('อัตราการกะพริบตา: N/A')
+        self.data_gap_label = QLabel('ช่วงเวลาที่ไม่มีข้อมูล: 00:00:00')
+        self.camera_loss_label = QLabel('จำนวนครั้งที่กล้องขาดการเชื่อมต่อ: 0')
         self.report_alert_count_label = QLabel('จำนวนการแจ้งเตือนที่บันทึก: --')
         self.frequent_event_label = QLabel('การแจ้งเตือนที่พบบ่อยที่สุด: N/A')
         self.risk_breakdown_label = QLabel('รายละเอียดความเสี่ยง: --')
@@ -148,6 +150,8 @@ class SessionSummaryPage(QWidget):
             self.average_risk_label,
             self.maximum_risk_label,
             self.blink_rate_label,
+            self.data_gap_label,
+            self.camera_loss_label,
             self.report_alert_count_label,
             self.frequent_event_label,
             self.risk_breakdown_label,
@@ -390,6 +394,14 @@ class SessionSummaryPage(QWidget):
         self.blink_rate_label.setText(
             "อัตราการกะพริบตา: " + self._number_or_na(report_metrics.get("blink_rate"))
         )
+        self.data_gap_label.setText(
+            "ช่วงเวลาที่ไม่มีข้อมูล: "
+            + duration_text(report_metrics.get("data_gap_duration", 0))
+        )
+        self.camera_loss_label.setText(
+            "จำนวนครั้งที่กล้องขาดการเชื่อมต่อ: "
+            + str(report_metrics.get("camera_loss_count", 0))
+        )
         alert_count = report_metrics.get("total_alert_count")
         self.report_alert_count_label.setText(
             f"จำนวนการแจ้งเตือนที่บันทึก: {alert_count if alert_count is not None else 'N/A'}"
@@ -509,26 +521,26 @@ class SessionSummaryPage(QWidget):
             notification_response = APIClient.get_session_alert_notifications(
                 session_id
             )
+            legacy_response = APIClient.get_session_alerts(session_id)
             stats = None
             if event_response.ok and notification_response.ok:
                 risk_events = event_response.json()
                 notifications = notification_response.json()
-                integrated_stats = summarize_integrated_alerts(
-                    risk_events,
-                    notifications,
+                legacy_alerts = legacy_response.json() if legacy_response.ok else []
+                integrated_stats = summarize_combined_alerts(
+                    risk_events, notifications, legacy_alerts,
                 )
-                if risk_events or notifications:
+                if risk_events or notifications or integrated_stats["total_alerts"]:
                     stats = integrated_stats
 
             # Reports created before integrated risk persistence still use the
             # legacy alert-events endpoint.
             if stats is None:
-                response = APIClient.get_session_alerts(session_id)
-                if not response.ok:
+                if not legacy_response.ok:
                     raise RuntimeError(
-                        f"Alert API HTTP {response.status_code}"
+                        f"Alert API HTTP {legacy_response.status_code}"
                     )
-                stats = summarize_alerts(response.json())
+                stats = summarize_alerts(legacy_response.json())
 
             self.alert_total_label.setText(
                 f"การแจ้งเตือนทั้งหมด: {stats['total_alerts']}"

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from app.services.api_client import APIClient
 from app.services.alert_history_service import (
     duration_text, event_type_label, local_datetime, summarize_alerts,
-    validate_session_id,
+    validate_session_id, wellness_alerts,
 )
 from app.ui.theme import APP_QSS
 
@@ -129,13 +129,15 @@ class AlertHistoryDialog(QDialog):
     def _integrated_records(self, session_id):
         event_response = APIClient.get_session_risk_events(session_id)
         notification_response = APIClient.get_session_alert_notifications(session_id)
+        legacy_response = APIClient.get_session_alerts(session_id)
         if not event_response.ok or not notification_response.ok:
             return None
         events = event_response.json()
         notifications = notification_response.json()
         if not isinstance(events, list) or not isinstance(notifications, list):
             return None
-        if not events and not notifications:
+        legacy = wellness_alerts(legacy_response.json()) if legacy_response.ok else []
+        if not events and not notifications and not legacy:
             return None
 
         rows = []
@@ -168,12 +170,33 @@ class AlertHistoryDialog(QDialog):
                     "--", "--", "SENT",
                 ],
             })
+        for alert in legacy:
+            ended = alert.get("ended_at")
+            rows.append({
+                "sort_at": alert.get("started_at"),
+                "values": [
+                    f"W#{alert.get('event_id', '--')}",
+                    event_type_label(alert.get("event_type")),
+                    "Wellness",
+                    local_datetime(alert.get("started_at")),
+                    local_datetime(ended),
+                    duration_text(alert.get("duration")) if ended else "--",
+                    (
+                        "INCOMPLETE" if alert.get("incomplete")
+                        else "CLOSED" if ended else "ACTIVE"
+                    ),
+                ],
+            })
         rows.sort(key=lambda row: str(row.get("sort_at") or ""))
         active = sum(1 for event in events if event.get("status") == "ACTIVE")
+        active += sum(1 for alert in legacy if alert.get("ended_at") is None)
         incomplete = sum(1 for event in events if event.get("status") == "INCOMPLETE")
+        incomplete += sum(1 for alert in legacy if alert.get("incomplete"))
         duration = sum(float(event.get("duration_seconds") or 0) for event in events)
+        duration += sum(float(alert.get("duration") or 0) for alert in legacy)
         stats = (
             f"Risk events: {len(events)} | Notifications: {len(notifications)} | "
+            f"Wellness episodes: {len(legacy)} | "
             f"Active: {active} | Incomplete: {incomplete} | "
             f"Recorded risk time: {duration_text(duration)}"
         )

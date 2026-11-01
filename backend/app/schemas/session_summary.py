@@ -9,6 +9,8 @@ class SessionSummaryCreate(BaseModel):
     maximum_risk_score: float | None = Field(default=None, ge=1, le=7)
     risk_score_method: str | None = Field(default=None, max_length=40)
     blink_rate: float | None = Field(default=None, ge=0)
+    data_gap_duration: float = Field(default=0.0, ge=0)
+    camera_loss_count: int = Field(default=0, ge=0, strict=True)
 
     detection_count: int = Field(default=0, ge=0, strict=True)
     pose_detected_count: int = Field(default=0, ge=0, strict=True)
@@ -62,5 +64,7 @@ class SessionSummaryResponse(BaseModel):
     total_alert_count: int
     most_frequent_alert_event: str | None
     blink_rate: float | None
+    data_gap_duration: float
+    camera_loss_count: int
 
     model_config = ConfigDict(from_attributes=True)

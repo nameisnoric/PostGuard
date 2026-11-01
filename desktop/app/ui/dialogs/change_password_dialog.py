@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.api_client import APIClient
+from app.ui.utils.password_visibility import attach_password_visibility
 from app.ui.theme import APP_QSS
 
 
@@ -71,7 +72,7 @@ class ChangePasswordDialog(QDialog):
     def _password_field(placeholder: str) -> QLineEdit:
         field = QLineEdit()
         field.setPlaceholderText(placeholder)
-        field.setEchoMode(QLineEdit.EchoMode.Password)
+        attach_password_visibility(field)
         return field
 
     @staticmethod

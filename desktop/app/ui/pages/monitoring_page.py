@@ -29,12 +29,16 @@ from app.services.api_client import APIClient
 from app.services.risk_persistence_service import RiskPersistenceService
 from app.services.alert_sound import AlertSoundPlayer
 from app.services.session_summary_service import save_session_summary
+from app.services.camera_loss_tracker import CameraLossTracker
+from app.services.wellness_alert_persistence import WellnessAlertPersistence
 from app.ui.dialogs.posture_alert_dialog import PostureAlertDialog
 from app.ui.utils.preview_sizing import fit_preview_label
 from app.ui.utils.risk_display import format_rula_percent
 
 
 class MonitoringPage(QWidget):
+    CAMERA_RECONNECT_INTERVAL_SECONDS = 1.0
+
     stop_requested = Signal(dict)
     state_changed = Signal()
 
@@ -62,6 +66,10 @@ class MonitoringPage(QWidget):
         self.risk_persistence = RiskPersistenceService()
         self.sound_player = AlertSoundPlayer()
         self.alert_popup = None
+        self.camera_loss = CameraLossTracker()
+        self._camera_gap_suspended_for_pause = False
+        self._last_camera_reconnect_attempt = float("-inf")
+        self.wellness_persistence = WellnessAlertPersistence()
 
         self.timer = QTimer(self)
         self.timer.setInterval(30)
@@ -175,10 +183,12 @@ class MonitoringPage(QWidget):
         self.neck_difference_label = QLabel('ผลต่างความเอียงคอ: --')
         self.eye_state_label = QLabel('Eye State: กำลังปรับเทียบ')
         self.blink_rate_label = QLabel('Blink Rate: N/A')
+        self.screen_distance_label = QLabel('Screen Distance: กำลังรอข้อมูล')
         for label in (
             self.detection_label, self.shoulder_label, self.neck_label,
             self.shoulder_difference_label, self.neck_difference_label,
             self.eye_state_label, self.blink_rate_label,
+            self.screen_distance_label,
         ):
             detection_layout.addWidget(label)
 
@@ -368,6 +378,10 @@ class MonitoringPage(QWidget):
         self.latest_blink_rate = None
         self.risk_samples.clear()
         self.latest_risk_result = None
+        self.camera_loss.reset()
+        self._camera_gap_suspended_for_pause = False
+        self._last_camera_reconnect_attempt = float("-inf")
+        self.wellness_persistence.reset()
         self.reset_risk_tracking()
         self.session_label.setText(f"Session ID: {self.session_id}")
         self.status_label.setText('สถานะ: กำลังตรวจจับ (RUNNING)')
@@ -538,6 +552,7 @@ class MonitoringPage(QWidget):
             factor=alert.get("factor"),
             duration_seconds=alert.get("duration_seconds", 0.0),
             risk_level=alert.get("risk_level", "MEDIUM"),
+            recorded=alert.get("recorded", True),
             parent=self.window(),
         )
         self.alert_popup.show_alert()
@@ -595,13 +610,11 @@ class MonitoringPage(QWidget):
             self.latest_blink_rate = blink_statistics.get("blink_rate")
 
     def update_frame(self) -> None:
-        if self.capture is None or self.is_paused or self.is_stopping:
+        if self.is_paused or self.is_stopping:
             return
 
-        success, frame = self.capture.read()
-        if not success or frame is None:
-            self._finish_after_capture_error()
-            QMessageBox.warning(self, 'ข้อผิดพลาดของกล้อง', "Unable to read camera frame.")
+        frame = self._read_or_reconnect_camera()
+        if frame is None:
             return
 
         frame = mirror_camera_frame(frame)
@@ -618,11 +631,97 @@ class MonitoringPage(QWidget):
                 self.update_baseline_comparison(result)
                 self.update_partial_risk(result)
                 self._update_detection_labels(result)
+                self._update_wellness_alert(result)
             except Exception as error:
                 self._finish_after_capture_error()
                 QMessageBox.warning(self, 'ข้อผิดพลาดของระบบตรวจจับ', str(error))
                 return
         self._update_preview(frame)
+
+    def _release_capture_only(self) -> None:
+        if self.capture is None:
+            return
+        try:
+            self.capture.release()
+        finally:
+            self.capture = None
+
+    def _record_camera_data_gap(self, now: float) -> None:
+        if self._camera_gap_suspended_for_pause:
+            first_failure = self.camera_loss.continue_after_pause(now)
+            self._camera_gap_suspended_for_pause = False
+        else:
+            first_failure = self.camera_loss.begin(now)
+        if first_failure and self.detector is not None and self.session_id is not None:
+            result = self.detector.process_data_gap(
+                "CAMERA_FRAME_UNAVAILABLE",
+                timestamp=now,
+            )
+            if isinstance(result, dict):
+                self.update_partial_risk(result)
+        if not first_failure:
+            return
+        self.status_label.setText(
+            "สถานะ: กล้องขาดการเชื่อมต่อ กำลังเชื่อมใหม่..."
+        )
+        self.preview_label.clear()
+        self.preview_label.setText(
+            "ไม่พบภาพจากกล้อง\nPostGuard กำลังลองเชื่อมต่อใหม่"
+        )
+        self.detection_label.setText(
+            "ท่าทาง: ไม่มีข้อมูล | ใบหน้า: ไม่มีข้อมูล"
+        )
+        self.state_changed.emit()
+
+    def _read_or_reconnect_camera(self):
+        now = time.monotonic()
+        if self.capture is not None:
+            success, frame = self.capture.read()
+            if success and frame is not None:
+                if self.camera_loss.active:
+                    gap = self.camera_loss.recover(now)
+                    if self.detector is not None:
+                        self.detector.resume_after_data_gap(timestamp=now)
+                    self.status_label.setText(
+                        "สถานะ: กำลังตรวจจับ (RUNNING) "
+                        f"| กล้องกลับมาแล้วหลัง {gap:.1f} วินาที"
+                    )
+                    self.state_changed.emit()
+                return frame
+            self._release_capture_only()
+            self._record_camera_data_gap(now)
+
+        if now - self._last_camera_reconnect_attempt < self.CAMERA_RECONNECT_INTERVAL_SECONDS:
+            return None
+        self._last_camera_reconnect_attempt = now
+        device_index = (self.selected_camera or {}).get("device_index")
+        if device_index is None:
+            self._record_camera_data_gap(now)
+            return None
+
+        candidate = cv2.VideoCapture(int(device_index))
+        if not candidate.isOpened():
+            candidate.release()
+            self._record_camera_data_gap(now)
+            return None
+        success, frame = candidate.read()
+        if not success or frame is None:
+            candidate.release()
+            self._record_camera_data_gap(now)
+            return None
+
+        self.capture = candidate
+        self._camera_gap_suspended_for_pause = False
+        if self.camera_loss.active:
+            gap = self.camera_loss.recover(now)
+            if self.detector is not None:
+                self.detector.resume_after_data_gap(timestamp=now)
+            self.status_label.setText(
+                "สถานะ: กำลังตรวจจับ (RUNNING) "
+                f"| เชื่อมกล้องใหม่สำเร็จหลัง {gap:.1f} วินาที"
+            )
+            self.state_changed.emit()
+        return frame
 
     def _update_detection_labels(self, result: dict) -> None:
         pose_text = "ตรวจพบ" if result["pose_points"] is not None else "ไม่พบ"
@@ -657,6 +756,54 @@ class MonitoringPage(QWidget):
             f"Blink Rate: {rate:.1f} ครั้ง/นาที"
             if rate is not None
             else "Blink Rate: N/A"
+        )
+        distance = result.get("screen_distance")
+        if isinstance(distance, dict):
+            state = distance.get("state", "NOT_EVALUATED")
+            ratio = distance.get("ratio")
+            state_text = {
+                "NORMAL": "ระยะปกติ",
+                "PENDING": "กำลังตรวจสอบว่าใกล้เกินไป",
+                "TOO_CLOSE": "อยู่ใกล้หน้าจอเกินไป",
+                "NOT_EVALUATED": "ไม่มีข้อมูล",
+            }.get(state, str(state))
+            ratio_text = (
+                f" ({float(ratio):.2f}× จากค่าตั้งต้น)"
+                if isinstance(ratio, (int, float)) and not isinstance(ratio, bool)
+                else ""
+            )
+            self.screen_distance_label.setText(
+                f"Screen Distance: {state_text}{ratio_text}"
+            )
+        else:
+            self.screen_distance_label.setText('Screen Distance: ไม่มีข้อมูล')
+
+    def _update_wellness_alert(self, result: dict) -> None:
+        policy = result.get("wellness_alert")
+        if not isinstance(policy, dict) or self.session_id is None:
+            return
+        self.wellness_persistence.update(self.session_id, policy)
+        notification = policy.get("notification")
+        if isinstance(notification, dict):
+            event_type = str(notification.get("event_type") or "WELLNESS")
+            value = notification.get("value")
+            factor = None
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                factor = (
+                    f"ratio {float(value):.2f}x"
+                    if event_type == "SCREEN_DISTANCE"
+                    else f"{float(value):.1f} blinks/min"
+                )
+            self.show_posture_alert({
+                "event_type": event_type,
+                "factor": factor,
+                "duration_seconds": 0.0,
+                "risk_level": "REMINDER",
+                "recorded": self.wellness_persistence.last_error is None,
+            })
+        self.sound_player.notify(
+            policy.get("active") is True,
+            new_alert=isinstance(notification, dict),
         )
 
     def _update_preview(self, frame) -> None:
@@ -695,11 +842,7 @@ class MonitoringPage(QWidget):
                 print("DETECTION CLOSE ERROR:", error)
             finally:
                 self.detector = None
-        if self.capture is not None:
-            try:
-                self.capture.release()
-            finally:
-                self.capture = None
+        self._release_capture_only()
 
     def _release_local_resources(self) -> None:
         self._close_capture_resources()
@@ -714,6 +857,7 @@ class MonitoringPage(QWidget):
         self.neck_difference_label.setText('ผลต่างความเอียงคอ: --')
         self.eye_state_label.setText('Eye State: กำลังปรับเทียบ')
         self.blink_rate_label.setText('Blink Rate: N/A')
+        self.screen_distance_label.setText('Screen Distance: กำลังรอข้อมูล')
         self.preview_label.clear()
         self.preview_label.setText("ภาพการตรวจจับจะแสดงที่นี่")
         self.stop_button.setEnabled(False)
@@ -807,6 +951,8 @@ class MonitoringPage(QWidget):
             "risk_score_method": (
                 "RULA_ADAPTED_FRONT_V1" if self.risk_samples else None
             ),
+            "camera_loss_count": self.camera_loss.loss_count,
+            "data_gap_duration": self.camera_loss.duration(time.monotonic()),
         }
 
     def _change_remote_session_status(
@@ -882,7 +1028,7 @@ class MonitoringPage(QWidget):
     def handle_pause_resume(self) -> None:
         """Pause or resume without creating a new session."""
 
-        if self.session_id is None or self.is_stopping or self.capture is None:
+        if self.session_id is None or self.is_stopping:
             return
 
         self.pause_button.setEnabled(False)
@@ -925,8 +1071,14 @@ class MonitoringPage(QWidget):
         self.timer.stop()
         self.is_paused = True
 
+        # A confirmed pause is intentional downtime, not missing camera data.
+        if self.camera_loss.active:
+            self.camera_loss.recover(time.monotonic())
+            self._camera_gap_suspended_for_pause = True
+
         # Backend closes active risk events when pausing.
         self.risk_persistence.reset()
+        self.wellness_persistence.reset()
 
         self.preview_label.clear()
         self.preview_label.setText('หยุดการตรวจจับชั่วคราว')

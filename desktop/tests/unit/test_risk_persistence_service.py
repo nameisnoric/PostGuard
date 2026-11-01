@@ -103,6 +103,34 @@ class RiskPersistenceServiceTests(unittest.TestCase):
         self.assertEqual(len(keys), 2)
         self.assertEqual(keys[0], keys[1])
 
+    def test_failed_batch_is_kept_until_connectivity_returns(self):
+        online = [False]
+        event_ids = []
+
+        def create_event(*args):
+            event_ids.append(args[1])
+            if not online[0]:
+                raise requests.ConnectionError("offline")
+            return Response()
+
+        service = RiskPersistenceService(max_attempts=1)
+        with patch(
+            "app.services.risk_persistence_service.APIClient.create_risk_event",
+            side_effect=create_event,
+        ), patch(
+            "app.services.risk_persistence_service.APIClient.create_alert_notification",
+            return_value=Response(),
+        ):
+            service.process_pipeline_result(4, pipeline_result())
+            self.assertFalse(service.flush())
+            self.assertTrue(service.has_pending())
+            online[0] = True
+            self.assertTrue(service.flush())
+            self.assertFalse(service.has_pending())
+        service.shutdown()
+        self.assertGreaterEqual(len(event_ids), 2)
+        self.assertEqual(set(event_ids), {"risk-event-000001"})
+
 
 if __name__ == "__main__":
     unittest.main()

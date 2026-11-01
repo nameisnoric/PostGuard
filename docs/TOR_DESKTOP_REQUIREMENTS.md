@@ -103,8 +103,8 @@ uses `Proposal (1).pdf` only to clarify the selected desktop architecture.
 
 ## Camera preparation traceability
 
-The desktop flow is `Camera Setup -> Camera Preview -> Camera Preparation ->
-Personal Baseline -> Session`. Camera Preparation was adapted from the latest
+The desktop flow is `Camera Setup -> Camera Preparation -> Adjusted Camera
+Preview -> Personal Baseline -> Session`. Camera Preparation was adapted from the latest
 `feature/camera` reference-card implementation at commit `04211ba`. The
 posture-detection and camera-session modules were later integrated on
 `feature/detection` without merging or modifying their source branches.

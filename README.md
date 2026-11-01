@@ -43,6 +43,8 @@ dependency rules between these folders.
 
 Environment templates stay beside the application that uses them. Copy
 `backend/.env.example` to `backend/.env` and keep real secrets only in `.env`.
+For the Desktop client, copy `desktop/.env.example` to `desktop/.env` when the
+API is not running at the local development address.
 
 ## Run
 
@@ -59,6 +61,19 @@ Run the desktop application in a second terminal:
 cd desktop
 .\.venv\Scripts\python.exe -m app.main
 ```
+
+Build the Windows application locally (this does not deploy or upload it):
+
+```powershell
+cd desktop
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm PostGuard.spec
+```
+
+The executable is created under `desktop/dist/PostGuard/`. Put a `.env` file
+beside `PostGuard.exe` with `POSTGUARD_API_BASE_URL=https://...` when connecting
+the packaged client to a hosted API. The Desktop `.env` must never contain
+database, JWT, Resend or Supabase service-role secrets.
 
 ## Test
 

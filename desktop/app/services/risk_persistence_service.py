@@ -41,6 +41,7 @@ class RiskPersistenceService:
         self._lock = threading.Lock()
         self._futures: set[Future] = set()
         self._errors: list[str] = []
+        self._pending_batches: list[list[tuple[str, Callable[[], Any]]]] = []
         self._last_update_at: dict[tuple[int, str], float] = {}
 
     @staticmethod
@@ -97,7 +98,11 @@ class RiskPersistenceService:
         for name, operation in operations:
             self._with_retry(name, operation)
 
-    def _remember_future(self, future: Future) -> None:
+    def _remember_future(
+        self,
+        future: Future,
+        operations: list[tuple[str, Callable[[], Any]]],
+    ) -> None:
         with self._lock:
             self._futures.add(future)
 
@@ -107,11 +112,35 @@ class RiskPersistenceService:
                 self._futures.discard(done)
                 if error is not None:
                     self._errors.append(str(error))
+                    # Keep the same callables so idempotency keys and runtime
+                    # event IDs remain stable when connectivity returns.
+                    self._pending_batches.append(operations)
 
         future.add_done_callback(completed)
 
+    def _submit_operations(
+        self,
+        operations: list[tuple[str, Callable[[], Any]]],
+    ) -> None:
+        future = self._executor.submit(self._run_operations, operations)
+        self._remember_future(future, operations)
+
+    def retry_pending(self) -> int:
+        """Resubmit failed batches and return how many were queued."""
+        with self._lock:
+            batches = self._pending_batches
+            self._pending_batches = []
+        for operations in batches:
+            self._submit_operations(operations)
+        return len(batches)
+
+    def has_pending(self) -> bool:
+        with self._lock:
+            return bool(self._futures or self._pending_batches)
+
     def process_pipeline_result(self, session_id: int, result: Mapping[str, Any]) -> bool:
         """Queue writes for one pipeline result. Return True when work was queued."""
+        self.retry_pending()
         risk_event = result.get("risk_event")
         alert_policy = result.get("alert_policy")
         if not isinstance(risk_event, Mapping) or not isinstance(alert_policy, Mapping):
@@ -191,16 +220,20 @@ class RiskPersistenceService:
 
         if not operations:
             return False
-        self._remember_future(self._executor.submit(self._run_operations, operations))
+        self._submit_operations(operations)
         return True
 
     def flush(self, timeout: float = 8.0) -> bool:
+        self.retry_pending()
         with self._lock:
             pending = set(self._futures)
         if not pending:
-            return True
+            return not self.has_pending()
         _, unfinished = wait(pending, timeout=max(0.0, timeout))
-        return not unfinished
+        if unfinished:
+            return False
+        with self._lock:
+            return not self._pending_batches
 
     def drain_errors(self) -> list[str]:
         with self._lock:

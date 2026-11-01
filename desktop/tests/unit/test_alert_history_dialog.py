@@ -80,14 +80,28 @@ class AlertHistoryDialogTests(unittest.TestCase):
             APIClient, "get_session_risk_events", return_value=response(events)
         ), patch.object(
             APIClient, "get_session_alert_notifications", return_value=response(notifications)
+        ), patch.object(
+            APIClient,
+            "get_session_alerts",
+            return_value=response([{
+                "event_id": 9,
+                "event_type": "SCREEN_DISTANCE",
+                "risk_level": "MEDIUM",
+                "started_at": "2026-10-15T04:50:40Z",
+                "ended_at": "2026-10-15T04:50:50Z",
+                "duration": 10,
+                "incomplete": False,
+            }]),
         ):
             dialog = AlertHistoryDialog(session_id=12)
         self.addCleanup(dialog.deleteLater)
 
-        self.assertEqual(dialog.table.rowCount(), 2)
+        self.assertEqual(dialog.table.rowCount(), 3)
         self.assertEqual(dialog.table.item(0, 1).text(), "Risk event")
         self.assertEqual(dialog.table.item(1, 1).text(), "Alert Escalation")
+        self.assertEqual(dialog.table.item(2, 1).text(), "Screen Distance")
         self.assertIn("Notifications: 1", dialog.stats_label.text())
+        self.assertIn("Wellness episodes: 1", dialog.stats_label.text())
 
 
 if __name__ == "__main__":

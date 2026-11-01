@@ -3,6 +3,7 @@ from app.services.alert_history_service import (
     duration_text,
     event_type_label,
     summarize_alerts,
+    summarize_combined_alerts,
     summarize_integrated_alerts,
     validate_session_id,
 )
@@ -52,6 +53,28 @@ class AlertHistoryServiceTests(unittest.TestCase):
         self.assertEqual(result["closed_alerts"], 3)
         self.assertEqual(result["active_alerts"], 0)
         self.assertEqual(result["closed_alert_seconds"], 6)
+
+    def test_combined_summary_includes_wellness_without_old_posture_duplicates(self):
+        events = [{
+            "risk_event_id": 1, "status": "RESOLVED", "duration_seconds": 5,
+        }]
+        notifications = [{"notification_id": 1}]
+        legacy = [
+            {
+                "event_id": 10, "event_type": "SCREEN_DISTANCE",
+                "ended_at": "2026-10-10T16:12:09+07:00", "duration": 7,
+            },
+            {
+                "event_id": 11, "event_type": "SHOULDER_TILT",
+                "ended_at": "2026-10-10T16:12:09+07:00", "duration": 99,
+            },
+        ]
+
+        result = summarize_combined_alerts(events, notifications, legacy)
+
+        self.assertEqual(result["total_alerts"], 2)
+        self.assertEqual(result["closed_alerts"], 2)
+        self.assertEqual(result["closed_alert_seconds"], 12)
 
     def test_invalid_duration_rejected(self):
         with self.assertRaises(ValueError):

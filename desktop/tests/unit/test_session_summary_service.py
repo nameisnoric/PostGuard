@@ -33,6 +33,8 @@ class SummaryServiceTests(unittest.TestCase):
             "maximum_risk_score": 3.0,
             "blink_rate": 14.0,
             "risk_score_method": "RULA_ADAPTED_FRONT_V1",
+            "data_gap_duration": 4.5,
+            "camera_loss_count": 2,
         }
         with patch.object(
             APIClient,
@@ -46,6 +48,8 @@ class SummaryServiceTests(unittest.TestCase):
         self.assertEqual(payload["maximum_risk_score"], 3.0)
         self.assertEqual(payload["blink_rate"], 14.0)
         self.assertEqual(payload["risk_score_method"], "RULA_ADAPTED_FRONT_V1")
+        self.assertEqual(payload["data_gap_duration"], 4.5)
+        self.assertEqual(payload["camera_loss_count"], 2)
 
     def test_retry_after_lost_response_reads_existing_report(self):
         saved = {"session_id": 7, "detection_count": 10}
@@ -65,6 +69,8 @@ class SummaryServiceTests(unittest.TestCase):
             {"maximum_risk_score": 7.1},
             {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
             {"blink_rate": -1.0},
+            {"data_gap_duration": -1.0},
+            {"camera_loss_count": -1},
             {"average_risk_score": 2.0, "maximum_risk_score": 3.0},
             {"risk_score_method": "RULA_ADAPTED_FRONT_V1"},
         ):

@@ -24,6 +24,10 @@ from app.vision.session_monitoring.session_monitor import (
 from app.vision.temporal_tracking.temporal_posture_tracker import (
     TemporalPostureTracker,
 )
+from app.vision.mediapipe_detection.posture.screen_distance_policy import (
+    ScreenDistancePolicy,
+)
+from app.services.wellness_alert_policy import WellnessAlertPolicy
 
 
 DEFAULT_ALERT_POLICY = AlertPolicyConfig(
@@ -67,6 +71,8 @@ class DetectionService:
         self.temporal_tracker = TemporalPostureTracker()
         self.risk_event_tracker = RiskEventTracker()
         self.alert_policy = AlertPolicy(DEFAULT_ALERT_POLICY)
+        self.screen_distance_policy = ScreenDistancePolicy()
+        self.wellness_alert_policy = WellnessAlertPolicy()
 
         threshold_path = (
             Path(__file__).resolve().parents[1]
@@ -100,6 +106,8 @@ class DetectionService:
         # persisted before the pause.
         self.risk_event_tracker.reset(preserve_sequence=True)
         self.alert_policy.reset()
+        self.screen_distance_policy.reset()
+        self.wellness_alert_policy.reset()
 
     def process_frame(self, frame):
         if frame is None or frame.size == 0:
@@ -145,6 +153,29 @@ class DetectionService:
         neck_flexion = _feature_value(detection, "neck_flexion")
         eye_distance = _feature_value(detection, "eye_distance")
 
+        screen_distance = None
+        if self.session_context is not None:
+            _, baseline = self.session_context
+            baseline_eye_distance = baseline.get("ipd_baseline")
+            if baseline_eye_distance is None:
+                baseline_eye_distance = baseline.get("screen_distance_baseline")
+            screen_distance = self.screen_distance_policy.update(
+                eye_distance,
+                baseline_eye_distance,
+                now=timestamp,
+            )
+        wellness_policy = getattr(self, "wellness_alert_policy", None)
+        if wellness_policy is None:
+            # Compatibility for lightweight adapters/tests that construct the
+            # service without invoking the hardware-heavy initializer.
+            wellness_policy = WellnessAlertPolicy()
+            self.wellness_alert_policy = wellness_policy
+        wellness_alert = wellness_policy.update(
+            screen_distance,
+            blink_statistics,
+            now=timestamp,
+        )
+
         result = dict(detection)
         result.update({
             "detection": detection,
@@ -167,10 +198,80 @@ class DetectionService:
             ),
             "neck_flexion": neck_flexion,
             "eye_distance": eye_distance,
+            "screen_distance": screen_distance,
+            "wellness_alert": wellness_alert,
             "eye_openness": eye.get("measurement"),
             "eye_state": eye.get("state"),
         })
         return result
+
+    def process_data_gap(
+        self,
+        reason: str,
+        *,
+        timestamp: float | None = None,
+    ) -> dict[str, Any]:
+        """Advance lifecycle state without interpreting missing data as safe."""
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("data-gap reason is required")
+        if timestamp is None:
+            import time
+            timestamp = time.monotonic()
+
+        normalized_reason = reason.strip().upper()
+        # Uninterrupted posture and blink exposure cannot be proven while the
+        # camera is unavailable. RiskEventTracker still preserves the active
+        # risk episode below and records the DATA_GAP transition.
+        self.temporal_tracker.reset()
+        screen_distance = None
+        if self.session_context is not None:
+            _, baseline = self.session_context
+            baseline_eye_distance = baseline.get("ipd_baseline")
+            if baseline_eye_distance is None:
+                baseline_eye_distance = baseline.get("screen_distance_baseline")
+            screen_distance = self.screen_distance_policy.update(
+                None,
+                baseline_eye_distance,
+                now=timestamp,
+            )
+        wellness_alert = self.wellness_alert_policy.update(
+            screen_distance,
+            {"window_ready": False, "blink_rate": None},
+            now=timestamp,
+        )
+        risk = {
+            "risk_contract_version": "1.2",
+            "status": "NOT_EVALUATED",
+            "reason": normalized_reason,
+            "risk_level_available": False,
+            "risk_level": None,
+            "risk_event": None,
+            "alert": None,
+        }
+        risk_event = self.risk_event_tracker.update(risk, now=timestamp)
+        alert_policy = self.alert_policy.update(risk_event, now=timestamp)
+        return {
+            "assessment": {
+                "status": "NOT_EVALUATED",
+                "reason": normalized_reason,
+                "factors": [],
+            },
+            "temporal": {
+                "status": "DATA_GAP",
+                "reason": normalized_reason,
+                "active_factors": [],
+            },
+            "risk": risk,
+            "risk_event": risk_event,
+            "alert_policy": alert_policy,
+            "screen_distance": screen_distance,
+            "wellness_alert": wellness_alert,
+            "data_gap_reason": normalized_reason,
+        }
+
+    def resume_after_data_gap(self, *, timestamp: float | None = None) -> None:
+        """Restart measurement windows that require continuous camera data."""
+        self.blink_statistics.start(timestamp=timestamp)
 
     def close(self):
         self.pipeline.close()

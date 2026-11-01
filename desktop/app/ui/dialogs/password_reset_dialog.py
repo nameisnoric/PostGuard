@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.api_client import APIClient
+from app.ui.utils.password_visibility import attach_password_visibility
 from app.ui.theme import APP_QSS
 
 
@@ -55,7 +56,7 @@ class PasswordResetDialog(QDialog):
         self.confirm_input = QLineEdit()
         self.confirm_input.setPlaceholderText("ยืนยันรหัสผ่านใหม่")
         for field in (self.password_input, self.confirm_input):
-            field.setEchoMode(QLineEdit.EchoMode.Password)
+            attach_password_visibility(field)
         self.reset_button = QPushButton("บันทึกรหัสผ่านใหม่")
         self.reset_button.setProperty("variant", "primary")
         self.reset_button.clicked.connect(self.save_password)

@@ -80,3 +80,10 @@ class SessionSummary(Base):
     blink_rate: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )
+
+    data_gap_duration: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0
+    )
+    camera_loss_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )

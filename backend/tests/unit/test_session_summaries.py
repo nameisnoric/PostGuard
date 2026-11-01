@@ -81,6 +81,8 @@ class SessionSummaryTests(unittest.TestCase):
             maximum_risk_score=3.0,
             blink_rate=14.0,
             risk_score_method="RULA_ADAPTED_FRONT_V1",
+            data_gap_duration=4.5,
+            camera_loss_count=2,
         )
 
     def tearDown(self):
@@ -102,6 +104,8 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertEqual(saved["maximum_risk_score"], 3.0)
         self.assertEqual(saved["blink_rate"], 14.0)
         self.assertEqual(saved["risk_score_method"], "RULA_ADAPTED_FRONT_V1")
+        self.assertEqual(saved["data_gap_duration"], 4.5)
+        self.assertEqual(saved["camera_loss_count"], 2)
         self.assertEqual(saved["medium_risk_duration"], 12)
         self.assertEqual(saved["total_alert_count"], 1)
         self.assertEqual(self.client.get("/summaries").json(), [saved])
@@ -149,6 +153,10 @@ class SessionSummaryTests(unittest.TestCase):
         )
         self.db.add(event)
         self.db.flush()
+        self.db.add(AlertEvent(
+            session_id=1, event_type="SCREEN_DISTANCE", risk_level="MEDIUM",
+            started_at=now, ended_at=now, duration=3,
+        ))
         self.db.add(AlertNotification(
             risk_event_id=event.risk_event_id, session_id=1,
             runtime_notification_id="notice-1", alert_type="ESCALATION",
@@ -162,8 +170,8 @@ class SessionSummaryTests(unittest.TestCase):
         summary = response.json()
         self.assertEqual(summary["low_risk_duration"], 0)
         self.assertEqual(summary["high_risk_duration"], 18)
-        self.assertEqual(summary["total_alert_count"], 1)
-        self.assertEqual(summary["most_frequent_alert_event"], "ESCALATION")
+        self.assertEqual(summary["total_alert_count"], 2)
+        self.assertEqual(summary["most_frequent_alert_event"], "neck")
 
     def test_other_user_cannot_read_or_write(self):
         self.client.post("/sessions/1/summary", json=self.payload)
@@ -185,6 +193,8 @@ class SessionSummaryTests(unittest.TestCase):
             {"maximum_risk_score": 7.1},
             {"average_risk_score": 2.0, "maximum_risk_score": 1.0},
             {"blink_rate": -1.0},
+            {"data_gap_duration": -1.0},
+            {"camera_loss_count": -1},
             {"average_risk_score": 2.0, "maximum_risk_score": 3.0, "risk_score_method": None},
             {"average_risk_score": None, "maximum_risk_score": None, "risk_score_method": "RULA_ADAPTED_FRONT_V1"},
         ):

@@ -534,7 +534,7 @@ class MainWindow(QMainWindow):
             "Stop Monitoring before changing your password." if active else ""
         )
         self.session_bar.setVisible(active or monitor.is_stopping)
-        self.global_pause_button.setEnabled(can_control and monitor.capture is not None)
+        self.global_pause_button.setEnabled(can_control)
         self.global_stop_button.setEnabled(can_control)
         self.dashboard_page.set_monitoring_state(
             monitor.session_id, monitor.is_paused, monitor.is_stopping,

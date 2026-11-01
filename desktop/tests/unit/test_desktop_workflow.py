@@ -233,9 +233,13 @@ class DesktopWorkflowTests(unittest.TestCase):
         ) as adjust:
             page.update_frame()
 
-        adjust.assert_called_once_with(
-            self.capture.read.return_value[1][:, ::-1], self.camera_reference
+        adjust.assert_called_once()
+        adjusted_input, reference = adjust.call_args.args
+        np.testing.assert_array_equal(
+            adjusted_input,
+            self.capture.read.return_value[1][:, ::-1],
         )
+        self.assertEqual(reference, self.camera_reference)
         processed = page.detector.process_frame.call_args.args[0]
         self.assertTrue(np.array_equal(processed, adjusted))
 
@@ -581,14 +585,55 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.end.return_value = response({}, 503)
         self.window.show_dashboard()
         monitor.update_frame()
-        self.assertFalse(monitor.timer.isActive())
+        self.assertTrue(monitor.timer.isActive())
         self.assertEqual(monitor.detection_count, 1)
         self.assertIsNone(monitor.capture)
-        self.assertFalse(self.window.global_pause_button.isEnabled())
+        self.assertTrue(monitor.camera_loss.active)
+        self.assertEqual(monitor.camera_loss.loss_count, 1)
+        self.assertTrue(self.window.global_pause_button.isEnabled())
         self.assertTrue(self.window.global_stop_button.isEnabled())
+        self.capture.read.return_value = (
+            True,
+            np.zeros((360, 640, 3), dtype=np.uint8),
+        )
+        monitor._last_camera_reconnect_attempt = float("-inf")
+        monitor.update_frame()
+        self.assertIs(monitor.capture, self.capture)
+        self.assertFalse(monitor.camera_loss.active)
         self.end.return_value = response({"session_id": 3, "status": "COMPLETED"})
         self.window.global_stop_button.click()
         self.assertEqual(self.window.session_summary_page.current_summary["detection_count"], 1)
+
+    def test_pause_time_is_not_counted_as_camera_data_gap(self):
+        self.start_monitoring()
+        monitor = self.window.monitoring_page
+        monitor.capture = None
+        monitor.camera_loss.begin(10.0)
+
+        with patch(
+            "app.ui.pages.monitoring_page.time.monotonic",
+            return_value=12.0,
+        ), patch.object(
+            APIClient,
+            "pause_session",
+            return_value=response({
+                "session_id": 3,
+                "status": "PAUSED",
+                "pause_count": 1,
+            }),
+        ):
+            monitor.handle_pause_resume()
+
+        self.assertTrue(monitor.is_paused)
+        self.assertFalse(monitor.camera_loss.active)
+        self.assertTrue(monitor._camera_gap_suspended_for_pause)
+        with patch(
+            "app.ui.pages.monitoring_page.time.monotonic",
+            return_value=100.0,
+        ):
+            summary = monitor.build_session_summary()
+        self.assertEqual(summary["camera_loss_count"], 1)
+        self.assertEqual(summary["data_gap_duration"], 2.0)
 
 
 if __name__ == "__main__":

@@ -83,6 +83,10 @@ def create_session_summary(
     notifications = db.scalars(
         select(AlertNotification).where(AlertNotification.session_id == session_id)
     ).all()
+    wellness_events = [
+        event for event in alert_events
+        if event.event_type in {"SCREEN_DISTANCE", "LOW_BLINK_RATE"}
+    ]
 
     if risk_events:
         low_risk_duration = 0
@@ -103,8 +107,22 @@ def create_session_summary(
         high_risk_alert_count = sum(
             1 for item in notifications if item.risk_level == "HIGH"
         )
-        total_alert_count = len(notifications)
-        event_counter = Counter(item.alert_type for item in notifications)
+        total_alert_count = len(notifications) + len(wellness_events)
+        risk_events_by_id = {
+            event.risk_event_id: event for event in risk_events
+        }
+        event_counter = Counter()
+        for notification in notifications:
+            event = risk_events_by_id.get(notification.risk_event_id)
+            factors = event.active_factors if event is not None else []
+            normalized_factors = [
+                str(factor) for factor in factors or [] if factor
+            ]
+            if normalized_factors:
+                event_counter.update(normalized_factors)
+            else:
+                event_counter.update(["POSTURE_RISK"])
+        event_counter.update(event.event_type for event in wellness_events)
     else:
         low_risk_duration = round(sum(
             alert.duration or 0 for alert in alert_events if alert.risk_level == "LOW"
@@ -157,7 +175,9 @@ def create_session_summary(
 
         most_frequent_alert_event=most_frequent_alert_event,
 
-        blink_rate=request.blink_rate
+        blink_rate=request.blink_rate,
+        data_gap_duration=request.data_gap_duration,
+        camera_loss_count=request.camera_loss_count,
     )
 
     db.add(session_summary)

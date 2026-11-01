@@ -38,6 +38,12 @@ def build_summary_payload(summary: dict) -> dict:
         "maximum_risk_score": _optional_float(summary.get("maximum_risk_score")),
         "risk_score_method": summary.get("risk_score_method"),
         "blink_rate": _optional_float(summary.get("blink_rate")),
+        "data_gap_duration": _optional_float(
+            summary.get("data_gap_duration", 0.0)
+        ),
+        "camera_loss_count": _count(
+            summary.get("camera_loss_count", 0)
+        ),
 
         "detection_count": _count(
             summary["detection_count"]
@@ -59,6 +65,7 @@ def build_summary_payload(summary: dict) -> dict:
     average_risk = payload["average_risk_score"]
     maximum_risk = payload["maximum_risk_score"]
     blink_rate = payload["blink_rate"]
+    data_gap_duration = payload["data_gap_duration"]
     risk_method = payload["risk_score_method"]
     if average_risk is not None and not 1 <= average_risk <= 7:
         raise ValueError("average_risk_score must be between 1 and 7")
@@ -72,6 +79,8 @@ def build_summary_payload(summary: dict) -> dict:
         raise ValueError("maximum_risk_score cannot be below average_risk_score")
     if blink_rate is not None and blink_rate < 0:
         raise ValueError("blink_rate cannot be negative")
+    if data_gap_duration is None or data_gap_duration < 0:
+        raise ValueError("data_gap_duration cannot be negative")
     has_scores = average_risk is not None or maximum_risk is not None
     if has_scores and risk_method != "RULA_ADAPTED_FRONT_V1":
         raise ValueError("RULA-adapted scores require risk_score_method")
