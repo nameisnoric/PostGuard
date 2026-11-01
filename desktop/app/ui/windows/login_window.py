@@ -16,7 +16,9 @@ from app.core.token_store import TokenStore
 from app.services.api_client import APIClient
 from app.ui.windows.main_window import MainWindow
 from app.ui.theme import APP_QSS, set_centered_window
-
+from app.ui.utils.password_visibility import (
+    attach_password_visibility,
+)
 
 class LoginWindow(QWidget):
 
@@ -40,9 +42,13 @@ class LoginWindow(QWidget):
         self.email_input.setPlaceholderText("อีเมล KU")
 
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("รหัสผ่าน")
-        self.password_input.setEchoMode(
-            QLineEdit.EchoMode.Password
+
+        self.password_input.setPlaceholderText(
+            "รหัสผ่าน"
+        )
+
+        attach_password_visibility(
+            self.password_input
         )
 
         self.login_button = QPushButton("เข้าสู่ระบบ")

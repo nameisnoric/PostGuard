@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
 
 from app.services.api_client import APIClient
 from app.ui.theme import APP_QSS
-
+from app.ui.utils.password_visibility import (
+    attach_password_visibility,
+)
 
 class PasswordResetDialog(QDialog):
     def __init__(self, parent=None, email=""):
@@ -54,8 +56,13 @@ class PasswordResetDialog(QDialog):
         self.password_input.setPlaceholderText("รหัสผ่านใหม่")
         self.confirm_input = QLineEdit()
         self.confirm_input.setPlaceholderText("ยืนยันรหัสผ่านใหม่")
-        for field in (self.password_input, self.confirm_input):
-            field.setEchoMode(QLineEdit.EchoMode.Password)
+        for field in (
+            self.password_input,
+            self.confirm_input,
+        ):
+            attach_password_visibility(
+                field
+            )
         self.reset_button = QPushButton("บันทึกรหัสผ่านใหม่")
         self.reset_button.setProperty("variant", "primary")
         self.reset_button.clicked.connect(self.save_password)
