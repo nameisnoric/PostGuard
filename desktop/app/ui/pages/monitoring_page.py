@@ -664,6 +664,22 @@ class MonitoringPage(QWidget):
                 return
         self._update_preview(frame)
 
+    def refresh_after_window_restore(self) -> None:
+        """Resume the live preview immediately after the app is restored.
+
+        Monitoring normally keeps running while the main window is minimized.
+        Some window managers can delay a Qt timer while the window is hidden,
+        though, which leaves the last painted camera frame on screen after the
+        window is restored.  Restart an unexpectedly inactive timer and queue a
+        fresh read once the restored window can repaint.
+        """
+        if self.session_id is None or self.is_paused or self.is_stopping:
+            return
+        if not self.timer.isActive():
+            self.timer.start()
+        QTimer.singleShot(0, self.update_frame)
+        self.preview_label.update()
+
     def _handle_camera_movement(self, movement: dict) -> None:
         """End a session once a physical camera-placement change is confirmed."""
         if self.camera_movement_triggered:

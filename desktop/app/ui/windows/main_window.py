@@ -400,16 +400,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 'ประกาศความเป็นส่วนตัว',
-                "Cannot check your privacy choice. Check your connection before "
-                "opening the camera.",
+                "ไม่สามารถตรวจสอบสถานะความยินยอมได้ กรุณาตรวจสอบการเชื่อมต่อ"
+                "ก่อนเปิดกล้อง",
             )
             return False
         if not response.ok:
             QMessageBox.warning(
                 self,
                 'ประกาศความเป็นส่วนตัว',
-                "Your privacy choice could not be loaded. Restart the backend and "
-                "try again.",
+                "ไม่สามารถโหลดสถานะความยินยอมได้ กรุณาตรวจสอบ Backend "
+                "แล้วลองอีกครั้ง",
             )
             return False
         try:
@@ -573,6 +573,10 @@ class MainWindow(QMainWindow):
             self.pages.setCurrentWidget(self.monitoring_page)
         self.raise_()
         self.activateWindow()
+        QTimer.singleShot(
+            0,
+            self.monitoring_page.refresh_after_window_restore,
+        )
 
     def stop_from_monitoring_mini_window(self) -> None:
         """Show the app, then use the normal end-and-save session workflow."""
@@ -599,6 +603,7 @@ class MainWindow(QMainWindow):
             self.monitoring_mini_window.show_near_screen_corner(self.screen())
             return
         self.monitoring_mini_window.hide()
+        monitor.refresh_after_window_restore()
 
     def check_previous_sessions(self) -> bool:
         if self.monitoring_page.session_id is not None:

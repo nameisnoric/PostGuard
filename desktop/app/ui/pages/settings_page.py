@@ -168,8 +168,8 @@ class SettingsPage(QWidget):
         privacy_heading = QLabel("ความเป็นส่วนตัวและข้อมูลกล้อง")
         privacy_heading.setProperty("role", "heading")
         privacy_note = QLabel(
-            "Review how camera frames are processed, check your consent status, "
-            "or withdraw consent for future monitoring."
+            "ตรวจสอบวิธีประมวลผลภาพจากกล้อง ดูสถานะความยินยอม "
+            "หรือถอนความยินยอมสำหรับ Monitoring Session ในอนาคต"
         )
         privacy_note.setProperty("role", "muted")
         privacy_note.setWordWrap(True)
@@ -179,7 +179,7 @@ class SettingsPage(QWidget):
         privacy_actions = QHBoxLayout()
         self.review_privacy_button = QPushButton("อ่านประกาศความเป็นส่วนตัว")
         self.review_privacy_button.clicked.connect(self.review_privacy_notice)
-        self.consent_action_button = QPushButton("ให้ Consent")
+        self.consent_action_button = QPushButton("ให้ความยินยอม")
         self.consent_action_button.clicked.connect(self.handle_privacy_consent_action)
         privacy_actions.addWidget(self.review_privacy_button)
         privacy_actions.addStretch()
@@ -318,12 +318,14 @@ class SettingsPage(QWidget):
             response = APIClient.get_privacy_consent()
         except requests.RequestException:
             self.privacy_status_label.setText(
-                "Consent status: Cannot load. Check your connection."
+                "สถานะความยินยอม: โหลดไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ"
             )
             self._set_privacy_consent_action(None)
             return
         if not response.ok:
-            self.privacy_status_label.setText("Consent status: Could not be loaded.")
+            self.privacy_status_label.setText(
+                "สถานะความยินยอม: ไม่สามารถโหลดข้อมูลได้"
+            )
             self._set_privacy_consent_action(None)
             return
         try:
@@ -333,20 +335,22 @@ class SettingsPage(QWidget):
         if not isinstance(payload, dict) or type(
             payload.get("has_current_consent")
         ) is not bool:
-            self.privacy_status_label.setText("Consent status: Invalid response.")
+            self.privacy_status_label.setText(
+                "สถานะความยินยอม: ข้อมูลตอบกลับไม่ถูกต้อง"
+            )
             self._set_privacy_consent_action(None)
             return
 
         accepted = payload["has_current_consent"]
         self._set_privacy_consent_action(accepted)
         if accepted:
-            accepted_at = payload.get("accepted_at") or "recorded"
+            accepted_at = payload.get("accepted_at") or "บันทึกแล้ว"
             self.privacy_status_label.setText(
-                f"Consent status: Accepted · {accepted_at}"
+                f"สถานะความยินยอม: ให้ความยินยอมแล้ว · {accepted_at}"
             )
         elif payload.get("withdrawn_at"):
             self.privacy_status_label.setText(
-                f"Consent status: Withdrawn · {payload['withdrawn_at']}"
+                f"สถานะความยินยอม: ถอนความยินยอมแล้ว · {payload['withdrawn_at']}"
             )
         else:
             self.privacy_status_label.setText('สถานะความยินยอม: ยังไม่ยอมรับ')
@@ -369,15 +373,16 @@ class SettingsPage(QWidget):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._set_privacy_consent_action(True)
-        self.privacy_status_label.setText('Consent status: Accepted')
+        self.privacy_status_label.setText('สถานะความยินยอม: ให้ความยินยอมแล้ว')
         self.privacy_consent_changed.emit(True)
 
     def withdraw_privacy_consent(self) -> None:
         answer = QMessageBox.question(
             self,
             'ถอนความยินยอมการใช้กล้อง',
-            "Withdraw consent for future camera monitoring? Existing history "
-            "will remain available.",
+            "ต้องการถอนความยินยอมสำหรับการใช้กล้องหรือไม่?\n\n"
+            "หลังถอนความยินยอม คุณจะไม่สามารถเริ่ม Monitoring Session ใหม่ได้ "
+            "จนกว่าจะให้ความยินยอมอีกครั้ง ประวัติและรายงานเดิมจะยังคงอยู่",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -388,13 +393,20 @@ class SettingsPage(QWidget):
             response = APIClient.withdraw_privacy_consent()
         except requests.RequestException:
             self.privacy_status_label.setText(
-                "Consent could not be withdrawn. Check your connection."
+                "ถอนความยินยอมไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ"
             )
             self.consent_action_button.setEnabled(True)
             return
         if not response.ok:
+            if response.status_code == 409:
+                self.privacy_status_label.setText(
+                    "ยังถอนความยินยอมไม่ได้ กรุณา Stop Monitoring ให้ Session "
+                    "สิ้นสุดก่อน แล้วลองอีกครั้ง"
+                )
+                self.consent_action_button.setEnabled(True)
+                return
             self.privacy_status_label.setText(
-                self._response_error(response, "Consent could not be withdrawn.")
+                self._response_error(response, "ไม่สามารถถอนความยินยอมได้")
             )
             self.consent_action_button.setEnabled(True)
             return
@@ -403,7 +415,9 @@ class SettingsPage(QWidget):
         except (ValueError, AttributeError):
             payload = None
         if not isinstance(payload, dict) or payload.get("has_current_consent") is not False:
-            self.privacy_status_label.setText("Consent withdrawal was not confirmed.")
+            self.privacy_status_label.setText(
+                "เซิร์ฟเวอร์ไม่ยืนยันการถอนความยินยอม กรุณาลองอีกครั้ง"
+            )
             self.consent_action_button.setEnabled(True)
             return
         self.privacy_status_label.setText('สถานะความยินยอม: ถอนแล้ว')
@@ -414,10 +428,10 @@ class SettingsPage(QWidget):
         self.has_privacy_consent = accepted
         self.consent_action_button.setEnabled(accepted is not None)
         if accepted is True:
-            self.consent_action_button.setText("ยกเลิก Consent")
+            self.consent_action_button.setText("ถอนความยินยอม")
             self.consent_action_button.setProperty("variant", "danger")
         else:
-            self.consent_action_button.setText("ให้ Consent")
+            self.consent_action_button.setText("ให้ความยินยอม")
             self.consent_action_button.setProperty("variant", "primary")
         polish(self.consent_action_button)
 

@@ -507,9 +507,11 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.start_monitoring()
         monitor = self.window.monitoring_page
 
+        frame_count_before_minimize = monitor.frame_count
+
         self.window.showMinimized()
         self.app.processEvents()
-        QTest.qWait(10)
+        QTest.qWait(80)
 
         mini = self.window.monitoring_mini_window
         self.assertTrue(mini.isVisible())
@@ -519,12 +521,39 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertIn("Session 3", mini.session_label.text())
         self.assertEqual(mini.pause_button.text(), "Pause")
         self.end.assert_not_called()
+        self.assertGreater(monitor.frame_count, frame_count_before_minimize)
 
+        # Simulate a platform suspending the preview timer while minimized.
+        # Restoring must recover it and paint a newly read camera frame.
+        monitor.timer.stop()
+        frame_count_before_restore = monitor.frame_count
         mini.restore_button.click()
         self.app.processEvents()
+        QTest.qWait(50)
         self.assertFalse(self.window.isMinimized())
         self.assertFalse(mini.isVisible())
         self.assertIs(self.window.pages.currentWidget(), monitor)
+        self.assertTrue(monitor.timer.isActive())
+        self.assertGreater(monitor.frame_count, frame_count_before_restore)
+        self.assertIsNotNone(monitor.preview_label.pixmap())
+
+    def test_taskbar_restore_refreshes_running_camera_preview(self):
+        self.start_monitoring()
+        monitor = self.window.monitoring_page
+
+        self.window.showMinimized()
+        self.app.processEvents()
+        QTest.qWait(10)
+        monitor.timer.stop()
+        frame_count_before_restore = monitor.frame_count
+
+        self.window.showNormal()
+        self.app.processEvents()
+        QTest.qWait(50)
+
+        self.assertFalse(self.window.isMinimized())
+        self.assertTrue(monitor.timer.isActive())
+        self.assertGreater(monitor.frame_count, frame_count_before_restore)
 
     def test_compact_controls_pause_resume_and_stop_the_same_session(self):
         self.start_monitoring()

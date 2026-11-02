@@ -123,7 +123,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.load_privacy_consent()
 
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ถอนความยินยอม")
         changed = Mock()
         self.page.privacy_consent_changed.connect(changed)
         withdrawn = {**accepted, "has_current_consent": False, "withdrawn_at": "now"}
@@ -144,7 +144,7 @@ class SettingsPageTests(unittest.TestCase):
         changed.assert_called_once_with(False)
         self.assertIn("ถอนแล้ว", self.page.privacy_status_label.text())
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ความยินยอม")
 
     def test_missing_privacy_consent_offers_consent_action(self):
         missing = {
@@ -160,7 +160,29 @@ class SettingsPageTests(unittest.TestCase):
             self.page.load_privacy_consent()
 
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ความยินยอม")
+
+    def test_active_session_explains_why_consent_cannot_be_withdrawn(self):
+        self.page._set_privacy_consent_action(True)
+        conflict = response(
+            {"detail": "Stop the active monitoring session before withdrawing consent."},
+            status=409,
+        )
+        with (
+            patch(
+                "PySide6.QtWidgets.QMessageBox.question",
+                return_value=QMessageBox.StandardButton.Yes,
+            ),
+            patch.object(
+                APIClient,
+                "withdraw_privacy_consent",
+                return_value=conflict,
+            ),
+        ):
+            self.page.withdraw_privacy_consent()
+
+        self.assertIn("Stop Monitoring", self.page.privacy_status_label.text())
+        self.assertTrue(self.page.consent_action_button.isEnabled())
 
     def test_consent_action_updates_state_after_acceptance(self):
         self.page._set_privacy_consent_action(False)
@@ -175,7 +197,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.handle_privacy_consent_action()
 
         self.assertTrue(self.page.has_privacy_consent)
-        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ถอนความยินยอม")
         changed.assert_called_once_with(True)
 
 

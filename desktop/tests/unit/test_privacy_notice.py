@@ -28,6 +28,11 @@ class PrivacyNoticeDialogTests(unittest.TestCase):
 
     def test_accept_button_requires_explicit_checkbox(self):
         self.assertFalse(self.dialog.accept_button.isEnabled())
+        self.assertIn("ประมวลผลภายในคอมพิวเตอร์", self.dialog.notice.toPlainText())
+        self.assertIn("ระบบจะไม่เปิดกล้อง", self.dialog.notice.toPlainText())
+        self.assertIn("RUNNING หรือ PAUSED", self.dialog.notice.toPlainText())
+        self.assertIn(PRIVACY_NOTICE_VERSION, self.dialog.notice.toPlainText())
+        self.assertEqual(self.dialog.cancel_button.text(), "ยังไม่ยินยอม")
         self.dialog.accept_checkbox.setChecked(True)
         self.assertTrue(self.dialog.accept_button.isEnabled())
 
