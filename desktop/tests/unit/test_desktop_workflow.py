@@ -378,7 +378,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(summary_page.current_summary["summary_save_status"], "SAVED")
         self.assertEqual(summary_page.current_summary["detection_count"], 2)
         self.assertTrue(summary_page.save_group.isHidden())
-        self.assertEqual(monitor.stop_button.text(), "Stop Monitoring")
+        self.assertEqual(monitor.stop_button.text(), "จบการตรวจจับ")
         self.assertEqual(self.save.call_args.args[1]["average_neck"], 2.0)
         baseline_payload = self.create_baseline.call_args.kwargs["measurements"]
         self.assertEqual(baseline_payload["camera_scale_avg"], 3.50)

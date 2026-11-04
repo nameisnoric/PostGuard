@@ -524,7 +524,7 @@ class MonitoringPage(QWidget):
         )
 
         self.title_label = QLabel(
-            "Real-time Monitoring"
+            "การตรวจจับแบบเรียลไทม์"
         )
 
         self.title_label.setProperty(
@@ -674,7 +674,7 @@ class MonitoringPage(QWidget):
     ) -> QGroupBox:
 
         info_group = QGroupBox(
-            "Monitoring Information"
+            "ข้อมูลการตรวจจับ"
         )
 
         info_group.setSizePolicy(
@@ -769,7 +769,7 @@ class MonitoringPage(QWidget):
     ) -> QGroupBox:
 
         detection_group = QGroupBox(
-            "Live Detection"
+            "ผลการตรวจจับแบบเรียลไทม์"
         )
 
         detection_group.setSizePolicy(
@@ -882,7 +882,7 @@ class MonitoringPage(QWidget):
     ) -> QGroupBox:
 
         risk_group = QGroupBox(
-            "PostGuard Risk Pipeline"
+            "การประเมินความเสี่ยง PostGuard"
         )
 
         risk_group.setSizePolicy(
@@ -968,7 +968,7 @@ class MonitoringPage(QWidget):
         button_layout = QHBoxLayout()
 
         self.pause_button = QPushButton(
-            "Pause Monitoring"
+            "หยุดชั่วคราว"
         )
 
         self.pause_button.setEnabled(
@@ -980,7 +980,7 @@ class MonitoringPage(QWidget):
         )
 
         self.stop_button = QPushButton(
-            "Stop Monitoring"
+            "จบการตรวจจับ"
         )
 
         self.stop_button.setProperty(
@@ -2312,7 +2312,7 @@ class MonitoringPage(QWidget):
         self.is_paused = False
 
         self.pause_button.setText(
-            "Pause Monitoring"
+            "หยุดชั่วคราว"
         )
 
         self.pause_button.setEnabled(
@@ -2645,7 +2645,7 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.assessment_label.setText(
-            "Assessment: "
+            "ผลการประเมิน: "
             f"{assessment.get('status')} "
             f"({assessment.get('reason')})"
         )
@@ -2703,7 +2703,7 @@ class MonitoringPage(QWidget):
         ):
 
             self.risk_label.setText(
-                "Risk Level: "
+                "ระดับความเสี่ยง: "
                 f"{risk_level} "
                 "(PostGuard Prototype)"
             )
@@ -2750,7 +2750,7 @@ class MonitoringPage(QWidget):
         if event_id is not None:
 
             self.event_label.setText(
-                "Risk Event: "
+                "เหตุการณ์ความเสี่ยง: "
                 f"{event_action} | "
                 f"{event_id}"
             )
@@ -2758,7 +2758,7 @@ class MonitoringPage(QWidget):
         else:
 
             self.event_label.setText(
-                "Risk Event: "
+                "เหตุการณ์ความเสี่ยง: "
                 f"{event_action}"
             )
 
@@ -2804,7 +2804,7 @@ class MonitoringPage(QWidget):
         if should_notify:
 
             self.alert_label.setText(
-                "Alert Policy: "
+                "สถานะการแจ้งเตือน: "
                 f"{decision} | "
                 f"{alert_type} | "
                 f"{alert.get('current_risk_level')}"
@@ -2836,7 +2836,7 @@ class MonitoringPage(QWidget):
         else:
 
             self.alert_label.setText(
-                "Alert Policy: "
+                "สถานะการแจ้งเตือน: "
                 f"{decision}"
             )
 
@@ -3237,7 +3237,7 @@ class MonitoringPage(QWidget):
             )
 
             self.shoulder_difference_label.setText(
-                "Shoulder Difference: "
+                "ผลต่างจาก Baseline ไหล่: "
                 f"{difference:+.2f}°"
             )
 
@@ -3315,7 +3315,7 @@ class MonitoringPage(QWidget):
             )
 
             self.flexion_difference_label.setText(
-                "Neck Flexion Difference: "
+                "ผลต่างจาก Baseline ก้ม/เงยคอ: "
                 f"{difference:+.2f}°"
             )
 
@@ -5699,7 +5699,7 @@ class MonitoringPage(QWidget):
             )
 
             self.pause_button.setText(
-                "Pause Monitoring"
+                "หยุดชั่วคราว"
             )
 
             self.is_paused = False
@@ -6523,7 +6523,7 @@ class MonitoringPage(QWidget):
         )
 
         self.pause_button.setText(
-            "Resume Monitoring"
+            "ตรวจจับต่อ"
         )
 
     # ========================================================
@@ -6636,7 +6636,7 @@ class MonitoringPage(QWidget):
         )
 
         self.pause_button.setText(
-            "Pause Monitoring"
+            "หยุดชั่วคราว"
         )
 
         self.timer.start()
