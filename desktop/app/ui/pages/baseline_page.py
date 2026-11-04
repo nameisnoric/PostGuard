@@ -512,7 +512,7 @@ class BaselinePage(QWidget):
         )
 
         self.camera_id_label = QLabel(
-            'Camera ID: -'
+            'รหัสกล้อง: -'
         )
 
         self.resolution_label = QLabel(
@@ -743,7 +743,7 @@ class BaselinePage(QWidget):
 
         camera_name = camera.get(
             "camera_name",
-            "Unknown Camera"
+            "กล้องไม่ทราบชื่อ"
         )
 
         device_index = camera.get(
@@ -759,7 +759,7 @@ class BaselinePage(QWidget):
         )
 
         self.camera_id_label.setText(
-            f"Camera ID: {camera_id}"
+            f"รหัสกล้อง: {camera_id}"
         )
 
         self.camera_name_label.setText(
@@ -1131,7 +1131,7 @@ class BaselinePage(QWidget):
             QMessageBox.warning(
                 self,
                 'บันทึกค่าอ้างอิง',
-                'Camera ID ไม่ถูกต้อง'
+                'รหัสกล้องไม่ถูกต้อง'
             )
 
             return
@@ -1213,7 +1213,7 @@ class BaselinePage(QWidget):
 
             if baseline_id is None:
                 raise RuntimeError(
-                    "Server did not return a Baseline ID."
+                    "เซิร์ฟเวอร์ไม่ส่งรหัสค่าท่าทางอ้างอิงกลับมา"
                 )
 
             # -------------------------
@@ -1302,11 +1302,11 @@ class BaselinePage(QWidget):
         except CameraReferenceError as error:
             self.stop_camera_preview()
             self.status_label.setText(
-                'สถานะ: Camera Reference ไม่ถูกต้อง'
+                'สถานะ: ข้อมูลการเตรียมกล้องไม่ถูกต้อง'
             )
             QMessageBox.warning(
                 self,
-                'Camera Reference',
+                'การเตรียมกล้อง',
                 str(error)
             )
             return

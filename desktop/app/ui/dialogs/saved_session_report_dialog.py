@@ -88,7 +88,7 @@ class SavedSessionReportDialog(
 
         self.setWindowTitle(
             (
-                "PostGuard - Saved Session Report "
+                "PostGuard - รายงานเซสชันที่บันทึกไว้ "
                 f"#{session_id}"
             )
         )

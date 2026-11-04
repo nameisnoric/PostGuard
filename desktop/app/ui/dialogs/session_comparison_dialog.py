@@ -646,7 +646,7 @@ class SessionComparisonDialog(
             )
 
             label = (
-                f"Session #{session_id} "
+                f"เซสชัน #{session_id} "
                 f"• คะแนนเฉลี่ย {average:.2f}"
             )
 
@@ -716,7 +716,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "ต้องมีอย่างน้อย 2 Session "
+                    "ต้องมีอย่างน้อย 2 เซสชัน "
                     "ที่มีคะแนนความเสี่ยงจึงจะเปรียบเทียบได้"
                 )
             )
@@ -791,7 +791,7 @@ class SessionComparisonDialog(
             self.explanation_label.setText(
                 (
                     "กรุณาเลือกครั้งก่อนและครั้งล่าสุด "
-                    "ให้เป็นคนละ Session"
+                    "ให้เป็นคนละเซสชัน"
                 )
             )
 
@@ -834,7 +834,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "สอง Session นี้ใช้วิธีคำนวณคะแนนคนละรุ่น "
+                    "สองเซสชันนี้ใช้วิธีคำนวณคะแนนคนละรุ่น "
                     "จึงไม่ควรนำคะแนนมาเปรียบเทียบกัน"
                 )
             )
@@ -852,7 +852,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "อย่างน้อยหนึ่ง Session "
+                    "อย่างน้อยหนึ่งเซสชัน "
                     "ไม่มีคะแนนความเสี่ยงที่ใช้เปรียบเทียบได้"
                 )
             )
@@ -869,7 +869,7 @@ class SessionComparisonDialog(
             )
 
             self.explanation_label.setText(
-                "ไม่สามารถเปรียบเทียบ Session ที่เลือกได้"
+                "ไม่สามารถเปรียบเทียบเซสชันที่เลือกได้"
             )
 
             return

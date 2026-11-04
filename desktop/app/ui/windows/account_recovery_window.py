@@ -44,8 +44,8 @@ class AccountRecoveryWindow(QWidget):
         title.setProperty("role", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message = QLabel(
-            "This account is disabled. Recover it before the deadline to restore "
-            "access to PostGuard and keep its saved data."
+            "บัญชีนี้ถูกปิดใช้งานชั่วคราว กรุณากู้คืนบัญชีก่อนถึงกำหนดเพื่อกลับมาใช้งาน "
+            "PostGuard และเก็บข้อมูลที่บันทึกไว้"
         )
         message.setProperty("role", "muted")
         message.setWordWrap(True)
@@ -95,8 +95,8 @@ class AccountRecoveryWindow(QWidget):
     def _deadline_text(self) -> str:
         deadline = self._deadline()
         if deadline is None:
-            return "Deletion deadline is unavailable."
-        return "Deletion deadline: " + deadline.astimezone().strftime("%d %b %Y, %H:%M %Z")
+            return "ไม่พบข้อมูลกำหนดเวลาลบบัญชี"
+        return "กำหนดเวลาลบบัญชี: " + deadline.astimezone().strftime("%d %b %Y, %H:%M %Z")
 
     def _deadline_has_passed(self) -> bool:
         deadline = self._deadline()
@@ -109,13 +109,13 @@ class AccountRecoveryWindow(QWidget):
             response = APIClient.cancel_account_deletion()
         except requests.RequestException:
             self.recover_button.setEnabled(True)
-            self.status_label.setText("Cannot recover the account. Check your connection.")
+            self.status_label.setText("ไม่สามารถกู้คืนบัญชีได้ กรุณาตรวจสอบการเชื่อมต่อ")
             return
         if not response.ok:
             try:
-                detail = response.json().get("detail", "Account recovery failed.")
+                detail = response.json().get("detail", "ไม่สามารถกู้คืนบัญชีได้")
             except (ValueError, AttributeError):
-                detail = "Account recovery failed."
+                detail = "ไม่สามารถกู้คืนบัญชีได้"
             self.recover_button.setEnabled(response.status_code != 410)
             self.status_label.setText(str(detail))
             return
@@ -123,11 +123,11 @@ class AccountRecoveryWindow(QWidget):
             recovered_user = response.json()
         except (ValueError, AttributeError):
             self.recover_button.setEnabled(True)
-            self.status_label.setText("Account recovery returned an invalid response.")
+            self.status_label.setText("ข้อมูลตอบกลับจากการกู้คืนบัญชีไม่ถูกต้อง")
             return
         if recovered_user.get("account_status") != "ACTIVE":
             self.recover_button.setEnabled(True)
-            self.status_label.setText("Account recovery could not be confirmed.")
+            self.status_label.setText("ไม่สามารถยืนยันการกู้คืนบัญชีได้")
             return
 
         QMessageBox.information(self, 'กู้คืนบัญชีแล้ว', 'บัญชี PostGuard ของคุณกลับมาใช้งานได้แล้ว')

@@ -130,7 +130,7 @@ class SessionSummaryPage(
         # ====================================================
 
         self.title_label = QLabel(
-            "Session Summary"
+            "สรุปผลเซสชัน"
         )
 
         self.title_label.setProperty(
@@ -141,7 +141,7 @@ class SessionSummaryPage(
         self.description_label = QLabel(
             (
                 "สรุปผลการตรวจจับ "
-                "Posture Risk และ "
+                "ความเสี่ยงด้านท่าทาง และ "
                 "PostGuard Risk Score"
             )
         )
@@ -156,7 +156,7 @@ class SessionSummaryPage(
         # ====================================================
 
         info_group = QGroupBox(
-            "Session Information"
+            "ข้อมูลเซสชัน"
         )
 
         info_group.setSizePolicy(
@@ -169,7 +169,7 @@ class SessionSummaryPage(
         )
 
         self.session_label = QLabel(
-            "Session ID: --"
+            "รหัสเซสชัน: --"
         )
 
         self.database_label = QLabel(
@@ -181,7 +181,7 @@ class SessionSummaryPage(
         )
 
         self.baseline_label = QLabel(
-            "Baseline ID: --"
+            "รหัสค่าท่าทางอ้างอิง: --"
         )
 
         self.start_label = QLabel(
@@ -224,7 +224,7 @@ class SessionSummaryPage(
         # ====================================================
 
         detection_group = QGroupBox(
-            "Detection Summary"
+            "สรุปผลการตรวจจับ"
         )
 
         detection_group.setSizePolicy(
@@ -293,21 +293,21 @@ class SessionSummaryPage(
 
         self.average_score_card = (
             self._create_score_card(
-                "AVERAGE",
+                "เฉลี่ย",
                 "--",
             )
         )
 
         self.minimum_score_card = (
             self._create_score_card(
-                "MINIMUM",
+                "ต่ำสุด",
                 "--",
             )
         )
 
         self.maximum_score_card = (
             self._create_score_card(
-                "MAXIMUM",
+                "สูงสุด",
                 "--",
             )
         )
@@ -364,7 +364,7 @@ class SessionSummaryPage(
         # ====================================================
 
         chart_group = QGroupBox(
-            "Risk Score Over Session"
+            "Risk Score ตลอดเซสชัน"
         )
 
         chart_layout = QVBoxLayout(
@@ -418,11 +418,11 @@ class SessionSummaryPage(
         )
 
         self.report_alert_count_label = QLabel(
-            "Posture Alerts ที่บันทึก: --"
+            "การแจ้งเตือนท่าทางที่บันทึก: --"
         )
 
         self.eye_alert_count_label = QLabel(
-            "Eye Reminders ที่บันทึก: --"
+            "การแจ้งเตือนการกระพริบตาที่บันทึก: --"
         )
 
         self.frequent_event_label = QLabel(
@@ -548,7 +548,7 @@ class SessionSummaryPage(
         alert_buttons = QHBoxLayout()
 
         self.refresh_alerts_button = QPushButton(
-            "Refresh Alert Summary"
+            "รีเฟรชสรุปการแจ้งเตือน"
         )
 
         self.refresh_alerts_button.clicked.connect(
@@ -556,7 +556,7 @@ class SessionSummaryPage(
         )
 
         self.view_alerts_button = QPushButton(
-            "View Alert History"
+            "ดูประวัติการแจ้งเตือน"
         )
 
         self.view_alerts_button.clicked.connect(
@@ -603,7 +603,7 @@ class SessionSummaryPage(
         # ====================================================
 
         self.back_button = QPushButton(
-            "Back to Dashboard"
+            "กลับไปหน้าแดชบอร์ด"
         )
 
         self.back_button.clicked.connect(
@@ -839,9 +839,9 @@ class SessionSummaryPage(
                 parts.append(
                     (
                         f"{level.title()} "
-                        f"{count_text} alert(s), "
+                        f"{count_text} ครั้ง, "
                         f"{duration_text(seconds)} "
-                        "open time"
+                        "ระยะเวลาที่เกิดเหตุการณ์"
                     )
                 )
 
@@ -934,7 +934,7 @@ class SessionSummaryPage(
         )
 
         self.title_label.setText(
-            "Saved Session Report"
+            "รายงานเซสชันที่บันทึกไว้"
         )
 
         self.back_button.setText(
@@ -978,14 +978,14 @@ class SessionSummaryPage(
 
         self.session_label.setText(
             (
-                "Session ID: "
+                "รหัสเซสชัน: "
                 f"{self.current_session_id}"
             )
         )
 
         self.database_label.setText(
             (
-                "Session Status: "
+                "สถานะเซสชัน: "
                 +
                 str(
                     summary.get(
@@ -998,7 +998,7 @@ class SessionSummaryPage(
 
         self.camera_label.setText(
             (
-                "Camera: "
+                "กล้อง: "
                 +
                 str(
                     summary.get(
@@ -1011,7 +1011,7 @@ class SessionSummaryPage(
 
         self.baseline_label.setText(
             (
-                "Baseline ID: "
+                "รหัสค่าท่าทางอ้างอิง: "
                 +
                 str(
                     summary.get(
@@ -1024,7 +1024,7 @@ class SessionSummaryPage(
 
         self.start_label.setText(
             (
-                "Started: "
+                "เริ่มเมื่อ: "
                 +
                 local_datetime(
                     summary.get(
@@ -1036,7 +1036,7 @@ class SessionSummaryPage(
 
         self.end_label.setText(
             (
-                "Ended: "
+                "สิ้นสุดเมื่อ: "
                 +
                 local_datetime(
                     summary.get(
@@ -1273,7 +1273,7 @@ class SessionSummaryPage(
 
         self.report_alert_count_label.setText(
             (
-                "Posture Alerts ที่บันทึก: "
+                "การแจ้งเตือนท่าทางที่บันทึก: "
                 +
                 (
                     str(
@@ -1297,7 +1297,7 @@ class SessionSummaryPage(
 
         self.eye_alert_count_label.setText(
             (
-                "Eye Reminders ที่บันทึก: "
+                "การแจ้งเตือนการกระพริบตาที่บันทึก: "
                 f"{eye_alert_count if eye_alert_count is not None else 'N/A'} "
                 f"(FIRST {eye_first_count if eye_first_count is not None else 'N/A'}, "
                 f"REPEAT {eye_repeat_count if eye_repeat_count is not None else 'N/A'})"
@@ -1360,7 +1360,7 @@ class SessionSummaryPage(
             session_id <= 0
         ):
             self.chart_status_label.setText(
-                "ไม่พบ Session ID สำหรับโหลดกราฟ"
+                "ไม่พบรหัสเซสชันสำหรับโหลดกราฟ"
             )
 
             return
@@ -1380,7 +1380,7 @@ class SessionSummaryPage(
         ) as error:
             self.chart_status_label.setText(
                 (
-                    "ไม่สามารถโหลด Risk Score graph ได้: "
+                    "ไม่สามารถโหลดกราฟ Risk Score ได้: "
                     f"{error}"
                 )
             )
@@ -1398,8 +1398,8 @@ class SessionSummaryPage(
         if not buckets:
             self.chart_status_label.setText(
                 (
-                    "Session นี้ไม่มี COMPLETE "
-                    "Risk Score samples"
+                    "เซสชันนี้ไม่มีข้อมูล Risk Score ที่สมบูรณ์ "
+                    "ที่สามารถนำมาแสดงบนกราฟได้"
                 )
             )
 
@@ -1424,10 +1424,10 @@ class SessionSummaryPage(
 
         self.chart_status_label.setText(
             (
-                f"{len(buckets)} buckets | "
-                f"{total_samples} valid score samples | "
+                f"{len(buckets)} ช่วง | "
+                f"{total_samples} ตัวอย่างคะแนนที่ใช้ได้ | "
                 f"{first_second:.0f}-"
-                f"{last_second:.0f} sec"
+                f"{last_second:.0f} วินาที"
             )
         )
 
@@ -1490,13 +1490,13 @@ class SessionSummaryPage(
         else:
             self.save_status_label.setText(
                 (
-                    "The session report has not "
-                    "been saved.\n"
+                    "รายงานของเซสชันยังไม่ได้"
+                    "ถูกบันทึก\n"
                     +
                     str(
                         error
                         or
-                        "Unknown error"
+                        "ข้อผิดพลาดที่ไม่ทราบสาเหตุ"
                     )
                 )
             )
@@ -1607,7 +1607,7 @@ class SessionSummaryPage(
             session_id <= 0
         ):
             self.alert_error_label.setText(
-                "ไม่พบ Session ID ที่ถูกต้อง"
+                "ไม่พบรหัสเซสชันที่ถูกต้อง"
             )
 
             return
@@ -1638,7 +1638,7 @@ class SessionSummaryPage(
                 list,
             ):
                 raise ValueError(
-                    "Invalid Risk Event response."
+                    "ข้อมูลเหตุการณ์ความเสี่ยงที่ได้รับไม่ถูกต้อง"
                 )
 
             notification_response = (
@@ -1667,8 +1667,8 @@ class SessionSummaryPage(
             ):
                 raise ValueError(
                     (
-                        "Invalid Alert Notification "
-                        "response."
+                        "ข้อมูลการแจ้งเตือนที่ได้รับ"
+                        "ไม่ถูกต้อง"
                     )
                 )
 
@@ -1692,7 +1692,7 @@ class SessionSummaryPage(
                 list,
             ):
                 raise ValueError(
-                    "Invalid Eye Alert Notification response."
+                    "ข้อมูลการแจ้งเตือนการกระพริบตาที่ได้รับไม่ถูกต้อง"
                 )
 
         except (
@@ -1704,7 +1704,7 @@ class SessionSummaryPage(
             self.alert_error_label.setText(
                 (
                     "ไม่สามารถโหลดข้อมูล "
-                    "Risk Event / Alert Notification ได้: "
+                    "เหตุการณ์ความเสี่ยง / การแจ้งเตือนได้: "
                     f"{error}"
                 )
             )
@@ -1859,16 +1859,16 @@ class SessionSummaryPage(
 
         self.alert_total_label.setText(
             (
-                "Posture Alerts: "
+                "การแจ้งเตือนท่าทาง: "
                 f"{notification_count} ครั้ง "
                 f"(ครั้งแรก {first_count}, "
                 f"ซ้ำ {repeat_count}, "
                 "ระดับความเสี่ยงเพิ่มขึ้น "
                 f"{escalation_count}) "
-                "| Eye Reminders: "
+                "| การแจ้งเตือนการกระพริบตา: "
                 f"{eye_notification_count} ครั้ง "
-                f"(FIRST {eye_first_count}, "
-                f"REPEAT {eye_repeat_count})"
+                f"(ครั้งแรก {eye_first_count}, "
+                f"ซ้ำ {eye_repeat_count})"
             )
         )
 
@@ -1946,11 +1946,11 @@ class SessionSummaryPage(
                 self,
                 "รายงานยังไม่ถูกบันทึก",
                 (
-                    "This session report has not been "
-                    "saved successfully. "
-                    "If you leave now, you may not be "
-                    "able to retry with the same data.\n\n"
-                    "Leave this report?"
+                    "รายงานของเซสชันนี้ยังไม่ได้"
+                    "บันทึกสำเร็จ "
+                    "หากออกจากหน้านี้ตอนนี้ คุณอาจไม่สามารถ"
+                    "ลองบันทึกใหม่ด้วยข้อมูลชุดเดิมได้\n\n"
+                    "ต้องการออกจากรายงานนี้หรือไม่?"
                 ),
                 (
                     QMessageBox.StandardButton.Yes

@@ -49,7 +49,7 @@ class RegistrationUITests(unittest.TestCase):
 
         request_otp.assert_not_called()
         show_error.assert_called_once_with(
-            "Password and confirmation do not match."
+            "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน"
         )
         self.assertEqual(self.window.confirm_password_input.text(), "")
 

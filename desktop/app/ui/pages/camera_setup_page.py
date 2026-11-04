@@ -70,8 +70,8 @@ class CameraSetupPage(QWidget):
         layout.addWidget(card)
 
         privacy = QLabel(
-            "Camera access stays on this device. Scanning checks which camera can "
-            "provide a frame; it does not save or upload an image."
+            "การเข้าถึงกล้องจะทำงานอยู่บนอุปกรณ์นี้เท่านั้น การตรวจสอบจะค้นหากล้องที่ "
+            "สามารถส่งภาพได้ โดยจะไม่บันทึกหรืออัปโหลดรูปภาพ"
         )
         privacy.setProperty("role", "muted")
         privacy.setWordWrap(True)
@@ -106,18 +106,18 @@ class CameraSetupPage(QWidget):
         self.detected_cameras = cameras
         if not cameras:
             self.status_label.setText(
-                "No available camera was found. Check Windows camera permission "
-                "and make sure another application is not using the camera."
+                "ไม่พบกล้องที่พร้อมใช้งาน โปรดตรวจสอบสิทธิ์การใช้กล้องใน Windows "
+                "และตรวจสอบว่าไม่มีโปรแกรมอื่นกำลังใช้งานกล้องอยู่"
             )
             return
 
         for camera in cameras:
-            name = camera.get("camera_name", "Unknown Camera")
+            name = camera.get("camera_name", "กล้องไม่ทราบชื่อ")
             device_index = camera.get("device_index", "--")
             width = camera.get("resolution_width", "--")
             height = camera.get("resolution_height", "--")
             self.camera_list.addItem(
-                f"{name}  ·  อุปกรณ์ {device_index}  ·  {width}×{height}"
+                f"{name} · อุปกรณ์ {device_index} · {width}×{height}"
             )
 
         count = len(cameras)
@@ -136,8 +136,8 @@ class CameraSetupPage(QWidget):
         if not 0 <= row < len(self.detected_cameras):
             QMessageBox.warning(
                 self,
-                'การตั้งค่ากล้อง',
-                'โปรดสแกนและเลือกกล้องที่พร้อมใช้งานก่อน',
+                "การตั้งค่ากล้อง",
+                "โปรดสแกนและเลือกกล้องที่พร้อมใช้งานก่อน",
             )
             return
         self.camera_selected.emit(self.detected_cameras[row].copy())

@@ -83,9 +83,9 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(app_title)
         navigation_layout.addStretch()
 
-        self.monitor_button = self._nav_button("Monitoring")
-        self.dashboard_button = self._nav_button("Dashboard")
-        self.history_button = self._nav_button("History")
+        self.monitor_button = self._nav_button("การตรวจจับ")
+        self.dashboard_button = self._nav_button("ภาพรวม")
+        self.history_button = self._nav_button("ประวัติ")
         navigation_layout.addWidget(self.monitor_button)
         navigation_layout.addWidget(self.dashboard_button)
         navigation_layout.addWidget(self.history_button)
@@ -96,10 +96,10 @@ class MainWindow(QMainWindow):
         self.account_button.setProperty("accountActive", False)
         self.account_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         account_menu = QMenu(self.account_button)
-        self.profile_action = account_menu.addAction("Profile")
-        self.settings_action = account_menu.addAction("Settings")
+        self.profile_action = account_menu.addAction("โปรไฟล์")
+        self.settings_action = account_menu.addAction("การตั้งค่า")
         account_menu.addSeparator()
-        self.logout_action = account_menu.addAction("Log out")
+        self.logout_action = account_menu.addAction("ออกจากระบบ")
         self.account_button.setMenu(account_menu)
         navigation_layout.addWidget(self.account_button)
         main_layout.addWidget(navigation)
@@ -108,11 +108,11 @@ class MainWindow(QMainWindow):
         self.session_bar.setProperty("variant", "sessionBar")
         session_layout = QHBoxLayout(self.session_bar)
         session_layout.setContentsMargins(32, 8, 24, 8)
-        self.monitoring_status_label = QLabel("Monitoring: ยังไม่เริ่ม")
+        self.monitoring_status_label = QLabel("การตรวจจับ: ยังไม่เริ่ม")
         self.monitoring_status_label.setProperty("status", "idle")
-        self.global_pause_button = QPushButton("Pause Monitoring")
-        self.global_mini_button = QPushButton("Minimize Monitoring")
-        self.global_stop_button = QPushButton("Stop Monitoring")
+        self.global_pause_button = QPushButton("หยุดการตรวจจับชั่วคราว")
+        self.global_mini_button = QPushButton("ย่อหน้าต่างการตรวจจับ")
+        self.global_stop_button = QPushButton("สิ้นสุดการตรวจจับ")
         self.global_stop_button.setProperty("variant", "danger")
         session_layout.addWidget(
             self.monitoring_status_label,
@@ -448,16 +448,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 'ประกาศความเป็นส่วนตัว',
-                "Cannot check your privacy choice. Check your connection before "
-                "opening the camera.",
+                "ไม่สามารถตรวจสอบการตั้งค่าความเป็นส่วนตัวได้ โปรดตรวจสอบการเชื่อมต่อก่อน "
+                "เปิดใช้งานกล้อง",
             )
             return False
         if not response.ok:
             QMessageBox.warning(
                 self,
                 'ประกาศความเป็นส่วนตัว',
-                "Your privacy choice could not be loaded. Restart the backend and "
-                "try again.",
+                "ไม่สามารถโหลดการตั้งค่าความเป็นส่วนตัวได้ โปรดรีสตาร์ต backend แล้ว "
+                "ลองอีกครั้ง",
             )
             return False
         try:
@@ -495,17 +495,17 @@ class MainWindow(QMainWindow):
         except requests.RequestException:
             self.settings_page.delete_account_button.setEnabled(True)
             self.settings_page.account_status_label.setText(
-                "Cannot request account deletion. Check your connection."
+                "ไม่สามารถส่งคำขอลบบัญชีได้ โปรดตรวจสอบการเชื่อมต่อ"
             )
             return
         if not response.ok:
             self.settings_page.delete_account_button.setEnabled(True)
             try:
                 detail = response.json().get(
-                    "detail", "Account deletion could not be requested."
+                    "detail", "ไม่สามารถส่งคำขอลบบัญชีได้"
                 )
             except (ValueError, AttributeError):
-                detail = "Account deletion could not be requested."
+                detail = "ไม่สามารถส่งคำขอลบบัญชีได้"
             self.settings_page.account_status_label.setText(str(detail))
             return
 
@@ -516,9 +516,9 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             'ส่งคำขอลบบัญชีแล้ว',
-            "Your account is disabled and scheduled for permanent deletion in 14 days. "
-            "Sign in again before the deadline to recover it."
-            + (f"\n\nDeletion deadline: {scheduled_for}" if scheduled_for else ""),
+            "บัญชีของคุณถูกปิดใช้งานและมีกำหนดลบถาวรภายใน 14 วัน "
+            "เข้าสู่ระบบอีกครั้งก่อนถึงกำหนดหากต้องการกู้คืนบัญชี"
+            + (f"\n\nกำหนดเวลาลบบัญชี: {scheduled_for}" if scheduled_for else ""),
         )
         TokenStore.clear_token()
         self._exit_ready = True
@@ -581,13 +581,13 @@ class MainWindow(QMainWindow):
 
             status = (
                 f"เซสชัน {monitor.session_id}: "
-                "Stop pending | NETWORK GAP"
+                "กำลังรอสิ้นสุด | การเชื่อมต่อเครือข่ายขาดหาย"
             )
 
         elif monitor.is_stopping:
 
             status = (
-                "Monitoring: Ending and saving..."
+                "การตรวจจับ: กำลังสิ้นสุดและบันทึกข้อมูล..."
             )
 
         elif active:
@@ -597,13 +597,13 @@ class MainWindow(QMainWindow):
                 if monitor.is_paused:
 
                     state = (
-                        "Paused | NETWORK GAP"
+                        "หยุดชั่วคราว | การเชื่อมต่อเครือข่ายขาดหาย"
                     )
 
                 else:
 
                     state = (
-                        "Running locally | NETWORK GAP"
+                        "กำลังทำงานภายในเครื่อง | การเชื่อมต่อเครือข่ายขาดหาย"
                     )
 
             elif (
@@ -612,16 +612,16 @@ class MainWindow(QMainWindow):
             ):
 
                 state = (
-                    "Running | CAMERA DATA GAP"
+                    "กำลังทำงาน | ข้อมูลจากกล้องขาดหาย"
                 )
 
             elif monitor.is_paused:
 
-                state = "Paused"
+                state = "หยุดชั่วคราว"
 
             else:
 
-                state = "Running (camera on)"
+                state = "กำลังตรวจจับ (เปิดกล้อง)"
 
             status = (
                 f"เซสชัน "
@@ -632,7 +632,7 @@ class MainWindow(QMainWindow):
         else:
 
             status = (
-                "Monitoring: Not running"
+                "การตรวจจับ: ยังไม่ทำงาน"
             )
 
         self.monitoring_status_label.setText(
@@ -678,10 +678,10 @@ class MainWindow(QMainWindow):
 
         self.global_pause_button.setText(
             (
-                "Resume Monitoring"
+                "ทำการตรวจจับต่อ"
                 if monitor.is_paused
                 else
-                "Pause Monitoring"
+                "หยุดการตรวจจับชั่วคราว"
             )
         )
 
@@ -746,22 +746,22 @@ class MainWindow(QMainWindow):
             for session in sessions:
                 answer = QMessageBox.question(
                     self, 'พบเซสชันที่ยังไม่จบ',
-                    f"Session {session['session_id']} is still {session['status']}.\n"
-                    "It may be running on another device.\n\n"
-                    "Mark it as interrupted so you can start a new session?\n"
-                    "Existing records will be kept. The actual end time and lost "
-                    "detection statistics cannot be recovered; no summary will be fabricated.",
+                    f"เซสชัน {session['session_id']} ยังอยู่ในสถานะ {session['status']}.\n"
+                    "เซสชันนี้อาจกำลังทำงานอยู่บนอุปกรณ์อื่น\n\n"
+                    "ต้องการกำหนดเซสชันนี้เป็นถูกขัดจังหวะ เพื่อเริ่มเซสชันใหม่หรือไม่?\n"
+                    "ข้อมูลที่บันทึกไว้เดิมจะยังคงอยู่ แต่เวลาสิ้นสุดจริงและสถิติการตรวจจับ "
+                    "ที่สูญหายจะไม่สามารถกู้คืนได้ และระบบจะไม่สร้างข้อมูลสรุปขึ้นมาแทน",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )
                 if answer != QMessageBox.StandardButton.Yes:
-                    self.monitoring_status_label.setText("Previous session unresolved; Monitor to retry")
+                    self.monitoring_status_label.setText("เซสชันก่อนหน้ายังไม่ได้รับการแก้ไข กรุณาลองเริ่มการตรวจจับอีกครั้ง")
                     return False
                 interrupt_previous_session(session["session_id"])
             self.update_monitoring_controls()
             return True
         except (requests.RequestException, RuntimeError, ValueError) as error:
-            self.monitoring_status_label.setText("Session check failed; Monitor to retry")
+            self.monitoring_status_label.setText("ตรวจสอบเซสชันไม่สำเร็จ กรุณาลองเริ่มการตรวจจับอีกครั้ง")
             QMessageBox.warning(self, 'การกู้คืนเซสชัน', str(error))
             return False
         finally:
@@ -911,25 +911,25 @@ class MainWindow(QMainWindow):
         monitor = self.monitoring_page
 
         if monitor.session_id is None:
-            return "Monitoring is not running"
+            return "ยังไม่ได้เริ่มการตรวจจับ"
 
         if monitor.network_stop_pending:
-            return "Stop pending | NETWORK GAP"
+            return "กำลังรอสิ้นสุด | การเชื่อมต่อเครือข่ายขาดหาย"
 
         if monitor.network_gap_active:
             return (
-                "Paused | NETWORK GAP"
+                "หยุดชั่วคราว | การเชื่อมต่อเครือข่ายขาดหาย"
                 if monitor.is_paused
-                else "Running locally | NETWORK GAP"
+                else "กำลังทำงานภายในเครื่อง | การเชื่อมต่อเครือข่ายขาดหาย"
             )
 
         if monitor.camera_gap_started_at is not None:
             return "CAMERA DATA GAP"
 
         return (
-            "Monitoring paused"
+            "หยุดการตรวจจับชั่วคราว"
             if monitor.is_paused
-            else "Camera and detection are running"
+            else "กล้องและระบบตรวจจับกำลังทำงาน"
         )
 
     def _on_monitoring_state_changed(self) -> None:
@@ -1001,7 +1001,7 @@ class MainWindow(QMainWindow):
     def _setup_monitoring_tray(self) -> None:
         self.monitoring_tray = QSystemTrayIcon(self)
         self.monitoring_tray.setToolTip(
-            "PostGuard Monitoring"
+            "การตรวจจับ PostGuard"
         )
 
         tray_icon = self.windowIcon()
@@ -1013,19 +1013,19 @@ class MainWindow(QMainWindow):
         tray_menu = QMenu(self)
 
         self.tray_restore_action = tray_menu.addAction(
-            "Restore PostGuard"
+            "เปิด PostGuard"
         )
         self.tray_pause_action = tray_menu.addAction(
-            "Pause Monitoring"
+            "หยุดการตรวจจับชั่วคราว"
         )
         self.tray_end_action = tray_menu.addAction(
-            "End Monitoring"
+            "สิ้นสุดการตรวจจับ"
         )
 
         tray_menu.addSeparator()
 
         self.tray_exit_action = tray_menu.addAction(
-            "Exit PostGuard"
+            "ออกจาก PostGuard"
         )
 
         self.monitoring_tray.setContextMenu(
@@ -1073,9 +1073,9 @@ class MainWindow(QMainWindow):
             can_pause
         )
         self.tray_pause_action.setText(
-            "Resume Monitoring"
+            "ทำการตรวจจับต่อ"
             if monitor.is_paused
-            else "Pause Monitoring"
+            else "หยุดการตรวจจับชั่วคราว"
         )
 
         self.tray_end_action.setEnabled(
@@ -1204,7 +1204,7 @@ class MainWindow(QMainWindow):
 
             if not response.ok:
                 raise RuntimeError(
-                    f"Cannot load cameras: "
+                    f"ไม่สามารถโหลดรายการกล้องได้: "
                     f"HTTP {response.status_code}"
                 )
 
@@ -1212,7 +1212,7 @@ class MainWindow(QMainWindow):
 
             if not isinstance(saved_cameras, list):
                 raise ValueError(
-                    "Invalid camera list from server."
+                    "รายการกล้องที่ได้รับจากเซิร์ฟเวอร์ไม่ถูกต้อง"
                 )
 
             # 3. Find Existing Camera
@@ -1237,7 +1237,7 @@ class MainWindow(QMainWindow):
                     device_id=device_id,
                     camera_name=camera.get(
                         "camera_name",
-                        f"Camera {device_index}"
+                        f"กล้อง {device_index}"
                     ),
                     resolution_width=camera[
                         "resolution_width"
@@ -1249,7 +1249,7 @@ class MainWindow(QMainWindow):
 
                 if not response.ok:
                     raise RuntimeError(
-                        f"Camera registration failed: "
+                        f"ลงทะเบียนกล้องไม่สำเร็จ: "
                         f"HTTP {response.status_code}"
                     )
 
@@ -1272,7 +1272,7 @@ class MainWindow(QMainWindow):
                 or camera_id <= 0
             ):
                 raise ValueError(
-                    "Invalid camera_id from server."
+                    "รหัสกล้องที่ได้รับจากเซิร์ฟเวอร์ไม่ถูกต้อง"
                 )
 
             # 6. Prepare Camera Data

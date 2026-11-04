@@ -231,7 +231,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(monitor.size().height(), 405)
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
-            "All Alert Events",
+            "การแจ้งเตือนทั้งหมด",
         )
         self.assertFalse(hasattr(self.window, "alert_history_button"))
 
@@ -467,7 +467,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertTrue(monitor.timer.isActive())
         self.assertEqual(monitor.session_id, 3)
         self.end.assert_not_called()
-        self.assertIn("Running", self.window.monitoring_status_label.text())
+        self.assertIn("กำลังตรวจจับ", self.window.monitoring_status_label.text())
         self.window.show_monitor()
         self.assertIs(self.window.pages.currentWidget(), monitor)
         self.start.assert_called_once()
@@ -481,8 +481,8 @@ class DesktopWorkflowTests(unittest.TestCase):
         with patch.object(APIClient, "pause_session", return_value=response({"session_id": 3, "status": "PAUSED", "pause_count": 1})):
             self.window.global_pause_button.click()
         self.assertFalse(monitor.timer.isActive())
-        self.assertIn("Paused", self.window.monitoring_status_label.text())
-        self.assertEqual(self.window.global_pause_button.text(), "Resume Monitoring")
+        self.assertIn("หยุดชั่วคราว", self.window.monitoring_status_label.text())
+        self.assertEqual(self.window.global_pause_button.text(), "ทำการตรวจจับต่อ")
         self.window.show_monitor()
         self.assertTrue(monitor.is_paused)
         self.window.show_dashboard()
@@ -656,7 +656,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "Previous session unresolved",
+            "เซสชันก่อนหน้ายังไม่ได้รับการแก้ไข",
             self.window.monitoring_status_label.text(),
         )
 
@@ -705,7 +705,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "Session check failed",
+            "ตรวจสอบเซสชันไม่สำเร็จ",
             self.window.monitoring_status_label.text(),
         )
 

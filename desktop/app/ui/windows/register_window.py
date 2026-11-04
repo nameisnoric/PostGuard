@@ -195,13 +195,13 @@ class RegisterWindow(QWidget):
             or not confirm_password
         ):
             self.show_error(
-                "Please fill in all fields."
+                "กรุณากรอกข้อมูลให้ครบทุกช่อง"
             )
             return
 
         if password != confirm_password:
             self.show_error(
-                "Password and confirmation do not match."
+                "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน"
             )
             self.confirm_password_input.clear()
             self.confirm_password_input.setFocus()
@@ -219,7 +219,7 @@ class RegisterWindow(QWidget):
 
         except requests.RequestException:
             self.show_error(
-                "Cannot connect to the PostGuard server."
+                "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ PostGuard ได้"
             )
             return
 
@@ -229,11 +229,11 @@ class RegisterWindow(QWidget):
 
                 message = error_data.get(
                     "detail",
-                    "Unable to send OTP."
+                    "ไม่สามารถส่งรหัส OTP ได้"
                 )
 
             except ValueError:
-                message = "Unable to send OTP."
+                message = "ไม่สามารถส่งรหัส OTP ได้"
 
             self.show_error(
                 str(message)

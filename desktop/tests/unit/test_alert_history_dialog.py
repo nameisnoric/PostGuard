@@ -318,7 +318,7 @@ class AlertHistoryDialogTests(unittest.TestCase):
         stats = dialog.stats_label.text()
 
         self.assertIn(
-            "Eye: 1",
+            "การกระพริบตา: 1",
             stats,
         )
 

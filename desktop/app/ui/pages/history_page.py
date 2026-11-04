@@ -57,7 +57,7 @@ class HistoryPage(
         "สถานะ",
         "AVG Risk",
         "MAX Risk",
-        "Report",
+        "รายงาน",
     )
 
     def __init__(
@@ -139,15 +139,15 @@ class HistoryPage(
         copy = QVBoxLayout()
 
         self.title_label = self._label(
-            "Monitoring History",
+            "ประวัติการตรวจจับ",
             "title",
         )
 
         self.description_label = self._label(
             (
-                "ตรวจสอบ Session, Risk Score, "
-                "Alert Events, Saved Report "
-                "และเปรียบเทียบความเปลี่ยนแปลงระหว่าง Session"
+                "ตรวจสอบเซสชัน, Risk Score, "
+                "เหตุการณ์แจ้งเตือน, รายงานที่บันทึกไว้ "
+                "และเปรียบเทียบความเปลี่ยนแปลงระหว่างเซสชัน"
             ),
             "muted",
         )
@@ -166,7 +166,7 @@ class HistoryPage(
         )
 
         self.compare_button = QPushButton(
-            "Compare Sessions"
+            "เปรียบเทียบเซสชัน"
         )
 
         self.compare_button.setEnabled(
@@ -178,7 +178,7 @@ class HistoryPage(
         )
 
         self.alert_history_button = QPushButton(
-            "All Alert Events"
+            "การแจ้งเตือนทั้งหมด"
         )
 
         self.alert_history_button.clicked.connect(
@@ -186,7 +186,7 @@ class HistoryPage(
         )
 
         self.refresh_button = QPushButton(
-            "Refresh"
+            "รีเฟรช"
         )
 
         self.refresh_button.setProperty(
@@ -266,8 +266,8 @@ class HistoryPage(
 
         self.search_input.setPlaceholderText(
             (
-                "ค้นหาด้วย Session, "
-                "Camera หรือ Baseline ID"
+                "ค้นหาด้วยเซสชัน, "
+                "รหัสกล้อง หรือรหัสค่าท่าทางอ้างอิง"
             )
         )
 
@@ -405,7 +405,7 @@ class HistoryPage(
 
         details_layout.addWidget(
             self._label(
-                "Session Details",
+                "รายละเอียดเซสชัน",
                 "heading",
             )
         )
@@ -438,18 +438,18 @@ class HistoryPage(
             ("session", "เซสชัน"),
             ("status", "สถานะ"),
             ("started", "เริ่มเมื่อ"),
-            ("ended", "Ended"),
+            ("ended", "สิ้นสุดเมื่อ"),
             ("active", "เวลาตรวจจับ"),
-            ("total", "Total time"),
-            ("paused", "Paused time"),
-            ("pauses", "Pause count"),
-            ("camera", "Camera ID"),
-            ("baseline", "Baseline ID"),
+            ("total", "เวลารวม"),
+            ("paused", "เวลาที่หยุดชั่วคราว"),
+            ("pauses", "จำนวนครั้งที่หยุดชั่วคราว"),
+            ("camera", "รหัสกล้อง"),
+            ("baseline", "รหัสค่าท่าทางอ้างอิง"),
             ("avg_risk", "AVG Risk"),
             ("min_risk", "MIN Risk"),
             ("max_risk", "MAX Risk"),
-            ("alerts", "Alerts"),
-            ("report", "Saved report"),
+            ("alerts", "การแจ้งเตือน"),
+            ("report", "รายงานที่บันทึกไว้"),
         )
 
         for index, (
@@ -503,7 +503,7 @@ class HistoryPage(
         actions = QHBoxLayout()
 
         self.selected_alerts_button = QPushButton(
-            "View Session Alerts"
+            "ดูการแจ้งเตือนของเซสชัน"
         )
 
         self.selected_alerts_button.setEnabled(
@@ -515,7 +515,7 @@ class HistoryPage(
         )
 
         self.report_button = QPushButton(
-            "View Saved Report"
+            "ดูรายงานที่บันทึกไว้"
         )
 
         self.report_button.setProperty(
@@ -728,14 +728,14 @@ class HistoryPage(
         session_id,
     ):
         if not self.report_index_available:
-            return "Unavailable"
+            return "ไม่พร้อมใช้งาน"
 
         return (
-            "Saved"
+            "บันทึกแล้ว"
             if session_id
             in self.report_session_ids
             else
-            "Not available"
+            "ไม่มีข้อมูล"
         )
 
     def _summary_for_session(
@@ -765,8 +765,8 @@ class HistoryPage(
 
         self.status_label.setText(
             (
-                "กำลังโหลด Sessions "
-                "และ Saved Risk Reports..."
+                "กำลังโหลดเซสชัน "
+                "และรายงานความเสี่ยงที่บันทึกไว้..."
             )
         )
 
@@ -789,7 +789,7 @@ class HistoryPage(
             if not response.ok:
                 raise RuntimeError(
                     (
-                        "Server returned HTTP "
+                        "เซิร์ฟเวอร์ตอบกลับด้วย HTTP "
                         f"{response.status_code}"
                     )
                 )
@@ -814,7 +814,7 @@ class HistoryPage(
                 )
             ):
                 raise ValueError(
-                    "Invalid sessions response"
+                    "ข้อมูลเซสชันที่ได้รับไม่ถูกต้อง"
                 )
 
             self.sessions = sessions
@@ -915,7 +915,7 @@ class HistoryPage(
 
             self.status_label.setText(
                 (
-                    "History unavailable: "
+                    "ไม่สามารถโหลดประวัติได้: "
                     f"{error}"
                 )
             )
@@ -1178,14 +1178,14 @@ class HistoryPage(
         self.status_label.setText(
             (
                 (
-                    f"Showing "
+                    f"แสดง "
                     f"{len(self.visible_sessions)} "
-                    f"of {len(self.sessions)} "
-                    "session(s)."
+                    f"จาก {len(self.sessions)} "
+                    " เซสชัน"
                 )
                 if self.sessions
                 else
-                "No saved sessions found."
+                "ไม่พบเซสชันที่บันทึกไว้"
             )
         )
 
@@ -1442,7 +1442,7 @@ class HistoryPage(
             self.details_hint.setText(
                 (
                     "เซสชันนี้สิ้นสุดอย่างไม่สมบูรณ์ "
-                    "จึงไม่มี Final Risk Report "
+                    "จึงไม่มีรายงานความเสี่ยงฉบับสมบูรณ์ "
                     "ที่เชื่อถือได้"
                 )
             )
@@ -1466,10 +1466,10 @@ class HistoryPage(
         ) < 2:
             QMessageBox.information(
                 self,
-                "Session Comparison",
+                "เปรียบเทียบเซสชัน",
                 (
-                    "ต้องมีอย่างน้อย 2 Session "
-                    "ที่มี Persisted Risk Score "
+                    "ต้องมีอย่างน้อย 2 เซสชัน "
+                    "ที่มี Risk Score ที่บันทึกไว้ "
                     "จึงจะเปรียบเทียบได้"
                 ),
             )

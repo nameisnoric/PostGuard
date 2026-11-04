@@ -30,8 +30,8 @@ class ProfileSaveConfirmationDialog(QDialog):
         heading = QLabel("ยืนยันการบันทึกโปรไฟล์?")
         heading.setProperty("role", "title")
         message = QLabel(
-            "Please review the changes below. Your photo stays private and is "
-            "available only through your signed-in account."
+            "โปรดตรวจสอบการเปลี่ยนแปลงด้านล่าง รูปโปรไฟล์ของคุณจะถูกเก็บเป็นส่วนตัวและ "
+            "เข้าถึงได้เฉพาะผ่านบัญชีที่เข้าสู่ระบบของคุณเท่านั้น"
         )
         message.setProperty("role", "muted")
         message.setWordWrap(True)
@@ -85,7 +85,7 @@ class ProfilePage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("Profile")
+        title = QLabel("โปรไฟล์")
         title.setProperty("role", "title")
         subtitle = QLabel("จัดการรูปโปรไฟล์และข้อมูลส่วนตัวของคุณ")
         subtitle.setProperty("role", "muted")
@@ -237,9 +237,9 @@ class ProfilePage(QWidget):
     def choose_photo(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose profile photo",
+            "เลือกรูปโปรไฟล์",
             "",
-            "Images (*.jpg *.jpeg *.png)",
+            "ไฟล์รูปภาพ (*.jpg *.jpeg *.png)",
         )
         if not path:
             return
@@ -278,12 +278,12 @@ class ProfilePage(QWidget):
             except requests.RequestException:
                 self.remove_photo_button.setEnabled(True)
                 self.status_label.setText(
-                    "Cannot remove the profile photo. Check your connection."
+                    "ไม่สามารถลบรูปโปรไฟล์ได้ โปรดตรวจสอบการเชื่อมต่อ"
                 )
                 return
             if not response.ok and response.status_code != 404:
                 self.remove_photo_button.setEnabled(True)
-                self.status_label.setText("Profile photo could not be removed.")
+                self.status_label.setText("ไม่สามารถลบรูปโปรไฟล์ได้")
                 return
 
         self.selected_photo_path = None
@@ -318,11 +318,11 @@ class ProfilePage(QWidget):
         full_name = " ".join(part for part in (first, last) if part)
         changes = []
         if full_name != str(self.user_data.get("full_name") or ""):
-            changes.append("Your first and last name will be saved to your account.")
+            changes.append("ชื่อและนามสกุลใหม่จะถูกบันทึกลงในบัญชีของคุณ")
         if username != str(self.user_data.get("username") or ""):
-            changes.append("Your username will be saved to your account.")
+            changes.append("ชื่อผู้ใช้ใหม่จะถูกบันทึกลงในบัญชีของคุณ")
         if self.selected_photo_path:
-            changes.append("Your new profile photo will be uploaded to private storage.")
+            changes.append("รูปโปรไฟล์ใหม่จะถูกอัปโหลดไปยังพื้นที่จัดเก็บส่วนตัว")
 
         if not changes:
             self.status_label.setText('ไม่มีการเปลี่ยนแปลงโปรไฟล์ให้บันทึก')
@@ -362,23 +362,23 @@ class ProfilePage(QWidget):
                     response = APIClient.update_profile(username, full_name)
                 except requests.RequestException:
                     self.status_label.setText(
-                        "Cannot save profile information. Check your connection."
+                        "ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้ โปรดตรวจสอบการเชื่อมต่อ"
                     )
                     return
                 if not response.ok:
                     self.status_label.setText(self._response_detail(
-                        response, "Profile information could not be saved."
+                        response, "ไม่สามารถบันทึกข้อมูลโปรไฟล์ได้"
                     ))
                     return
                 try:
                     payload = response.json()
                 except (ValueError, AttributeError):
-                    self.status_label.setText("Profile update returned an invalid response.")
+                    self.status_label.setText("ข้อมูลตอบกลับจากการอัปเดตโปรไฟล์ไม่ถูกต้อง")
                     return
                 saved_username = payload.get("username")
                 saved_full_name = payload.get("full_name")
                 if not isinstance(saved_username, str) or not isinstance(saved_full_name, str):
-                    self.status_label.setText("Profile update returned an invalid response.")
+                    self.status_label.setText("ข้อมูลตอบกลับจากการอัปเดตโปรไฟล์ไม่ถูกต้อง")
                     return
                 username = saved_username
                 full_name = saved_full_name
@@ -399,19 +399,19 @@ class ProfilePage(QWidget):
                     if profile_saved:
                         self.profile_updated.emit(self._current_profile_update())
                         self.status_label.setText(
-                            "Profile information was saved, but the photo could not be uploaded."
+                            "บันทึกข้อมูลโปรไฟล์แล้ว แต่ไม่สามารถอัปโหลดรูปโปรไฟล์ได้"
                         )
                     else:
                         self.status_label.setText(
-                            "Cannot upload the profile photo. Check your connection."
+                            "ไม่สามารถอัปโหลดรูปโปรไฟล์ได้ โปรดตรวจสอบการเชื่อมต่อ"
                         )
                     return
                 if not response.ok:
-                    detail = self._response_detail(response, "Avatar upload failed.")
+                    detail = self._response_detail(response, "อัปโหลดรูปโปรไฟล์ไม่สำเร็จ")
                     if profile_saved:
                         self.profile_updated.emit(self._current_profile_update())
                         self.status_label.setText(
-                            "Profile information was saved, but the photo could not be uploaded. "
+                            "บันทึกข้อมูลโปรไฟล์แล้ว แต่ไม่สามารถอัปโหลดรูปโปรไฟล์ได้ "
                             + detail
                         )
                     else:
@@ -421,13 +421,13 @@ class ProfilePage(QWidget):
                     payload = response.json()
                 except (ValueError, AttributeError):
                     self._show_photo_failure(
-                        "Avatar upload returned an invalid response.", profile_saved
+                        "ข้อมูลตอบกลับจากการอัปโหลดรูปโปรไฟล์ไม่ถูกต้อง", profile_saved
                     )
                     return
                 avatar_path = payload.get("avatar_path")
                 if not isinstance(avatar_path, str) or not avatar_path:
                     self._show_photo_failure(
-                        "Avatar upload returned an invalid response.", profile_saved
+                        "ข้อมูลตอบกลับจากการอัปโหลดรูปโปรไฟล์ไม่ถูกต้อง", profile_saved
                     )
                     return
                 photo_uploaded = True
@@ -460,7 +460,7 @@ class ProfilePage(QWidget):
         if profile_saved:
             self.profile_updated.emit(self._current_profile_update())
             self.status_label.setText(
-                "Profile information was saved, but the photo upload failed. " + detail
+                "บันทึกข้อมูลโปรไฟล์แล้ว แต่การอัปโหลดรูปโปรไฟล์ไม่สำเร็จ " + detail
             )
         else:
             self.status_label.setText(detail)

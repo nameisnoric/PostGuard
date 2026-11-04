@@ -83,7 +83,7 @@ class MonitoringMiniControllerTests(
 
         self.assertEqual(
             self.widget.pause_button.text(),
-            "Resume",
+            "ทำงานต่อ",
         )
 
         self.assertEqual(

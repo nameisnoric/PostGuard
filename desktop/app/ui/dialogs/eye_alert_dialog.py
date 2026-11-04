@@ -47,7 +47,7 @@ class EyeAlertDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle(
-            "PostGuard - Eye Reminder"
+            "PostGuard - แจ้งเตือนการกระพริบตา"
         )
 
         self.setWindowModality(
@@ -138,7 +138,7 @@ class EyeAlertDialog(QDialog):
         title_layout = QVBoxLayout()
 
         title = QLabel(
-            "Eye Reminder"
+            "แจ้งเตือนการกระพริบตา"
         )
 
         title.setProperty(
@@ -204,7 +204,7 @@ class EyeAlertDialog(QDialog):
             rate_text = "N/A"
 
         rate_label = QLabel(
-            f"Blink Rate: {rate_text}"
+            f"อัตราการกระพริบตา: {rate_text}"
         )
 
         rate_label.setProperty(

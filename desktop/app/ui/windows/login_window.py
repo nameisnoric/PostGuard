@@ -92,7 +92,7 @@ class LoginWindow(QWidget):
 
         if not email or not password:
             self.show_error(
-                "Please enter your email and password."
+                "กรุณากรอกอีเมลและรหัสผ่าน"
             )
             return
 
@@ -104,13 +104,13 @@ class LoginWindow(QWidget):
 
         except requests.RequestException:
             self.show_error(
-                "Cannot connect to the PostGuard server."
+                "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ PostGuard ได้"
             )
             return
 
         if response.status_code != 200:
             self.show_error(
-                "Invalid email or password."
+                "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
             )
             return
 
@@ -123,7 +123,7 @@ class LoginWindow(QWidget):
 
         if not access_token or not refresh_token:
             self.show_error(
-                "Authentication tokens were not returned by the server."
+                "เซิร์ฟเวอร์ไม่ส่งข้อมูลยืนยันตัวตนกลับมา"
             )
             return
 
@@ -140,7 +140,7 @@ class LoginWindow(QWidget):
             TokenStore.clear_token()
 
             self.show_error(
-                "Unable to load user information."
+                "ไม่สามารถโหลดข้อมูลผู้ใช้ได้"
             )
             return
 
@@ -148,7 +148,7 @@ class LoginWindow(QWidget):
             TokenStore.clear_token()
 
             self.show_error(
-                "Unable to verify the current user."
+                "ไม่สามารถยืนยันข้อมูลผู้ใช้ปัจจุบันได้"
             )
             return
 

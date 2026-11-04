@@ -82,7 +82,7 @@ class _DashboardLoader(QRunnable):
 
             if not session_response.ok:
                 raise ValueError(
-                    "Session API returned HTTP "
+                    "ไม่สามารถโหลดข้อมูลเซสชันได้ HTTP "
                     f"{session_response.status_code}"
                 )
 
@@ -99,7 +99,7 @@ class _DashboardLoader(QRunnable):
                 )
             ):
                 raise ValueError(
-                    "Invalid Session response"
+                    "ข้อมูลเซสชันที่ได้รับไม่ถูกต้อง"
                 )
 
             # ------------------------------------------------
@@ -113,7 +113,7 @@ class _DashboardLoader(QRunnable):
 
             if not summary_response.ok:
                 raise ValueError(
-                    "Summary API returned HTTP "
+                    "ไม่สามารถโหลดข้อมูลสรุปเซสชันได้ HTTP "
                     f"{summary_response.status_code}"
                 )
 
@@ -130,7 +130,7 @@ class _DashboardLoader(QRunnable):
                 )
             ):
                 raise ValueError(
-                    "Invalid Summary response"
+                    "ข้อมูลสรุปเซสชันที่ได้รับไม่ถูกต้อง"
                 )
 
             self.signals.finished.emit(
@@ -148,8 +148,8 @@ class _DashboardLoader(QRunnable):
                 None,
                 None,
                 (
-                    "Cannot load saved activity. "
-                    "Use Refresh to retry."
+                    "ไม่สามารถโหลดกิจกรรมที่บันทึกไว้ได้ "
+                    "กดรีเฟรชเพื่อลองอีกครั้ง"
                 ),
             )
 
@@ -391,12 +391,12 @@ class DashboardPage(QWidget):
             or
             user_data.get("username")
             or
-            "User"
+            "ผู้ใช้"
         )
 
         welcome_copy.addWidget(
             self._label(
-                f"Welcome back, {name}",
+                f"ยินดีต้อนรับกลับมา, {name}",
                 "title",
             )
         )
@@ -465,7 +465,7 @@ class DashboardPage(QWidget):
         actions = QHBoxLayout()
 
         self.monitor_button = QPushButton(
-            "Start Monitoring"
+            "เริ่มการตรวจจับ"
         )
 
         self.monitor_button.setProperty(
@@ -478,7 +478,7 @@ class DashboardPage(QWidget):
         )
 
         self.history_button = QPushButton(
-            "View History"
+            "ดูประวัติ"
         )
 
         self.history_button.clicked.connect(
@@ -486,7 +486,7 @@ class DashboardPage(QWidget):
         )
 
         self.refresh_button = QPushButton(
-            "Refresh"
+            "รีเฟรช"
         )
 
         self.refresh_button.clicked.connect(
@@ -525,7 +525,7 @@ class DashboardPage(QWidget):
             summary_grid,
             0,
             "เซสชันที่เสร็จสิ้น",
-            "Completed Sessions",
+            "จำนวนเซสชันที่ตรวจจับเสร็จสิ้น",
         )
 
         self.time_value = self._metric(
@@ -539,7 +539,7 @@ class DashboardPage(QWidget):
             summary_grid,
             2,
             "เซสชันที่ถูกขัดจังหวะ",
-            "ไม่นำมารวมใน Risk Report",
+            "ไม่นำมารวมในรายงานความเสี่ยง",
         )
 
         layout.addLayout(
@@ -559,8 +559,8 @@ class DashboardPage(QWidget):
         self.overall_risk_value = self._metric(
             risk_grid,
             0,
-            "Overall Session Risk",
-            "คะแนนเฉลี่ย 0-100 ของ Session ล่าสุด",
+            "ความเสี่ยงโดยรวมของเซสชัน",
+            "คะแนนเฉลี่ย 0-100 ของเซสชันล่าสุด",
         )
 
         # Compatibility with Task 4.2/4.3 tests/code.
@@ -573,31 +573,31 @@ class DashboardPage(QWidget):
         self.risk_trend_value = self._metric(
             risk_grid,
             1,
-            "Risk Trend",
+            "แนวโน้มความเสี่ยง",
             (
-                "เทียบกับ Session ก่อนหน้า"
-                "ที่ใช้สูตรเดียวกัน"
+                "เทียบกับเซสชันก่อนหน้า"
+                "ที่ใช้วิธีคำนวณเดียวกัน"
             ),
         )
 
         self.latest_maximum_value = self._metric(
             risk_grid,
             2,
-            "Latest MAX Risk",
-            "คะแนนสูงสุดใน Session ล่าสุด",
+            "ความเสี่ยงสูงสุดล่าสุด",
+            "คะแนนสูงสุดในเซสชันล่าสุด",
         )
 
         self.latest_alert_value = self._metric(
             risk_grid,
             3,
-            "Latest Alerts",
-            "จำนวน Notification ที่บันทึก",
+            "การแจ้งเตือนล่าสุด",
+            "จำนวนการแจ้งเตือนที่บันทึก",
         )
 
         self.latest_duration_value = self._metric(
             risk_grid,
             4,
-            "Latest Duration",
+            "ระยะเวลาล่าสุด",
             "เวลาตรวจจับจริง",
         )
 
@@ -611,7 +611,7 @@ class DashboardPage(QWidget):
 
         self.data_status = self._label(
             (
-                "กด Refresh เพื่อโหลด"
+                "กดรีเฟรชเพื่อโหลด"
                 "กิจกรรมที่บันทึกไว้"
             ),
             "muted",
@@ -656,7 +656,7 @@ class DashboardPage(QWidget):
 
         layout.addWidget(
             self._label(
-                "Recent Sessions",
+                "เซสชันล่าสุด",
                 "heading",
             )
         )
@@ -664,8 +664,8 @@ class DashboardPage(QWidget):
         layout.addWidget(
             self._label(
                 (
-                    "ดับเบิลคลิก Session "
-                    "เพื่อเปิด Saved Report โดยตรง"
+                    "ดับเบิลคลิกเซสชัน "
+                    "เพื่อเปิดรายงานที่บันทึกไว้โดยตรง"
                 ),
                 "muted",
             )
@@ -741,13 +741,13 @@ class DashboardPage(QWidget):
 
         risk_layout.addWidget(
             self._label(
-                "Latest Risk Report",
+                "รายงานความเสี่ยงล่าสุด",
                 "heading",
             )
         )
 
         self.latest_session_label = self._label(
-            "Session: N/A",
+            "เซสชัน: N/A",
             "muted",
         )
 
@@ -757,22 +757,22 @@ class DashboardPage(QWidget):
         )
 
         self.latest_trend_label = self._label(
-            "Trend: N/A",
+            "แนวโน้ม: N/A",
             "heading",
         )
 
         self.latest_comparison_label = self._label(
-            "Comparison: N/A",
+            "การเปรียบเทียบ: N/A",
             "muted",
         )
 
         self.latest_method_label = self._label(
-            "Risk Score Method: N/A",
+            "วิธีคำนวณ Risk Score: N/A",
             "muted",
         )
 
         self.latest_report_button = QPushButton(
-            "Open Latest Report"
+            "เปิดรายงานล่าสุด"
         )
 
         self.latest_report_button.setProperty(
@@ -822,15 +822,15 @@ class DashboardPage(QWidget):
 
         trend_layout.addWidget(
             self._label(
-                "Risk Trend History",
+                "ประวัติแนวโน้มความเสี่ยง",
                 "heading",
             )
         )
 
         self.trend_history_note = self._label(
             (
-                "แสดง average PostGuard Risk Score "
-                "สูงสุด 10 Session ล่าสุดที่ใช้ Risk Score Method เดียวกัน"
+                "แสดงค่าเฉลี่ย PostGuard Risk Score "
+                "สูงสุด 10 เซสชันล่าสุดที่ใช้วิธีคำนวณ Risk Score เดียวกัน"
             ),
             "muted",
         )
@@ -873,10 +873,10 @@ class DashboardPage(QWidget):
                     "PostGuard Modified RULA สำหรับกล้องด้านหน้า "
                     "ไม่ใช่ความน่าจะเป็นของการบาดเจ็บ "
                     "และไม่ใช่การวินิจฉัยทางการแพทย์\n\n"
-                    "Risk Trend ใช้การเปลี่ยนแปลง ±5 คะแนน "
-                    "เป็น engineering deadband สำหรับการแสดงผล "
-                    "และเปรียบเทียบเฉพาะ Session "
-                    "ที่ใช้ Risk Score Method เดียวกัน"
+                    "แนวโน้มความเสี่ยงใช้การเปลี่ยนแปลง ±5 คะแนน "
+                    "เป็นช่วงค่าคงที่สำหรับลดการเปลี่ยนสถานะจากความผันผวนเล็กน้อย "
+                    "และเปรียบเทียบเฉพาะเซสชัน "
+                    "ที่ใช้วิธีคำนวณ Risk Score เดียวกัน"
                 ),
                 "muted",
             )
@@ -906,7 +906,7 @@ class DashboardPage(QWidget):
                 (
                     "N/A\n"
                     "ยังไม่ได้เปิดใช้ Blink Rate "
-                    "ใน Production Report"
+                    "ในรายงานการใช้งานจริง"
                 ),
                 "muted",
             )
@@ -1109,10 +1109,10 @@ class DashboardPage(QWidget):
 
         self.monitor_button.setText(
             (
-                "Return to Monitoring"
+                "กลับไปหน้าการตรวจจับ"
                 if session_id is not None
                 else
-                "Start Monitoring"
+                "เริ่มการตรวจจับ"
             )
         )
 
@@ -1134,8 +1134,8 @@ class DashboardPage(QWidget):
 
         self.data_status.setText(
             (
-                "กำลังโหลด Sessions "
-                "และ Risk Reports..."
+                "กำลังโหลดเซสชัน "
+                "และรายงานความเสี่ยง..."
             )
         )
 
@@ -1219,7 +1219,7 @@ class DashboardPage(QWidget):
             self.risk_trend_chart.clear()
 
             self.trend_history_note.setText(
-                "Risk Trend History unavailable"
+                "ไม่สามารถแสดงประวัติแนวโน้มความเสี่ยงได้"
             )
 
             for label in (
@@ -1237,7 +1237,7 @@ class DashboardPage(QWidget):
                 )
 
             self.latest_session_label.setText(
-                "Session: N/A"
+                "เซสชัน: N/A"
             )
 
             self.latest_score_label.setText(
@@ -1245,15 +1245,15 @@ class DashboardPage(QWidget):
             )
 
             self.latest_trend_label.setText(
-                "Trend: N/A"
+                "แนวโน้ม: N/A"
             )
 
             self.latest_comparison_label.setText(
-                "Comparison: N/A"
+                "การเปรียบเทียบ: N/A"
             )
 
             self.latest_method_label.setText(
-                "Risk Score Method: N/A"
+                "วิธีคำนวณ Risk Score: N/A"
             )
 
             self.latest_report_button.setEnabled(
@@ -1431,7 +1431,7 @@ class DashboardPage(QWidget):
         if point_count == 0:
             self.trend_history_note.setText(
                 (
-                    "ยังไม่มี Session ที่มี Risk Score "
+                    "ยังไม่มีเซสชันที่มี Risk Score "
                     "สำหรับแสดงแนวโน้ม"
                 )
             )
@@ -1439,7 +1439,7 @@ class DashboardPage(QWidget):
         elif point_count == 1:
             self.trend_history_note.setText(
                 (
-                    "มี Risk Score แล้ว 1 Session "
+                    "มี Risk Score แล้ว 1 เซสชัน "
                     "จึงยังไม่มีเส้นแนวโน้มสำหรับเปรียบเทียบ"
                 )
             )
@@ -1447,8 +1447,8 @@ class DashboardPage(QWidget):
         else:
             self.trend_history_note.setText(
                 (
-                    f"แสดง {point_count} Session ล่าสุด "
-                    "ที่ใช้ Risk Score Method เดียวกัน"
+                    f"แสดง {point_count} เซสชันล่าสุด "
+                    "ที่ใช้วิธีคำนวณ Risk Score เดียวกัน"
                 )
             )
 
@@ -1634,7 +1634,7 @@ class DashboardPage(QWidget):
             )
 
             self.latest_session_label.setText(
-                "Session: N/A"
+                "เซสชัน: N/A"
             )
 
             self.latest_score_label.setText(
@@ -1642,7 +1642,7 @@ class DashboardPage(QWidget):
             )
 
             self.latest_method_label.setText(
-                "Risk Score Method: N/A"
+                "วิธีคำนวณ Risk Score: N/A"
             )
 
             self.latest_report_button.setEnabled(
@@ -1711,7 +1711,7 @@ class DashboardPage(QWidget):
 
         self.latest_session_label.setText(
             (
-                "Session: #"
+                "เซสชัน: #"
                 f"{session_id}"
             )
         )
@@ -1729,7 +1729,7 @@ class DashboardPage(QWidget):
 
         self.latest_method_label.setText(
             (
-                "Risk Score Method: "
+                "วิธีคำนวณ Risk Score: "
                 +
                 (
                     str(method)
@@ -1780,11 +1780,11 @@ class DashboardPage(QWidget):
             )
 
             self.latest_trend_label.setText(
-                "Trend: N/A"
+                "แนวโน้ม: N/A"
             )
 
             self.latest_comparison_label.setText(
-                "Comparison: N/A"
+                "การเปรียบเทียบ: N/A"
             )
 
             return
@@ -1825,7 +1825,7 @@ class DashboardPage(QWidget):
 
         self.latest_trend_label.setText(
             (
-                "Trend: "
+                "แนวโน้ม: "
                 f"{trend_text}"
             )
         )
@@ -1930,10 +1930,10 @@ class DashboardPage(QWidget):
         ):
             QMessageBox.information(
                 self,
-                "Saved Session Report",
+                "รายงานเซสชันที่บันทึกไว้",
                 (
-                    "Session นี้ยังไม่ COMPLETED "
-                    "จึงไม่สามารถเปิด Final Report ได้"
+                    "เซสชันนี้ยังไม่เสร็จสิ้น "
+                    "จึงไม่สามารถเปิดรายงานฉบับสมบูรณ์ได้"
                 ),
             )
 
@@ -1946,10 +1946,10 @@ class DashboardPage(QWidget):
         ):
             QMessageBox.information(
                 self,
-                "Saved Session Report",
+                "รายงานเซสชันที่บันทึกไว้",
                 (
-                    "Session นี้ยังไม่มี "
-                    "Saved Session Report"
+                    "เซสชันนี้ยังไม่มี "
+                    "รายงานเซสชันที่บันทึกไว้"
                 ),
             )
 
@@ -1965,10 +1965,10 @@ class DashboardPage(QWidget):
             if saved is None:
                 QMessageBox.information(
                     self,
-                    "Saved Session Report",
+                    "รายงานเซสชันที่บันทึกไว้",
                     (
                         "ไม่พบรายงานที่บันทึก"
-                        "สำหรับ Session นี้"
+                        "สำหรับเซสชันนี้"
                     ),
                 )
 
@@ -1992,6 +1992,6 @@ class DashboardPage(QWidget):
         ) as error:
             QMessageBox.warning(
                 self,
-                "ไม่สามารถเปิด Saved Report",
+                "ไม่สามารถเปิดรายงานที่บันทึกไว้",
                 str(error),
             )

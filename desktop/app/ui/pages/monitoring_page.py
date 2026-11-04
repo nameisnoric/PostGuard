@@ -533,8 +533,8 @@ class MonitoringPage(QWidget):
         )
 
         self.description_label = QLabel(
-            "Detection → Assessment → Temporal → "
-            "Risk Evaluation → Risk Event → Alert Policy"
+            "การตรวจจับ → การประเมินท่าทาง → ตรวจสอบความต่อเนื่อง → "
+            "ประเมินความเสี่ยง → เหตุการณ์ความเสี่ยง → การแจ้งเตือน"
         )
 
         self.description_label.setProperty(
@@ -691,11 +691,11 @@ class MonitoringPage(QWidget):
         )
 
         self.baseline_label = QLabel(
-            "รหัส Baseline: -"
+            "รหัสค่าท่าทางอ้างอิง: -"
         )
 
         self.session_label = QLabel(
-            "รหัส Session: -"
+            "รหัสเซสชัน: -"
         )
 
         self.baseline_shoulder_label = QLabel(
@@ -825,7 +825,7 @@ class MonitoringPage(QWidget):
         )
 
         self.eye_openness_label = QLabel(
-            "Eye Openness: --"
+            "ค่าการเปิดตา: --"
         )
 
         self.blink_count_label = QLabel(
@@ -895,11 +895,11 @@ class MonitoringPage(QWidget):
         )
 
         self.assessment_label = QLabel(
-            "Assessment: Waiting"
+            "การประเมินท่าทาง: กำลังรอข้อมูล"
         )
 
         self.factor_label = QLabel(
-            "Posture Factors: -"
+            "ปัจจัยด้านท่าทาง: -"
         )
 
         self.factor_label.setWordWrap(
@@ -907,19 +907,19 @@ class MonitoringPage(QWidget):
         )
 
         self.duration_label = QLabel(
-            "Longest Continuous Factor: -"
+            "ปัจจัยต่อเนื่องนานที่สุด: -"
         )
 
         self.risk_label = QLabel(
-            "Risk Level: -"
+            "ระดับความเสี่ยง: -"
         )
 
         self.event_label = QLabel(
-            "Risk Event: -"
+            "เหตุการณ์ความเสี่ยง: -"
         )
 
         self.alert_label = QLabel(
-            "Alert Policy: Waiting"
+            "การแจ้งเตือน: กำลังรอข้อมูล"
         )
 
         self.alert_label.setWordWrap(
@@ -927,9 +927,9 @@ class MonitoringPage(QWidget):
         )
 
         self.risk_note_label = QLabel(
-            "ระดับความเสี่ยงนี้เป็น PostGuard Prototype "
-            "Engineering Policy ไม่ใช่ Full RULA, "
-            "RULA Action Level หรือการวินิจฉัยทางการแพทย์"
+            "ระดับความเสี่ยงนี้เป็นการประเมินของต้นแบบ PostGuard "
+            "ตามเกณฑ์ที่ออกแบบสำหรับระบบ ไม่ใช่ RULA ฉบับเต็ม, "
+            "ระดับการดำเนินการของ RULA หรือการวินิจฉัยทางการแพทย์"
         )
 
         self.risk_note_label.setWordWrap(
@@ -1066,23 +1066,23 @@ class MonitoringPage(QWidget):
         if self.network_stop_pending:
 
             self.status_label.setText(
-                "สถานะ: NETWORK GAP | "
+                "สถานะ: ขาดการเชื่อมต่อเครือข่าย | "
                 "หยุดตรวจจับในเครื่องแล้ว "
-                "| รอ Backend ยืนยันการจบ Session"
+                "| รอ Backend ยืนยันการจบเซสชัน"
             )
 
         elif self.is_paused:
 
             self.status_label.setText(
-                "สถานะ: PAUSED | NETWORK GAP "
-                "| รอเชื่อมต่อ Backend"
+                "สถานะ: หยุดชั่วคราว | ขาดการเชื่อมต่อเครือข่าย "
+                "| รอเชื่อมต่อ Backend อีกครั้ง"
             )
 
         else:
 
             self.status_label.setText(
                 "สถานะ: กำลังตรวจจับในเครื่อง "
-                "(LOCAL RUNNING) | NETWORK GAP"
+                "(ระบบในเครื่องยังทำงาน) | ขาดการเชื่อมต่อเครือข่าย"
             )
 
         if (
@@ -1122,14 +1122,14 @@ class MonitoringPage(QWidget):
 
                 self.status_label.setText(
                     "สถานะ: หยุดชั่วคราว "
-                    "(PAUSED)"
+                    "(หยุดชั่วคราว)"
                 )
 
             else:
 
                 self.status_label.setText(
                     "สถานะ: กำลังตรวจจับ "
-                    "(RUNNING)"
+                    "(กำลังทำงาน)"
                 )
 
                 if (
@@ -1353,9 +1353,9 @@ class MonitoringPage(QWidget):
         # Backend is reachable, but state does not agree with
         # Desktop. Do not silently overwrite local state.
         self.status_label.setText(
-            "สถานะ: Backend กลับมาแล้ว "
-            "แต่สถานะ Session ไม่ตรงกัน "
-            f"(Local={expected_status}, "
+            "สถานะ: เชื่อมต่อ Backend กลับมาแล้ว "
+            "แต่สถานะเซสชันไม่ตรงกัน "
+            f"(ในเครื่อง={expected_status}, "
             f"Backend={remote_status})"
         )
 
@@ -1417,13 +1417,13 @@ class MonitoringPage(QWidget):
             "รอยืนยันการจบเซสชัน",
             (
                 "PostGuard หยุดการตรวจจับในเครื่องแล้ว "
-                "แต่ Backend ยังไม่สามารถยืนยันการจบ "
-                "Session ได้\n\n"
-                f"Session ID: {self.session_id}\n"
+                "แต่ Backend ยังไม่สามารถยืนยันการสิ้นสุด "
+                "เซสชันได้\n\n"
+                f"รหัสเซสชัน: {self.session_id}\n"
                 f"{error}\n\n"
-                "ระบบจะลองเชื่อมต่อและจบ Session "
-                "ให้อัตโนมัติเมื่อ Backend กลับมา\n"
-                "ระหว่างนี้จะไม่สร้าง Session ใหม่ทับ"
+                "ระบบจะลองเชื่อมต่อและจบเซสชัน "
+                "ให้อัตโนมัติเมื่อเชื่อมต่อ Backend ได้อีกครั้ง\n"
+                "ระหว่างนี้จะไม่สร้างเซสชันใหม่ทับ"
             ),
         )
 
@@ -1580,8 +1580,8 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Backend did not confirm "
-                "COMPLETED session status."
+                "Backend ไม่ได้ยืนยัน "
+                "สถานะ COMPLETED ของเซสชัน"
             )
 
         if (
@@ -1593,8 +1593,8 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Backend returned an "
-                "unexpected session_id."
+                "Backend ส่ง "
+                "รหัสเซสชันที่ไม่ตรงกับที่คาดไว้"
             )
 
         # สำคัญ:
@@ -1623,7 +1623,7 @@ class MonitoringPage(QWidget):
         if not response.ok:
 
             raise RuntimeError(
-                "Cannot load baseline: "
+                "ไม่สามารถโหลดค่าท่าทางอ้างอิงได้: "
                 +
                 self._response_error(
                     response
@@ -1640,7 +1640,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Invalid baseline response."
+                "ข้อมูลค่าท่าทางอ้างอิงที่ได้รับไม่ถูกต้อง"
             )
 
         if (
@@ -1652,7 +1652,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Baseline ID does not match."
+                "รหัสค่าท่าทางอ้างอิงไม่ตรงกัน"
             )
 
         if (
@@ -1664,7 +1664,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Baseline belongs to another camera."
+                "ค่าท่าทางอ้างอิงนี้เป็นของกล้องอื่น"
             )
 
         shoulder = (
@@ -1687,11 +1687,11 @@ class MonitoringPage(QWidget):
 
         for name, value in (
             (
-                "Shoulder",
+                "ไหล่",
                 shoulder,
             ),
             (
-                "Neck lateral",
+                "คอด้านข้าง",
                 neck,
             ),
         ):
@@ -1707,16 +1707,16 @@ class MonitoringPage(QWidget):
             ):
 
                 raise ValueError(
-                    f"Invalid {name} baseline value."
+                    f"ค่าท่าทางอ้างอิงของ {name} ไม่ถูกต้อง"
                 )
 
         self.baseline_shoulder_label.setText(
-            "Baseline Shoulder Tilt: "
+            "ค่าท่าทางอ้างอิงของไหล่: "
             f"{shoulder:+.2f}°"
         )
 
         self.baseline_neck_label.setText(
-            "Baseline Neck Lateral Tilt: "
+            "ค่าท่าทางอ้างอิงของคอด้านข้าง: "
             f"{neck:+.2f}°"
         )
 
@@ -1731,15 +1731,15 @@ class MonitoringPage(QWidget):
         ):
 
             self.baseline_flexion_label.setText(
-                "Baseline Neck Flexion: "
+                "ค่าท่าทางอ้างอิงของการก้ม/เงยคอ: "
                 f"{flexion:+.2f}°"
             )
 
         else:
 
             self.baseline_flexion_label.setText(
-                "Baseline Neck Flexion: N/A "
-                "(Risk Evaluation may be PARTIAL)"
+                "ค่าท่าทางอ้างอิงของการก้ม/เงยคอ: N/A "
+                "(การประเมินความเสี่ยงอาจไม่สมบูรณ์)"
             )
 
         self.baseline_data = (
@@ -1772,13 +1772,13 @@ class MonitoringPage(QWidget):
 
         if self.capture is None:
             raise RuntimeError(
-                "Camera is not available for resolution validation."
+                "ไม่พบกล้องสำหรับตรวจสอบความละเอียดภาพ"
             )
 
         if self.baseline_data is None:
             raise RuntimeError(
-                "Personal Baseline is not available "
-                "for resolution validation."
+                "ไม่พบค่าท่าทางอ้างอิงส่วนบุคคล "
+                "สำหรับตรวจสอบความละเอียดภาพ"
             )
 
         # ----------------------------------------------------
@@ -1796,8 +1796,8 @@ class MonitoringPage(QWidget):
             frame is None
         ):
             raise RuntimeError(
-                "Unable to read camera frame for "
-                "resolution validation."
+                "ไม่สามารถอ่านภาพจากกล้องเพื่อ "
+                "ตรวจสอบความละเอียดภาพได้"
             )
 
         result = evaluate_resolution_compatibility(
@@ -1845,21 +1845,21 @@ class MonitoringPage(QWidget):
                 actual_height is not None
             ):
                 raise RuntimeError(
-                    "Camera resolution does not match "
-                    "the Personal Baseline.\n\n"
-                    f"Baseline: "
+                    "ความละเอียดของกล้องไม่ตรงกับ "
+                    "ค่าท่าทางอ้างอิงส่วนบุคคล\n\n"
+                    f"ค่าท่าทางอ้างอิง: "
                     f"{expected_width}x{expected_height}\n"
-                    f"Current camera: "
+                    f"กล้องปัจจุบัน: "
                     f"{actual_width}x{actual_height}\n\n"
-                    "Please use the same camera resolution "
-                    "used during Camera Setup / "
-                    "Personal Baseline."
+                    "กรุณาใช้ความละเอียดของกล้องเดียวกับที่ใช้ตอน "
+                    "เตรียมกล้อง / "
+                    "สร้างค่าท่าทางอ้างอิงส่วนบุคคล"
                 )
 
             raise RuntimeError(
-                "Camera resolution could not be validated "
-                "against the Personal Baseline.\n"
-                f"Reason: {reason}"
+                "ไม่สามารถตรวจสอบความละเอียดของกล้อง "
+                "กับค่าท่าทางอ้างอิงส่วนบุคคลได้\n"
+                f"สาเหตุ: {reason}"
             )
 
         return result
@@ -1880,9 +1880,9 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(
                 self,
                 "ข้อผิดพลาดของเซสชัน",
-                "The previous database session "
-                "could not be ended. "
-                "Check your connection and retry.",
+                "เซสชันก่อนหน้าในฐานข้อมูล "
+                "ยังไม่สามารถสิ้นสุดได้ "
+                "กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
             )
 
             return False
@@ -1901,7 +1901,7 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Camera Reference",
+                "การเตรียมกล้อง",
                 str(error),
             )
 
@@ -1948,7 +1948,7 @@ class MonitoringPage(QWidget):
             QMessageBox.warning(
                 self,
                 "การตรวจจับ",
-                "ต้องมี Baseline ID ที่บันทึกแล้ว",
+                "ต้องมีรหัสค่าท่าทางอ้างอิงที่บันทึกแล้ว",
             )
 
             return False
@@ -1969,7 +1969,7 @@ class MonitoringPage(QWidget):
             ):
 
                 raise ValueError(
-                    "Camera ID ไม่ถูกต้อง"
+                    "รหัสกล้องไม่ถูกต้อง"
                 )
 
             self.load_personal_baseline(
@@ -1993,16 +1993,16 @@ class MonitoringPage(QWidget):
             return False
 
         self.camera_label.setText(
-            "Camera: "
+            "กล้อง: "
             +
             camera.get(
                 "camera_name",
-                "Unknown Camera",
+                "กล้องไม่ทราบชื่อ",
             )
         )
 
         self.baseline_label.setText(
-            f"Baseline ID: {baseline_id}"
+            f"รหัสค่าท่าทางอ้างอิง: {baseline_id}"
         )
 
         # ====================================================
@@ -2025,8 +2025,8 @@ class MonitoringPage(QWidget):
                 or expected_height <= 0
             ):
                 raise RuntimeError(
-                    "Personal Baseline does not contain a valid "
-                    "camera resolution."
+                    "ค่าท่าทางอ้างอิงส่วนบุคคลไม่มีข้อมูล "
+                    "ความละเอียดของกล้องที่ถูกต้อง"
                 )
 
             # Monitoring must reopen the camera using the exact
@@ -2047,7 +2047,7 @@ class MonitoringPage(QWidget):
 
             if not self.capture.isOpened():
                 raise RuntimeError(
-                    "Unable to open camera."
+                    "ไม่สามารถเปิดกล้องได้"
                 )
             locked_width = (
                 camera_reference[
@@ -2065,8 +2065,8 @@ class MonitoringPage(QWidget):
                 or expected_height != locked_height
             ):
                 raise RuntimeError(
-                    "Personal Baseline camera resolution does not "
-                    "match the locked Camera Reference. "
+                    "ความละเอียดกล้องของค่าท่าทางอ้างอิงส่วนบุคคล "
+                    "ไม่ตรงกับข้อมูลการเตรียมกล้องที่บันทึกไว้ "
                     f"baseline={expected_width}x{expected_height}, "
                     f"reference={locked_width}x{locked_height}"
                 )
@@ -2135,7 +2135,7 @@ class MonitoringPage(QWidget):
             if not response.ok:
 
                 raise RuntimeError(
-                    "Cannot start session: "
+                    "ไม่สามารถเริ่มเซสชันได้: "
                     +
                     self._response_error(
                         response
@@ -2166,8 +2166,8 @@ class MonitoringPage(QWidget):
             ):
 
                 raise ValueError(
-                    "Backend returned an "
-                    "invalid session_id."
+                    "Backend ส่ง "
+                    "รหัสเซสชันที่ไม่ถูกต้องกลับมา"
                 )
 
             if (
@@ -2179,8 +2179,8 @@ class MonitoringPage(QWidget):
             ):
 
                 raise ValueError(
-                    "Backend did not confirm "
-                    "RUNNING status."
+                    "Backend ไม่ได้ยืนยัน "
+                    "สถานะ RUNNING"
                 )
 
             self.session_id = (
@@ -2290,7 +2290,7 @@ class MonitoringPage(QWidget):
         self.close_eye_alert()
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "สถานะตา: กำลังปรับเทียบ"
         )
 
         self.blink_count_label.setText(
@@ -2302,11 +2302,11 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.session_label.setText(
-            f"Session ID: {self.session_id}"
+            f"รหัสเซสชัน: {self.session_id}"
         )
 
         self.status_label.setText(
-            "สถานะ: กำลังตรวจจับ (RUNNING)"
+            "สถานะ: กำลังตรวจจับ"
         )
 
         self.is_paused = False
@@ -2369,27 +2369,27 @@ class MonitoringPage(QWidget):
         self.last_pipeline_result = None
 
         self.assessment_label.setText(
-            "Assessment: Waiting"
+            "การประเมินท่าทาง: กำลังรอข้อมูล"
         )
 
         self.factor_label.setText(
-            "Posture Factors: -"
+            "ปัจจัยด้านท่าทาง: -"
         )
 
         self.duration_label.setText(
-            "Longest Continuous Factor: -"
+            "ปัจจัยต่อเนื่องนานที่สุด: -"
         )
 
         self.risk_label.setText(
-            "Risk Level: -"
+            "ระดับความเสี่ยง: -"
         )
 
         self.event_label.setText(
-            "Risk Event: -"
+            "เหตุการณ์ความเสี่ยง: -"
         )
 
         self.alert_label.setText(
-            "Alert Policy: Waiting"
+            "การแจ้งเตือน: กำลังรอข้อมูล"
         )
 
     # ========================================================
@@ -2659,7 +2659,7 @@ class MonitoringPage(QWidget):
         )
 
         self.factor_label.setText(
-            "Posture Factors: "
+            "ปัจจัยด้านท่าทาง: "
             +
             self._factor_text(
                 factors
@@ -2677,8 +2677,8 @@ class MonitoringPage(QWidget):
         )
 
         self.duration_label.setText(
-            "Longest Continuous Factor: "
-            f"{longest_seconds:.1f} s"
+            "ปัจจัยต่อเนื่องนานที่สุด: "
+            f"{longest_seconds:.1f} วินาที"
         )
 
         # ====================================================
@@ -2705,7 +2705,7 @@ class MonitoringPage(QWidget):
             self.risk_label.setText(
                 "ระดับความเสี่ยง: "
                 f"{risk_level} "
-                "(PostGuard Prototype)"
+                "(ต้นแบบ PostGuard)"
             )
 
             self.risk_sample_counts[
@@ -2715,7 +2715,7 @@ class MonitoringPage(QWidget):
         else:
 
             self.risk_label.setText(
-                "Risk Level: N/A "
+                "ระดับความเสี่ยง: N/A "
                 f"({risk.get('status')})"
             )
 
@@ -3276,7 +3276,7 @@ class MonitoringPage(QWidget):
             )
 
             self.neck_difference_label.setText(
-                "Neck Difference: "
+                "ผลต่างจากค่าท่าทางอ้างอิงของคอด้านข้าง: "
                 f"{difference:+.2f}°"
             )
 
@@ -3489,7 +3489,7 @@ class MonitoringPage(QWidget):
             )
 
             calibration_text = (
-                f"กำลัง Calibration "
+                f"กำลังปรับเทียบ "
                 f"{progress * 100:.0f}%"
             )
 
@@ -3506,7 +3506,7 @@ class MonitoringPage(QWidget):
             )
 
             self.eye_pattern_label.setText(
-                "รูปแบบตา: CALIBRATING"
+                "รูปแบบตา: กำลังปรับเทียบ"
             )
 
         else:
@@ -3632,7 +3632,7 @@ class MonitoringPage(QWidget):
         ):
 
             self.eye_openness_label.setText(
-                "Eye Openness: "
+                "ค่าการเปิดตา: "
                 f"R={right_openness:.3f} | "
                 f"L={left_openness:.3f}"
             )
@@ -3640,7 +3640,7 @@ class MonitoringPage(QWidget):
         else:
 
             self.eye_openness_label.setText(
-                "Eye Openness: --"
+                "ค่าการเปิดตา: --"
             )
 
         # ========================================================
@@ -3679,7 +3679,7 @@ class MonitoringPage(QWidget):
                 self.blink_count_label.setText(
                     "จำนวนการกระพริบตา: "
                     f"{blink_count} "
-                    f"| Blink {duration:.2f}s"
+                    f"| กระพริบตา {duration:.2f} วินาที"
                 )
 
             else:
@@ -3857,7 +3857,7 @@ class MonitoringPage(QWidget):
 
             self.screen_distance_label.setText(
                 "ระยะห่างหน้าจอ: N/A "
-                "(ไม่มี Eye Distance Baseline)"
+                "(ไม่มีค่าระยะห่างดวงตาอ้างอิง)"
             )
 
             return result
@@ -3954,7 +3954,7 @@ class MonitoringPage(QWidget):
         if state == STATE_NORMAL:
             self.screen_distance_label.setText(
                 "ระยะห่างหน้าจอ: ปกติ "
-                f"(Ratio {ratio:.2f}x)"
+                f"(อัตราส่วน {ratio:.2f}x)"
             )
 
         elif state == STATE_PENDING:
@@ -3968,15 +3968,15 @@ class MonitoringPage(QWidget):
             self.screen_distance_label.setText(
                 "ระยะห่างหน้าจอ: "
                 "กำลังตรวจสอบว่าใกล้เกินไป "
-                f"(Ratio {ratio:.2f}x, "
-                f"{seconds:.1f}s)"
+                f"(อัตราส่วน {ratio:.2f}x, "
+                f"{seconds:.1f} วินาที)"
             )
 
         elif state == STATE_TOO_CLOSE:
             self.screen_distance_label.setText(
                 "ระยะห่างหน้าจอ: "
                 "ใกล้กว่าค่าอ้างอิงมาก "
-                f"(Ratio {ratio:.2f}x)"
+                f"(อัตราส่วน {ratio:.2f}x)"
             )
 
         elif state == STATE_NOT_EVALUATED:
@@ -4039,42 +4039,42 @@ class MonitoringPage(QWidget):
             )
 
             self.status_label.setText(
-                "สถานะ: DATA GAP "
+                "สถานะ: ไม่มีข้อมูลจากกล้อง "
                 "(กล้องขาดการเชื่อมต่อ)"
             )
 
             self.assessment_label.setText(
-                "Assessment: NOT_EVALUATED "
+                "การประเมินท่าทาง: ไม่สามารถประเมินได้ "
                 "(CAMERA_DATA_GAP)"
             )
 
             self.factor_label.setText(
-                "Posture Factors: DATA_GAP"
+                "ปัจจัยด้านท่าทาง: ไม่มีข้อมูลจากกล้อง"
             )
 
             self.duration_label.setText(
-                "Longest Continuous Factor: 0.0 s"
+                "ปัจจัยต่อเนื่องนานที่สุด: 0.0 วินาที"
             )
 
             self.risk_label.setText(
-                "Risk Level: N/A "
+                "ระดับความเสี่ยง: N/A "
                 "(DATA_GAP)"
             )
 
             self.event_label.setText(
-                "Risk Event: DATA_GAP"
+                "เหตุการณ์ความเสี่ยง: ไม่มีข้อมูลจากกล้อง"
             )
 
             self.alert_label.setText(
-                "Alert Policy: DATA_GAP"
+                "การแจ้งเตือน: ไม่มีข้อมูลจากกล้อง"
             )
 
             self.screen_distance_label.setText(
-                "ระยะห่างหน้าจอ: DATA_GAP"
+                "ระยะห่างหน้าจอ: ไม่มีข้อมูลจากกล้อง"
             )
 
             self.eye_state_label.setText(
-                "สถานะตา: DATA_GAP"
+                "สถานะตา: ไม่มีข้อมูลจากกล้อง"
             )
 
             # หยุด alert presentation
@@ -4529,11 +4529,11 @@ class MonitoringPage(QWidget):
 
         self.status_label.setText(
             "สถานะ: กล้องกลับมาแล้ว "
-            "(RUNNING)"
+            "(กำลังทำงาน)"
         )
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "สถานะตา: กำลังปรับเทียบ"
         )
 
         self.screen_distance_label.setText(
@@ -4580,7 +4580,7 @@ class MonitoringPage(QWidget):
             (
                 "PostGuard ไม่สามารถเชื่อมต่อ"
                 "กล้องกลับมาได้ภายใน 60 วินาที\n\n"
-                "ระบบจะจบ Session ปัจจุบัน "
+                "ระบบจะจบเซสชันปัจจุบัน "
                 "เพื่อป้องกันการประเมินจาก"
                 "ข้อมูลที่ไม่ต่อเนื่อง"
             ),
@@ -4808,11 +4808,11 @@ class MonitoringPage(QWidget):
 
         self.status_label.setText(
             "สถานะ: กล้องกลับมาแล้ว "
-            "(RUNNING)"
+            "(กำลังทำงาน)"
         )
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "สถานะตา: กำลังปรับเทียบ"
         )
 
         self.screen_distance_label.setText(
@@ -4847,7 +4847,7 @@ class MonitoringPage(QWidget):
             "กล้องขาดการเชื่อมต่อ",
             "PostGuard ไม่สามารถเชื่อมต่อกล้องกลับมาได้"
             "ภายใน 60 วินาที\n\n"
-            "ระบบจะจบ Session ปัจจุบันเพื่อป้องกัน"
+            "ระบบจะจบเซสชันปัจจุบันเพื่อป้องกัน"
             "การประเมินจากข้อมูลที่ไม่ต่อเนื่อง",
         )
 
@@ -5067,7 +5067,7 @@ class MonitoringPage(QWidget):
 
             QMessageBox.warning(
                 self,
-                "Camera Reference",
+                "การเตรียมกล้อง",
                 str(error),
             )
 
@@ -5262,29 +5262,29 @@ class MonitoringPage(QWidget):
         )
 
         self.assessment_label.setText(
-            "Assessment: NOT_EVALUATED "
+            "การประเมินท่าทาง: ไม่สามารถประเมินได้ "
             "(CAMERA_MOVED)"
         )
 
         self.factor_label.setText(
-            "Posture Factors: CAMERA_MOVED"
+            "ปัจจัยด้านท่าทาง: ตำแหน่งกล้องเปลี่ยน"
         )
 
         self.duration_label.setText(
-            "Longest Continuous Factor: 0.0 s"
+            "ปัจจัยต่อเนื่องนานที่สุด: 0.0 วินาที"
         )
 
         self.risk_label.setText(
-            "Risk Level: N/A "
+            "ระดับความเสี่ยง: N/A "
             "(CAMERA_MOVED)"
         )
 
         self.event_label.setText(
-            "Risk Event: DATA_GAP"
+            "เหตุการณ์ความเสี่ยง: ไม่มีข้อมูลจากกล้อง"
         )
 
         self.alert_label.setText(
-            "Alert Policy: CAMERA_MOVED"
+            "การแจ้งเตือน: ตำแหน่งกล้องเปลี่ยน"
         )
 
         self.sound_player.notify(
@@ -5299,12 +5299,12 @@ class MonitoringPage(QWidget):
             "PostGuard ตรวจพบว่าตำแหน่งกล้องเปลี่ยน"
             "ระหว่างการตรวจจับ\n\n"
             f"{detail_text}\n\n"
-            "Camera Reference และ Personal Baseline เดิม"
+            "ข้อมูลการเตรียมกล้องและค่าท่าทางอ้างอิงส่วนบุคคลเดิม"
             "อาจไม่ตรงกับตำแหน่งกล้องปัจจุบัน "
             "ระบบจึงจบเซสชันนี้เพื่อไม่ให้ประเมินความเสี่ยงต่อ"
             "ด้วยข้อมูลอ้างอิงที่ไม่ถูกต้อง\n\n"
-            "กรุณาเริ่ม Monitoring ใหม่ แล้วทำ Camera Setup "
-            "และ Personal Baseline ใหม่",
+            "กรุณาเริ่มการตรวจจับใหม่ แล้วทำการเตรียมกล้อง "
+            "และสร้างค่าท่าทางอ้างอิงส่วนบุคคลใหม่",
         )
 
         # Existing validated session-finish path:
@@ -5718,15 +5718,15 @@ class MonitoringPage(QWidget):
             # ====================================================
 
             self.baseline_shoulder_label.setText(
-                "Baseline Shoulder Tilt: --"
+                "ค่าท่าทางอ้างอิงของไหล่: --"
             )
 
             self.baseline_neck_label.setText(
-                "Baseline Neck Lateral Tilt: --"
+                "ค่าท่าทางอ้างอิงของคอด้านข้าง: --"
             )
 
             self.baseline_flexion_label.setText(
-                "Baseline Neck Flexion: --"
+                "ค่าท่าทางอ้างอิงของการก้ม/เงยคอ: --"
             )
 
             # ====================================================
@@ -5761,27 +5761,27 @@ class MonitoringPage(QWidget):
             # ====================================================
 
             self.assessment_label.setText(
-                "Assessment: Waiting"
+                "การประเมินท่าทาง: กำลังรอข้อมูล"
             )
 
             self.factor_label.setText(
-                "Posture Factors: -"
+                "ปัจจัยด้านท่าทาง: -"
             )
 
             self.duration_label.setText(
-                "Longest Continuous Factor: -"
+                "ปัจจัยต่อเนื่องนานที่สุด: -"
             )
 
             self.risk_label.setText(
-                "Risk Level: -"
+                "ระดับความเสี่ยง: -"
             )
 
             self.event_label.setText(
-                "Risk Event: -"
+                "เหตุการณ์ความเสี่ยง: -"
             )
 
             self.alert_label.setText(
-                "Alert Policy: Waiting"
+                "การแจ้งเตือน: กำลังรอข้อมูล"
             )
 
     # ========================================================
@@ -5816,12 +5816,12 @@ class MonitoringPage(QWidget):
                 QMessageBox.warning(
                     self,
                     "ยังไม่สามารถจบเซสชัน",
-                    f"Session {self.session_id} "
-                    "may still be RUNNING "
-                    "on the server.\n"
+                    f"เซสชัน {self.session_id} "
+                    "อาจยังมีสถานะ RUNNING "
+                    "อยู่บนเซิร์ฟเวอร์\n"
                     f"{error}\n"
-                    "Reconnect and retry "
-                    "before starting another session.",
+                    "กรุณาเชื่อมต่ออีกครั้งและลองใหม่ "
+                    "ก่อนเริ่มเซสชันใหม่",
                 )
 
         self._release_local_resources()
@@ -5833,7 +5833,7 @@ class MonitoringPage(QWidget):
             )
 
             self.session_label.setText(
-                "Session ID: -"
+                "รหัสเซสชัน: -"
             )
 
         else:
@@ -5844,8 +5844,8 @@ class MonitoringPage(QWidget):
             )
 
             self.session_label.setText(
-                f"Session ID: {self.session_id} "
-                "(pending)"
+                f"รหัสเซสชัน: {self.session_id} "
+                "(กำลังรอยืนยัน)"
             )
 
         self.state_changed.emit()
@@ -5866,7 +5866,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise RuntimeError(
-                "No active monitoring session."
+                "ไม่มีเซสชันการตรวจจับที่กำลังทำงานอยู่"
             )
 
         duration = max(
@@ -5938,7 +5938,7 @@ class MonitoringPage(QWidget):
             "camera_name": (
                 camera.get(
                     "camera_name",
-                    "Unknown Camera",
+                    "กล้องไม่ทราบชื่อ",
                 )
             ),
 
@@ -6182,7 +6182,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "No valid active session"
+                "ไม่พบเซสชันที่กำลังทำงานอยู่"
             )
 
         if action == "pause":
@@ -6200,7 +6200,7 @@ class MonitoringPage(QWidget):
         else:
 
             raise ValueError(
-                "Unsupported session action"
+                "ไม่รองรับคำสั่งของเซสชันนี้"
             )
 
         response = None
@@ -6254,8 +6254,8 @@ class MonitoringPage(QWidget):
                     )
 
                 raise RuntimeError(
-                    "Session state could "
-                    "not be confirmed"
+                    "ไม่สามารถยืนยันสถานะ "
+                    "ของเซสชันได้"
                 )
 
             data = (
@@ -6279,7 +6279,7 @@ class MonitoringPage(QWidget):
                     )
 
                 raise RuntimeError(
-                    "Backend did not confirm "
+                    "Backend ไม่ได้ยืนยัน "
                     +
                     expected_status
                 )
@@ -6294,7 +6294,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Invalid session response"
+                "ข้อมูลเซสชันที่ได้รับไม่ถูกต้อง"
             )
 
         if (
@@ -6306,7 +6306,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Session ID mismatch"
+                "รหัสเซสชันไม่ตรงกัน"
             )
 
         if (
@@ -6318,8 +6318,8 @@ class MonitoringPage(QWidget):
         ):
 
             raise RuntimeError(
-                f"Expected {expected_status}, "
-                f"received "
+                f"คาดว่าสถานะเป็น {expected_status}, "
+                f"แต่ได้รับ "
                 f"{data.get('status')}"
             )
 
@@ -6353,8 +6353,8 @@ class MonitoringPage(QWidget):
                 self,
                 "Backend ยังไม่พร้อม",
                 (
-                    "ยังไม่สามารถ Pause / Resume ได้ "
-                    "จนกว่า PostGuard จะยืนยันสถานะ Session "
+                    "ยังไม่สามารถหยุดชั่วคราว / ทำงานต่อได้ "
+                    "จนกว่า PostGuard จะยืนยันสถานะเซสชัน "
                     "กับ Backend อีกครั้ง"
                 ),
             )
@@ -6418,7 +6418,7 @@ class MonitoringPage(QWidget):
                 (
                     "ไม่สามารถติดต่อ Backend "
                     "เพื่อยืนยันสถานะ PAUSED ได้\n\n"
-                    "Local Monitoring จะยังทำงานต่อ "
+                    "การตรวจจับในเครื่องจะยังทำงานต่อ "
                     "จนกว่า Backend จะกลับมา"
                 ),
             )
@@ -6475,7 +6475,7 @@ class MonitoringPage(QWidget):
         self.close_eye_alert()
 
         self.eye_state_label.setText(
-            "สถานะตา: PAUSED"
+            "สถานะตา: หยุดชั่วคราว"
         )
 
         # ====================================================
@@ -6489,31 +6489,31 @@ class MonitoringPage(QWidget):
         )
 
         self.assessment_label.setText(
-            "Assessment: PAUSED"
+            "การประเมินท่าทาง: หยุดชั่วคราว"
         )
 
         self.factor_label.setText(
-            "Posture Factors: PAUSED"
+            "ปัจจัยด้านท่าทาง: หยุดชั่วคราว"
         )
 
         self.duration_label.setText(
-            "Longest Continuous Factor: PAUSED"
+            "ปัจจัยต่อเนื่องนานที่สุด: หยุดชั่วคราว"
         )
 
         self.risk_label.setText(
-            "Risk Level: PAUSED"
+            "ระดับความเสี่ยง: หยุดชั่วคราว"
         )
 
         self.event_label.setText(
-            "Risk Event: PAUSED"
+            "เหตุการณ์ความเสี่ยง: หยุดชั่วคราว"
         )
 
         self.alert_label.setText(
-            "Alert Policy: PAUSED"
+            "การแจ้งเตือน: หยุดชั่วคราว"
         )
 
         self.screen_distance_label.setText(
-            "ระยะห่างหน้าจอ: PAUSED"
+            "ระยะห่างหน้าจอ: หยุดชั่วคราว"
         )
 
         self.status_label.setText(
@@ -6555,7 +6555,7 @@ class MonitoringPage(QWidget):
                 (
                     "ไม่สามารถติดต่อ Backend "
                     "เพื่อยืนยันสถานะ RUNNING ได้\n\n"
-                    "Session จะยังคง PAUSED "
+                    "เซสชันจะยังคงหยุดชั่วคราว "
                     "จนกว่า Backend จะกลับมา"
                 ),
             )
@@ -6606,7 +6606,7 @@ class MonitoringPage(QWidget):
         self.close_eye_alert()
 
         self.eye_state_label.setText(
-            "สถานะตา: กำลัง Calibration"
+            "สถานะตา: กำลังปรับเทียบ"
         )
 
         self.blink_count_label.setText(
@@ -6736,10 +6736,10 @@ class MonitoringPage(QWidget):
                 "ไม่สามารถจบเซสชัน",
                 (
                     "Backend ยังไม่ยืนยันว่า "
-                    "Session สิ้นสุด\n"
+                    "เซสชันสิ้นสุด\n"
                     f"{error}\n\n"
                     "กรุณาตรวจสอบ Backend "
-                    "แล้วกด Stop อีกครั้ง"
+                    "แล้วกดหยุดอีกครั้ง"
                 ),
             )
 
@@ -6776,7 +6776,7 @@ class MonitoringPage(QWidget):
         ):
 
             raise ValueError(
-                "Invalid completed session response."
+                "ข้อมูลเซสชันที่สิ้นสุดแล้วไม่ถูกต้อง"
             )
 
         # ====================================================
@@ -7047,12 +7047,12 @@ class MonitoringPage(QWidget):
                 self,
                 "เกิดข้อผิดพลาดในการบันทึกสรุป",
                 (
-                    "Session สิ้นสุดแล้ว "
-                    "แต่ยังบันทึก Summary "
+                    "เซสชันสิ้นสุดแล้ว "
+                    "แต่ยังบันทึกข้อมูลสรุป "
                     "ไม่สำเร็จ\n\n"
                     f"{error}\n\n"
-                    "สามารถกด Retry "
-                    "ที่หน้า Summary ได้"
+                    "สามารถกดลองอีกครั้ง "
+                    "ที่หน้าสรุปผลได้"
                 ),
             )
 

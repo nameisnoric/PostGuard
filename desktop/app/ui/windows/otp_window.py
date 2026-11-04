@@ -96,15 +96,15 @@ class OTPWindow(QWidget):
         otp = self.otp_input.text().strip()
 
         if not otp:
-            self.show_error("Please enter the OTP.")
+            self.show_error("กรุณากรอกรหัส OTP")
             return
 
         if len(otp) != 6:
-            self.show_error("OTP must contain 6 digits.")
+            self.show_error("รหัส OTP ต้องมี 6 หลัก")
             return
 
         if not otp.isdigit():
-            self.show_error("OTP must contain numbers only.")
+            self.show_error("รหัส OTP ต้องเป็นตัวเลขเท่านั้น")
             return
 
         self.verify_button.setEnabled(False)
@@ -116,7 +116,7 @@ class OTPWindow(QWidget):
             )
         except requests.RequestException:
             self.verify_button.setEnabled(True)
-            self.show_error("Cannot connect to the PostGuard server.")
+            self.show_error("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ PostGuard ได้")
             return
 
         if response.status_code not in (200, 201):
@@ -125,10 +125,10 @@ class OTPWindow(QWidget):
                 error_data = response.json()
                 message = error_data.get(
                     "detail",
-                    "OTP verification failed.",
+                    "ยืนยันรหัส OTP ไม่สำเร็จ",
                 )
             except (AttributeError, ValueError):
-                message = "OTP verification failed."
+                message = "ยืนยันรหัส OTP ไม่สำเร็จ"
 
             self.show_error(str(message))
             self.otp_input.selectAll()

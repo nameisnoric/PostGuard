@@ -76,7 +76,7 @@ class PostureAlertDialog(QDialog):
         # ====================================================
 
         self.setWindowTitle(
-            "PostGuard - Posture Alert"
+            "PostGuard - แจ้งเตือนท่าทาง"
         )
 
         self.setWindowModality(
@@ -224,7 +224,7 @@ class PostureAlertDialog(QDialog):
         )
 
         title = QLabel(
-            "Posture Alert"
+            "แจ้งเตือนท่าทาง"
         )
 
         title.setProperty(

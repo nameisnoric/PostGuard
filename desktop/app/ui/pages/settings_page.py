@@ -48,7 +48,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(16)
         scroll.setWidget(content)
 
-        title = QLabel("Settings")
+        title = QLabel("การตั้งค่า")
         title.setProperty("role", "title")
         subtitle = QLabel("จัดการการแจ้งเตือนท่าทางและเสียงแจ้งเตือน")
         subtitle.setProperty("role", "muted")
@@ -68,7 +68,7 @@ class SettingsPage(QWidget):
         heading.setProperty("role", "heading")
         card_layout.addWidget(heading)
 
-        self.notifications_enabled = QCheckBox("เปิด Popup แจ้งเตือนท่าทาง")
+        self.notifications_enabled = QCheckBox("เปิดป๊อปอัปแจ้งเตือนท่าทาง")
         self.notifications_enabled.toggled.connect(self._sync_enabled_state)
         self.sound_enabled = QCheckBox("เล่นเสียงเมื่อมีการแจ้งเตือนท่าทาง")
         self.sound_enabled.toggled.connect(self._sync_enabled_state)
@@ -92,15 +92,15 @@ class SettingsPage(QWidget):
         self.reminder_interval = QComboBox()
         for minutes in (1, 5, 10, 15, 30, 60):
             self.reminder_interval.addItem(
-                f"Every {minutes} minute" + ("" if minutes == 1 else "s"),
+                f"ทุก {minutes} นาที",
                 minutes,
             )
         reminder_row.addWidget(self.reminder_interval)
         card_layout.addLayout(reminder_row)
 
         note = QLabel(
-            "Popup จะแสดงเมื่อพบเหตุการณ์ท่าทางใหม่ ส่วนเสียงจะเล่นตามระดับเสียง "
-            "และช่วงเวลาแจ้งเตือนซ้ำที่กำหนด เหตุการณ์ยังถูกบันทึกใน History"
+            "ป๊อปอัปจะแสดงเมื่อพบเหตุการณ์ท่าทางใหม่ ส่วนเสียงจะเล่นตามระดับเสียง "
+            "และช่วงเวลาแจ้งเตือนซ้ำที่กำหนด เหตุการณ์ยังคงถูกบันทึกไว้ในประวัติ"
         )
         note.setProperty("role", "muted")
         note.setWordWrap(True)
@@ -138,8 +138,8 @@ class SettingsPage(QWidget):
         privacy_heading = QLabel("ความเป็นส่วนตัวและข้อมูลกล้อง")
         privacy_heading.setProperty("role", "heading")
         privacy_note = QLabel(
-            "Review how camera frames are processed, check your consent status, "
-            "or withdraw consent for future monitoring."
+            "ตรวจสอบวิธีประมวลผลภาพจากกล้อง สถานะการยินยอม "
+            "หรือถอนความยินยอมสำหรับการตรวจจับในอนาคต"
         )
         privacy_note.setProperty("role", "muted")
         privacy_note.setWordWrap(True)
@@ -149,7 +149,7 @@ class SettingsPage(QWidget):
         privacy_actions = QHBoxLayout()
         self.review_privacy_button = QPushButton("อ่านประกาศความเป็นส่วนตัว")
         self.review_privacy_button.clicked.connect(self.review_privacy_notice)
-        self.consent_action_button = QPushButton("ให้ Consent")
+        self.consent_action_button = QPushButton("ให้ความยินยอม")
         self.consent_action_button.clicked.connect(self.handle_privacy_consent_action)
         privacy_actions.addWidget(self.review_privacy_button)
         privacy_actions.addStretch()
@@ -172,7 +172,7 @@ class SettingsPage(QWidget):
         danger_layout = QVBoxLayout(self.danger_card)
         danger_layout.setContentsMargins(28, 22, 28, 22)
         danger_layout.setSpacing(10)
-        danger_title = QLabel("Delete Account")
+        danger_title = QLabel("ลบบัญชี")
         danger_title.setProperty("role", "heading")
         danger_message = QLabel(
             "ปิดใช้งานบัญชีทันทีและลบข้อมูลถาวรหลังระยะเวลากู้คืน 14 วัน "
@@ -183,7 +183,7 @@ class SettingsPage(QWidget):
         self.account_status_label = QLabel("")
         self.account_status_label.setProperty("role", "muted")
         self.account_status_label.setWordWrap(True)
-        self.delete_account_button = QPushButton("Delete Account")
+        self.delete_account_button = QPushButton("ลบบัญชี")
         self.delete_account_button.setProperty("variant", "danger")
         self.delete_account_button.clicked.connect(self.confirm_account_deletion)
         danger_actions = QHBoxLayout()
@@ -210,20 +210,20 @@ class SettingsPage(QWidget):
         try:
             response = APIClient.get_settings()
         except requests.RequestException:
-            self.status_label.setText("Cannot load settings. Check your connection.")
+            self.status_label.setText("ไม่สามารถโหลดการตั้งค่าได้ โปรดตรวจสอบการเชื่อมต่อ")
             return
         if not response.ok:
             self.status_label.setText(
-                self._response_error(response, "Settings could not be loaded.")
+                self._response_error(response, "ไม่สามารถโหลดการตั้งค่าได้")
             )
             return
         try:
             payload = response.json()
         except (ValueError, AttributeError):
-            self.status_label.setText("Settings response was invalid.")
+            self.status_label.setText("ข้อมูลการตั้งค่าที่ได้รับไม่ถูกต้อง")
             return
         if not self._valid_payload(payload):
-            self.status_label.setText("Settings response was invalid.")
+            self.status_label.setText("ข้อมูลการตั้งค่าที่ได้รับไม่ถูกต้อง")
             return
         self.current_settings = self._settings_only(payload)
         self._populate(self.current_settings)
@@ -237,22 +237,22 @@ class SettingsPage(QWidget):
         try:
             response = APIClient.update_settings(settings)
         except (requests.RequestException, ValueError):
-            self.status_label.setText("Cannot save settings. Check your connection.")
+            self.status_label.setText("ไม่สามารถบันทึกการตั้งค่าได้ โปรดตรวจสอบการเชื่อมต่อ")
             return
         finally:
             self.save_button.setEnabled(True)
         if not response.ok:
             self.status_label.setText(
-                self._response_error(response, "Settings could not be saved.")
+                self._response_error(response, "ไม่สามารถบันทึกการตั้งค่าได้")
             )
             return
         try:
             payload = response.json()
         except (ValueError, AttributeError):
-            self.status_label.setText("Settings update returned an invalid response.")
+            self.status_label.setText("ข้อมูลตอบกลับจากการอัปเดตการตั้งค่าไม่ถูกต้อง")
             return
         if not self._valid_payload(payload):
-            self.status_label.setText("Settings update returned an invalid response.")
+            self.status_label.setText("ข้อมูลตอบกลับจากการอัปเดตการตั้งค่าไม่ถูกต้อง")
             return
         self.current_settings = self._settings_only(payload)
         self._populate(self.current_settings)
@@ -269,10 +269,10 @@ class SettingsPage(QWidget):
 
     def test_sound(self) -> None:
         if not self.notifications_enabled.isChecked() or not self.sound_enabled.isChecked():
-            self.status_label.setText("Enable notifications and sound to test the alert.")
+            self.status_label.setText("โปรดเปิดการแจ้งเตือนและเสียงเพื่อทดสอบการแจ้งเตือน")
             return
         if self.volume_slider.value() == 0:
-            self.status_label.setText("Increase the alert volume to test the sound.")
+            self.status_label.setText("โปรดเพิ่มระดับเสียงแจ้งเตือนเพื่อทดสอบเสียง")
             return
         self.sound_player.play_preview(self.volume_slider.value())
         self.status_label.setText('กำลังเล่นเสียงแจ้งเตือน')
@@ -283,12 +283,12 @@ class SettingsPage(QWidget):
             response = APIClient.get_privacy_consent()
         except requests.RequestException:
             self.privacy_status_label.setText(
-                "Consent status: Cannot load. Check your connection."
+                "สถานะการยินยอม: ไม่สามารถโหลดได้ โปรดตรวจสอบการเชื่อมต่อ"
             )
             self._set_privacy_consent_action(None)
             return
         if not response.ok:
-            self.privacy_status_label.setText("Consent status: Could not be loaded.")
+            self.privacy_status_label.setText("สถานะการยินยอม: ไม่สามารถโหลดได้")
             self._set_privacy_consent_action(None)
             return
         try:
@@ -298,7 +298,7 @@ class SettingsPage(QWidget):
         if not isinstance(payload, dict) or type(
             payload.get("has_current_consent")
         ) is not bool:
-            self.privacy_status_label.setText("Consent status: Invalid response.")
+            self.privacy_status_label.setText("สถานะการยินยอม: ข้อมูลตอบกลับไม่ถูกต้อง")
             self._set_privacy_consent_action(None)
             return
 
@@ -307,11 +307,11 @@ class SettingsPage(QWidget):
         if accepted:
             accepted_at = payload.get("accepted_at") or "recorded"
             self.privacy_status_label.setText(
-                f"Consent status: Accepted · {accepted_at}"
+                f"สถานะการยินยอม: ยินยอมแล้ว · {accepted_at}"
             )
         elif payload.get("withdrawn_at"):
             self.privacy_status_label.setText(
-                f"Consent status: Withdrawn · {payload['withdrawn_at']}"
+                f"สถานะการยินยอม: ถอนความยินยอมแล้ว · {payload['withdrawn_at']}"
             )
         else:
             self.privacy_status_label.setText('สถานะความยินยอม: ยังไม่ยอมรับ')
@@ -341,8 +341,8 @@ class SettingsPage(QWidget):
         answer = QMessageBox.question(
             self,
             'ถอนความยินยอมการใช้กล้อง',
-            "Withdraw consent for future camera monitoring? Existing history "
-            "will remain available.",
+            "ต้องการถอนความยินยอมสำหรับการตรวจจับด้วยกล้องในอนาคตหรือไม่? ประวัติที่มีอยู่ "
+            "จะยังคงสามารถดูได้",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -353,13 +353,13 @@ class SettingsPage(QWidget):
             response = APIClient.withdraw_privacy_consent()
         except requests.RequestException:
             self.privacy_status_label.setText(
-                "Consent could not be withdrawn. Check your connection."
+                "ไม่สามารถถอนความยินยอมได้ โปรดตรวจสอบการเชื่อมต่อ"
             )
             self.consent_action_button.setEnabled(True)
             return
         if not response.ok:
             self.privacy_status_label.setText(
-                self._response_error(response, "Consent could not be withdrawn.")
+                self._response_error(response, "ไม่สามารถถอนความยินยอมได้")
             )
             self.consent_action_button.setEnabled(True)
             return
@@ -368,7 +368,7 @@ class SettingsPage(QWidget):
         except (ValueError, AttributeError):
             payload = None
         if not isinstance(payload, dict) or payload.get("has_current_consent") is not False:
-            self.privacy_status_label.setText("Consent withdrawal was not confirmed.")
+            self.privacy_status_label.setText("ไม่สามารถยืนยันการถอนความยินยอมได้")
             self.consent_action_button.setEnabled(True)
             return
         self.privacy_status_label.setText('สถานะความยินยอม: ถอนแล้ว')
@@ -379,10 +379,10 @@ class SettingsPage(QWidget):
         self.has_privacy_consent = accepted
         self.consent_action_button.setEnabled(accepted is not None)
         if accepted is True:
-            self.consent_action_button.setText("ยกเลิก Consent")
+            self.consent_action_button.setText("ถอนความยินยอม")
             self.consent_action_button.setProperty("variant", "danger")
         else:
-            self.consent_action_button.setText("ให้ Consent")
+            self.consent_action_button.setText("ให้ความยินยอม")
             self.consent_action_button.setProperty("variant", "primary")
         polish(self.consent_action_button)
 
@@ -424,7 +424,7 @@ class SettingsPage(QWidget):
     @staticmethod
     def _response_error(response, fallback: str) -> str:
         if getattr(response, "status_code", None) == 404:
-            return "Settings API is unavailable. Restart the PostGuard backend."
+            return "ไม่สามารถใช้งาน API การตั้งค่าได้ โปรดรีสตาร์ต PostGuard backend"
         try:
             detail = response.json().get("detail")
         except (ValueError, AttributeError, TypeError):

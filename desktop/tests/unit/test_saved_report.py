@@ -265,7 +265,7 @@ class SavedReportTests(
                 0,
                 6,
             ).text(),
-            "Saved",
+            "บันทึกแล้ว",
         )
 
         page.deleteLater()

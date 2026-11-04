@@ -34,7 +34,7 @@ class PasswordResetDialog(QDialog):
         self.send_button = QPushButton("ส่ง OTP สำหรับรีเซ็ต")
         self.send_button.setProperty("variant", "primary")
         self.send_button.clicked.connect(self.request_code)
-        self._add_page("Forgot Password", [self.email_input, self.send_button])
+        self._add_page("ลืมรหัสผ่าน", [self.email_input, self.send_button])
 
         self.otp_note = QLabel("")
         self.otp_note.setWordWrap(True)
@@ -48,7 +48,7 @@ class PasswordResetDialog(QDialog):
         self.resend_button.clicked.connect(self.request_code)
         self.change_email_button = QPushButton("เปลี่ยนอีเมล")
         self.change_email_button.clicked.connect(self.change_email)
-        self._add_page("Verify Reset OTP", [self.otp_note, self.otp_input, self.verify_button, self.resend_button, self.change_email_button])
+        self._add_page("ยืนยัน OTP สำหรับรีเซ็ตรหัสผ่าน", [self.otp_note, self.otp_input, self.verify_button, self.resend_button, self.change_email_button])
 
         rules = QLabel("ใช้อย่างน้อย 8 ตัวอักษร โดยมีตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก ตัวเลข และอักขระพิเศษ")
         rules.setWordWrap(True)
@@ -66,7 +66,7 @@ class PasswordResetDialog(QDialog):
         self.reset_button = QPushButton("บันทึกรหัสผ่านใหม่")
         self.reset_button.setProperty("variant", "primary")
         self.reset_button.clicked.connect(self.save_password)
-        self._add_page("Set New Password", [rules, self.password_input, self.confirm_input, self.reset_button])
+        self._add_page("ตั้งรหัสผ่านใหม่", [rules, self.password_input, self.confirm_input, self.reset_button])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
@@ -134,7 +134,7 @@ class PasswordResetDialog(QDialog):
             self._json_object(response)
             self._clear_credentials()
             self.email = email
-            self.otp_note.setText(f"If this account exists, a code will be sent to {email}.\nThe code expires after 5 minutes. Use the latest code.")
+            self.otp_note.setText(f"หากมีบัญชีนี้อยู่ ระบบจะส่งรหัสไปที่ {email}\nรหัสจะหมดอายุภายใน 5 นาที กรุณาใช้รหัสล่าสุด")
             self.pages.setCurrentIndex(1)
             self.status_label.setText('กรอกรหัสที่ได้รับทางอีเมล')
         except requests.RequestException:
@@ -165,9 +165,9 @@ class PasswordResetDialog(QDialog):
             self.pages.setCurrentIndex(2)
             self.status_label.setText('ยืนยัน OTP สำเร็จ โปรดตั้งรหัสผ่านใหม่ภายใน 10 นาที')
         except requests.RequestException:
-            self.status_label.setText("Cannot confirm verification. Check your connection; request a new OTP if this code was already used.")
+            self.status_label.setText("ไม่สามารถยืนยัน OTP ได้ กรุณาตรวจสอบการเชื่อมต่อ หากรหัสนี้ถูกใช้ไปแล้วให้ขอ OTP ใหม่")
         except ValueError:
-            self.status_label.setText("Invalid verification response. Please request a new OTP.")
+            self.status_label.setText("ข้อมูลการยืนยันไม่ถูกต้อง กรุณาขอ OTP ใหม่")
         finally:
             self._set_busy(False)
 
@@ -187,18 +187,18 @@ class PasswordResetDialog(QDialog):
             if response.status_code == 401:
                 self._clear_credentials()
                 self.pages.setCurrentIndex(1)
-                self.status_label.setText("Reset authorization expired or was already used. Try logging in if you previously submitted this password, or request a new OTP.")
+                self.status_label.setText("สิทธิ์สำหรับรีเซ็ตรหัสผ่านหมดอายุหรือถูกใช้ไปแล้ว หากเคยตั้งรหัสผ่านใหม่แล้วให้ลองเข้าสู่ระบบ หรือขอ OTP ใหม่")
                 return
             if response.status_code != 200:
-                self.status_label.setText("Password reset was not confirmed. Check the requirements and try again.")
+                self.status_label.setText("ไม่สามารถยืนยันการตั้งรหัสผ่านใหม่ได้ กรุณาตรวจสอบเงื่อนไขของรหัสผ่านแล้วลองอีกครั้ง")
                 return
             self._json_object(response)
             self._clear_credentials()
             QMessageBox.information(self, 'อัปเดตรหัสผ่านแล้ว', 'อัปเดตรหัสผ่านแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่')
             self.accept()
         except requests.RequestException:
-            self.status_label.setText("The result could not be confirmed. Try logging in with the new password before requesting another reset.")
+            self.status_label.setText("ไม่สามารถยืนยันผลการตั้งรหัสผ่านได้ กรุณาลองเข้าสู่ระบบด้วยรหัสผ่านใหม่ก่อนขอรีเซ็ตอีกครั้ง")
         except ValueError:
-            self.status_label.setText("Invalid response. Try logging in with the new password to check whether it was saved.")
+            self.status_label.setText("ข้อมูลตอบกลับไม่ถูกต้อง กรุณาลองเข้าสู่ระบบด้วยรหัสผ่านใหม่เพื่อตรวจสอบว่าบันทึกสำเร็จหรือไม่")
         finally:
             self._set_busy(False)

@@ -48,8 +48,8 @@ class SessionRiskTrendChart(
 
         self.setToolTip(
             (
-                "กราฟแสดง average PostGuard Risk Score "
-                "ของแต่ละ Session ที่เปรียบเทียบได้"
+                "กราฟแสดงค่าเฉลี่ย PostGuard Risk Score "
+                "ของแต่ละเซสชันที่สามารถเปรียบเทียบได้"
             )
         )
 
@@ -227,7 +227,7 @@ class SessionRiskTrendChart(
                 self.rect(),
                 Qt.AlignmentFlag.AlignCenter,
                 (
-                    "ยังไม่มี Risk Score History "
+                    "ยังไม่มีประวัติ Risk Score "
                     "ที่สามารถเปรียบเทียบได้"
                 ),
             )
@@ -496,5 +496,5 @@ class SessionRiskTrendChart(
                 18.0,
             ),
             Qt.AlignmentFlag.AlignCenter,
-            "Session",
+            "เซสชัน",
         )

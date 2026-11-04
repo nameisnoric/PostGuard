@@ -70,7 +70,7 @@ class SettingsPageTests(unittest.TestCase):
         self.assertTrue(self.page.save_button.isEnabled())
         self.assertEqual(
             self.page.status_label.text(),
-            "Settings API is unavailable. Restart the PostGuard backend.",
+            "ไม่สามารถใช้งาน API การตั้งค่าได้ โปรดรีสตาร์ต PostGuard backend",
         )
 
     def test_test_sound_uses_current_slider_volume(self):
@@ -82,7 +82,7 @@ class SettingsPageTests(unittest.TestCase):
 
     def test_account_deletion_is_confirmed_from_settings(self):
         self.assertEqual(self.page.danger_card.property("variant"), "dangerZone")
-        self.assertEqual(self.page.delete_account_button.text(), "Delete Account")
+        self.assertEqual(self.page.delete_account_button.text(), "ลบบัญชี")
         requested = Mock()
         self.page.account_deletion_requested.connect(requested)
         with patch.object(
@@ -109,7 +109,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.load_privacy_consent()
 
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ถอนความยินยอม")
         changed = Mock()
         self.page.privacy_consent_changed.connect(changed)
         withdrawn = {**accepted, "has_current_consent": False, "withdrawn_at": "now"}
@@ -130,7 +130,7 @@ class SettingsPageTests(unittest.TestCase):
         changed.assert_called_once_with(False)
         self.assertIn("ถอนแล้ว", self.page.privacy_status_label.text())
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ความยินยอม")
 
     def test_missing_privacy_consent_offers_consent_action(self):
         missing = {
@@ -146,7 +146,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.load_privacy_consent()
 
         self.assertTrue(self.page.consent_action_button.isEnabled())
-        self.assertEqual(self.page.consent_action_button.text(), "ให้ Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ให้ความยินยอม")
 
     def test_consent_action_updates_state_after_acceptance(self):
         self.page._set_privacy_consent_action(False)
@@ -161,7 +161,7 @@ class SettingsPageTests(unittest.TestCase):
             self.page.handle_privacy_consent_action()
 
         self.assertTrue(self.page.has_privacy_consent)
-        self.assertEqual(self.page.consent_action_button.text(), "ยกเลิก Consent")
+        self.assertEqual(self.page.consent_action_button.text(), "ถอนความยินยอม")
         changed.assert_called_once_with(True)
 
 

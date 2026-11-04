@@ -223,7 +223,7 @@ class SessionComparisonDialogTests(
         )
 
         self.assertIn(
-            "อย่างน้อย 2 Session",
+            "อย่างน้อย 2 เซสชัน",
             dialog.explanation_label.text(),
         )
 

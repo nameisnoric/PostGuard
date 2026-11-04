@@ -75,7 +75,7 @@ class AlertHistoryDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle(
-            "PostGuard - Alert History"
+            "PostGuard - ประวัติการแจ้งเตือน"
         )
         self.resize(
             1080,
@@ -117,7 +117,7 @@ class AlertHistoryDialog(QDialog):
         # ==================================================
 
         title = QLabel(
-            "Alert Notifications"
+            "ประวัติการแจ้งเตือน"
         )
         title.setProperty(
             "role",
@@ -133,8 +133,8 @@ class AlertHistoryDialog(QDialog):
         # ==================================================
 
         self.description = QLabel(
-            "ประวัติการแจ้งเตือนของ Session ทั้ง Posture Alert และ "
-            "Eye Reminder โดย Eye Reminder แยกจาก Posture Risk Event"
+            "ประวัติการแจ้งเตือนของเซสชัน ทั้งการแจ้งเตือนท่าทางและ "
+            "การแจ้งเตือนการกระพริบตา โดยการแจ้งเตือนการกระพริบตาจะแยกจากเหตุการณ์ความเสี่ยงด้านท่าทาง"
         )
         self.description.setWordWrap(
             True
@@ -189,7 +189,7 @@ class AlertHistoryDialog(QDialog):
         )
 
         self.refresh_button = QPushButton(
-            "Refresh"
+            "รีเฟรช"
         )
         self.refresh_button.clicked.connect(
             self.load_selected_alerts
@@ -252,14 +252,14 @@ class AlertHistoryDialog(QDialog):
 
         self.table.setHorizontalHeaderLabels(
             [
-                "Notification ID",
-                "Risk Event ID",
+                "รหัสการแจ้งเตือน",
+                "รหัสเหตุการณ์ความเสี่ยง",
                 "ประเภท",
                 "ระดับความเสี่ยง",
-                "Decision",
-                "Reason",
+                "ผลการตัดสินใจ",
+                "เหตุผล",
                 "เวลาที่แจ้งเตือน",
-                "Created At",
+                "เวลาที่สร้าง",
             ]
         )
 
@@ -388,7 +388,7 @@ class AlertHistoryDialog(QDialog):
                 list,
             ):
                 raise ValueError(
-                    "Invalid sessions response"
+                    "ข้อมูลเซสชันที่ได้รับไม่ถูกต้อง"
                 )
 
             self.session_selector.blockSignals(
@@ -579,7 +579,7 @@ class AlertHistoryDialog(QDialog):
                 list,
             ):
                 raise ValueError(
-                    "Invalid alert notifications response"
+                    "ข้อมูลการแจ้งเตือนท่าทางที่ได้รับไม่ถูกต้อง"
                 )
 
             for notification in notifications:
@@ -610,7 +610,7 @@ class AlertHistoryDialog(QDialog):
                 list,
             ):
                 raise ValueError(
-                    "Invalid eye alert notifications response"
+                    "ข้อมูลการแจ้งเตือนการกระพริบตาที่ได้รับไม่ถูกต้อง"
                 )
 
             for eye in eye_rows:
@@ -638,9 +638,9 @@ class AlertHistoryDialog(QDialog):
                         "risk_level": "EYE",
                         "decision": eye.get("decision", "ALERT"),
                         "reason": (
-                            f"{reason} | Blink Rate "
-                            f"{rate if rate is not None else 'N/A'}/min "
-                            f"| Window Blinks "
+                            f"{reason} | อัตราการกระพริบตา "
+                            f"{rate if rate is not None else 'N/A'} ครั้ง/นาที "
+                            f"| จำนวนการกระพริบในช่วงล่าสุด "
                             f"{count if count is not None else 'N/A'}"
                         ),
                         "emitted_at": eye.get("emitted_at"),
@@ -666,7 +666,7 @@ class AlertHistoryDialog(QDialog):
 
             self.empty_label.setText(
                 "ไม่สามารถโหลดการแจ้งเตือนได้ "
-                "กด Refresh เพื่อลองอีกครั้ง"
+                "กดรีเฟรชเพื่อลองอีกครั้ง"
             )
             self.empty_label.show()
 
@@ -736,8 +736,8 @@ class AlertHistoryDialog(QDialog):
 
         stats_text = (
             f"ทั้งหมด: {total_count} | "
-            f"Posture: {posture_count} | "
-            f"Eye: {eye_count} | "
+            f"ท่าทาง: {posture_count} | "
+            f"การกระพริบตา: {eye_count} | "
             f"ครั้งแรก: {first_count} | "
             f"ซ้ำ: {repeat_count} | "
             f"ระดับความเสี่ยงเพิ่มขึ้น: "
@@ -772,7 +772,7 @@ class AlertHistoryDialog(QDialog):
         if not has_notifications:
 
             self.empty_label.setText(
-                "เซสชันนี้ไม่มีการแจ้งเตือนจาก Alert Policy"
+                "เซสชันนี้ไม่มีการแจ้งเตือนจากระบบ"
             )
 
             self.table.setRowCount(

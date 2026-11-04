@@ -14,7 +14,7 @@ class AccountDeletionConfirmationDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - Delete Account")
+        self.setWindowTitle("PostGuard - ลบบัญชี")
         self.setModal(True)
         self.setFixedWidth(520)
 
@@ -27,7 +27,7 @@ class AccountDeletionConfirmationDialog(QDialog):
         message = QLabel(
             "บัญชีจะถูกปิดใช้งานทันทีและกำหนดให้ลบถาวรภายใน 14 วัน "
             "ระหว่างนี้สามารถเข้าสู่ระบบอีกครั้งเพื่อกู้คืนบัญชีได้ "
-            "เมื่อครบกำหนด บัญชี ประวัติการตรวจจับ และรูป Profile "
+            "เมื่อครบกำหนด บัญชี ประวัติการตรวจจับ และรูปโปรไฟล์ "
             "ส่วนตัวจะถูกลบถาวร"
         )
         message.setWordWrap(True)
@@ -36,7 +36,7 @@ class AccountDeletionConfirmationDialog(QDialog):
         buttons.addStretch()
         cancel = QPushButton("เก็บบัญชีไว้")
         cancel.clicked.connect(self.reject)
-        confirm = QPushButton("Delete Account")
+        confirm = QPushButton("ลบบัญชี")
         confirm.setProperty("variant", "danger")
         confirm.clicked.connect(self.accept)
         buttons.addWidget(cancel)

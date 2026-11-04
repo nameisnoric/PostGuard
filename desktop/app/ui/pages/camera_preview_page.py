@@ -272,7 +272,7 @@ class CameraPreviewPage(QWidget):
             QMessageBox.warning(
                 self,
                 "PostGuard",
-                "Selected camera does not contain a valid resolution."
+                "กล้องที่เลือกไม่มีข้อมูลความละเอียดที่ถูกต้อง"
             )
             return
 

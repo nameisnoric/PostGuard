@@ -253,9 +253,9 @@ class CameraCalibrationPage(
         )
 
         subtitle = QLabel(
-            "Step 3 of 4  ·  "
+            "ขั้นตอน 3 จาก 4  ·  "
             "PostGuard จะตรวจและปรับแนวภาพจากกล้องให้อัตโนมัติ "
-            "จากนั้นใช้บัตรขนาดมาตรฐานเพื่อสร้าง Camera Reference"
+            "จากนั้นใช้บัตรขนาดมาตรฐานเพื่อสร้างข้อมูลอ้างอิงของกล้อง"
         )
 
         subtitle.setProperty(
@@ -604,19 +604,19 @@ class CameraCalibrationPage(
         fields = (
             (
                 "resolution",
-                "Reference resolution",
+                "ความละเอียดอ้างอิง",
             ),
             (
                 "scale",
-                "Pixel scale",
+                "อัตราส่วนพิกเซล",
             ),
             (
                 "roll",
-                "Card orientation",
+                "แนวเอียงของการ์ด",
             ),
             (
                 "perspective",
-                "Perspective difference",
+                "ความคลาดเคลื่อนของมุมมอง",
             ),
         )
 
@@ -962,7 +962,7 @@ class CameraCalibrationPage(
         if reference is not None:
             return (
                 "ตรวจบัตรสำเร็จ "
-                "Camera Reference พร้อมใช้งาน"
+                "ข้อมูลอ้างอิงของกล้องพร้อมใช้งาน"
             )
 
         # Common tracker guidance mappings.
@@ -1669,7 +1669,7 @@ class CameraCalibrationPage(
             f"{self.tracker.stable_frames}/"
             f"{self.tracker.stable_frames}\n"
 
-            f"Pixel scale: "
+            f"อัตราส่วนพิกเซล: "
             f"{reference['scale_avg']:.2f} px/mm\n\n"
 
             "สามารถไปสร้างค่าท่าทางอ้างอิงส่วนบุคคลต่อได้",

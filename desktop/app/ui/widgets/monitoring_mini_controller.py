@@ -52,7 +52,7 @@ class MonitoringMiniController(QWidget):
         super().__init__(parent)
 
         self.setWindowTitle(
-            "PostGuard Monitoring"
+            "การตรวจจับ PostGuard"
         )
 
         self.setWindowFlags(
@@ -202,7 +202,7 @@ class MonitoringMiniController(QWidget):
         )
 
         self.edge_hide_button.setToolTip(
-            "ซ่อน Mini ไว้ที่ขอบจอ "
+            "ซ่อนหน้าต่างย่อไว้ที่ขอบจอ "
             "โดยการตรวจจับยังทำงานต่อ"
         )
 
@@ -256,7 +256,7 @@ class MonitoringMiniController(QWidget):
         # ---------------------------------------------------------
 
         self.status_label = QLabel(
-            "Monitoring is not running"
+            "ยังไม่ได้เริ่มการตรวจจับ"
         )
 
         self.status_label.setProperty(
@@ -277,7 +277,7 @@ class MonitoringMiniController(QWidget):
         # ---------------------------------------------------------
 
         self.preview_label = QLabel(
-            "กำลังรอภาพจาก Monitoring"
+            "กำลังรอภาพจากการตรวจจับ"
         )
 
         self.preview_label.setAlignment(
@@ -315,7 +315,7 @@ class MonitoringMiniController(QWidget):
         )
 
         self.pause_button = QPushButton(
-            "Pause"
+            "หยุดชั่วคราว"
         )
 
         self.restore_button = QPushButton(
@@ -373,7 +373,7 @@ class MonitoringMiniController(QWidget):
         )
 
         self.edge_tab_button.setToolTip(
-            "แสดง Mini Monitoring"
+            "แสดงหน้าต่างตรวจจับแบบย่อ"
         )
 
         self.edge_tab_button.clicked.connect(
@@ -514,9 +514,9 @@ class MonitoringMiniController(QWidget):
         )
 
         self.pause_button.setText(
-            "Resume"
+            "ทำงานต่อ"
             if is_paused
-            else "Pause"
+            else "หยุดชั่วคราว"
         )
 
         self.status_label.setText(
@@ -537,7 +537,7 @@ class MonitoringMiniController(QWidget):
             )
 
             self.preview_label.setText(
-                "กำลังรอภาพจาก Monitoring"
+                "กำลังรอภาพจากการตรวจจับ"
             )
 
         else:
@@ -653,7 +653,7 @@ class MonitoringMiniController(QWidget):
             is None
         ):
 
-            return "Monitoring"
+            return "กำลังตรวจจับ"
 
         try:
 
@@ -664,11 +664,11 @@ class MonitoringMiniController(QWidget):
 
         except RuntimeError:
 
-            return "Monitoring"
+            return "กำลังตรวจจับ"
 
         return (
             text
-            or "Monitoring"
+            or "กำลังตรวจจับ"
         )
 
     @staticmethod
@@ -887,7 +887,7 @@ class MonitoringMiniController(QWidget):
         if screen is None:
 
             raise RuntimeError(
-                "No screen is available"
+                "ไม่พบหน้าจอที่พร้อมใช้งาน"
             )
 
         return (

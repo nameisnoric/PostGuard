@@ -53,7 +53,7 @@ class PrivacyNoticeDialog(QDialog):
         layout.setContentsMargins(32, 28, 32, 28)
         layout.setSpacing(14)
 
-        eyebrow = QLabel(f"PRIVACY NOTICE · VERSION {PRIVACY_NOTICE_VERSION}")
+        eyebrow = QLabel(f"ประกาศความเป็นส่วนตัว · เวอร์ชัน {PRIVACY_NOTICE_VERSION}")
         eyebrow.setProperty("role", "eyebrow")
         title = QLabel("ข้อมูลจากกล้องจะอยู่บนอุปกรณ์นี้")
         title.setProperty("role", "title")
@@ -120,7 +120,7 @@ class PrivacyNoticeDialog(QDialog):
                 detail = response.json().get("detail")
             except (ValueError, AttributeError, TypeError):
                 detail = None
-            self.status_label.setText(str(detail or "Privacy consent could not be saved."))
+            self.status_label.setText(str(detail or "ไม่สามารถบันทึกการยินยอมด้านความเป็นส่วนตัวได้"))
             self.accept_button.setEnabled(True)
             return
         try:
