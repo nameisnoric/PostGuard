@@ -3551,8 +3551,20 @@ class MonitoringPage(QWidget):
                 f"ตาซ้าย: {left_state}"
             )
 
+            display_combined_state = combined_state
+
+            # BlinkDetectionService intentionally uses UNKNOWN for a
+            # one-eye-only closure because it is not a normal bilateral
+            # blink. For the UI, however, both per-eye states are known,
+            # so show a clearer aggregate label instead of "UNKNOWN".
+            if eye_pattern in (
+                "RIGHT_ONLY_CLOSED",
+                "LEFT_ONLY_CLOSED",
+            ):
+                display_combined_state = "PARTIAL_CLOSED"
+
             self.eye_state_label.setText(
-                f"สถานะตารวม: {combined_state}"
+                f"สถานะตารวม: {display_combined_state}"
             )
 
             pattern_text = {

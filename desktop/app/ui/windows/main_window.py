@@ -1,3 +1,5 @@
+import time
+
 import requests
 
 from PySide6.QtCore import QSize
@@ -14,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QMenu,
     QToolButton,
+    QSystemTrayIcon,
 )
 
 from app.core.token_store import TokenStore
@@ -30,6 +33,7 @@ from app.ui.pages.profile_page import ProfilePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import APP_QSS, polish, set_centered_window
 from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
+from app.ui.widgets.monitoring_mini_controller import MonitoringMiniController
 
 from app.services.api_client import APIClient
 from app.services.session_recovery_service import (
@@ -46,6 +50,15 @@ class MainWindow(QMainWindow):
         self._exit_ready = False
         self._exit_in_progress = False
         self._recovery_in_progress = False
+
+        # ============================================================
+        # MINI / TRAY DISPLAY STATE
+        # ============================================================
+        # These values are UI-only. They do not own Monitoring state.
+        self._mini_clock_session_id = None
+        self._mini_total_paused_seconds = 0.0
+        self._mini_pause_started_monotonic = None
+        self._mini_last_paused_state = False
 
         self.setWindowTitle("PostGuard")
         set_centered_window(self, 1280, 800, 980, 680)
@@ -98,11 +111,25 @@ class MainWindow(QMainWindow):
         self.monitoring_status_label = QLabel("Monitoring: ยังไม่เริ่ม")
         self.monitoring_status_label.setProperty("status", "idle")
         self.global_pause_button = QPushButton("Pause Monitoring")
+        self.global_mini_button = QPushButton("Minimize Monitoring")
         self.global_stop_button = QPushButton("Stop Monitoring")
         self.global_stop_button.setProperty("variant", "danger")
-        session_layout.addWidget(self.monitoring_status_label, 1)
-        session_layout.addWidget(self.global_pause_button)
-        session_layout.addWidget(self.global_stop_button)
+        session_layout.addWidget(
+            self.monitoring_status_label,
+            1,
+        )
+
+        session_layout.addWidget(
+            self.global_pause_button
+        )
+
+        session_layout.addWidget(
+            self.global_mini_button
+        )
+
+        session_layout.addWidget(
+            self.global_stop_button
+        )
         main_layout.addWidget(self.session_bar)
 
         self.pages = QStackedWidget()
@@ -131,6 +158,37 @@ class MainWindow(QMainWindow):
         self.monitoring_page = (
             MonitoringPage()
         )
+
+        # ============================================================
+        # MINI MONITORING CONTROLLER
+        # ============================================================
+
+        self.mini_controller = MonitoringMiniController()
+
+        self.mini_controller.set_state_providers(
+            elapsed_seconds_provider=self._monitoring_elapsed_seconds,
+            is_paused_provider=lambda: self.monitoring_page.is_paused,
+            preview_pixmap_provider=self._mini_preview_pixmap,
+            status_text_provider=self._mini_status_text,
+        )
+
+        self.mini_controller.pause_resume_requested.connect(
+            self._mini_pause_resume
+        )
+
+        self.mini_controller.restore_requested.connect(
+            self._restore_from_mini
+        )
+
+        self.mini_controller.end_requested.connect(
+            self._end_from_mini
+        )
+
+        self.mini_controller.hide_requested.connect(
+            self._mini_hidden
+        )
+
+        self._setup_monitoring_tray()
 
         # NEW: Session Summary
         self.session_summary_page = (
@@ -254,8 +312,11 @@ class MainWindow(QMainWindow):
         self.monitoring_page.stop_requested.connect(
             self.show_session_summary
         )
-        self.monitoring_page.state_changed.connect(self.update_monitoring_controls)
+        self.monitoring_page.state_changed.connect(self._on_monitoring_state_changed)
         self.global_pause_button.clicked.connect(self.monitoring_page.handle_pause_resume)
+        self.global_mini_button.clicked.connect(
+            self.show_mini_monitoring
+        )
         self.global_stop_button.clicked.connect(self.monitoring_page.handle_stop)
         self.update_monitoring_controls()
         self.settings_page.load_settings()
@@ -657,6 +718,16 @@ class MainWindow(QMainWindow):
         self.global_stop_button.setEnabled(
             can_control
         )
+        self.global_mini_button.setEnabled(
+            active
+            and not monitor.is_stopping
+            and not monitor.network_stop_pending
+        )
+
+        self._sync_monitoring_tray_state()
+
+        if self.mini_controller.isVisible():
+            self.mini_controller.refresh_state()
 
         self.dashboard_page.set_monitoring_state(
             monitor.session_id,
@@ -733,12 +804,336 @@ class MainWindow(QMainWindow):
         finally:
             self._exit_in_progress = False
 
+    # ============================================
+    # Mini Monitoring / Tray
+    # ============================================
+
+    def _ensure_mini_clock_session(self) -> None:
+        """Keep a UI-only active-time clock synchronized with the session."""
+
+        monitor = self.monitoring_page
+        session_id = monitor.session_id
+
+        if session_id is None:
+            self._mini_clock_session_id = None
+            self._mini_total_paused_seconds = 0.0
+            self._mini_pause_started_monotonic = None
+            self._mini_last_paused_state = False
+            return
+
+        if self._mini_clock_session_id != session_id:
+            self._mini_clock_session_id = session_id
+            self._mini_total_paused_seconds = 0.0
+            self._mini_pause_started_monotonic = (
+                time.monotonic()
+                if monitor.is_paused
+                else None
+            )
+            self._mini_last_paused_state = bool(
+                monitor.is_paused
+            )
+
+    def _sync_mini_pause_clock(self) -> None:
+        """Track pause intervals without changing MonitoringPage state."""
+
+        monitor = self.monitoring_page
+        self._ensure_mini_clock_session()
+
+        if monitor.session_id is None:
+            return
+
+        paused = bool(monitor.is_paused)
+        now = time.monotonic()
+
+        if paused and not self._mini_last_paused_state:
+            self._mini_pause_started_monotonic = now
+
+        elif (
+            not paused
+            and self._mini_last_paused_state
+            and self._mini_pause_started_monotonic is not None
+        ):
+            self._mini_total_paused_seconds += max(
+                0.0,
+                now - self._mini_pause_started_monotonic,
+            )
+            self._mini_pause_started_monotonic = None
+
+        self._mini_last_paused_state = paused
+
+    def _monitoring_elapsed_seconds(self) -> int:
+        """
+        Return active Monitoring seconds for the Mini display.
+
+        This clock is display-only and never controls camera/detection/session
+        timing. Time spent paused is excluded.
+        """
+
+        monitor = self.monitoring_page
+
+        if monitor.session_started_monotonic is None:
+            return 0
+
+        self._ensure_mini_clock_session()
+
+        now = time.monotonic()
+        paused_seconds = self._mini_total_paused_seconds
+
+        if (
+            monitor.is_paused
+            and self._mini_pause_started_monotonic is not None
+        ):
+            paused_seconds += max(
+                0.0,
+                now - self._mini_pause_started_monotonic,
+            )
+
+        return max(
+            0,
+            int(
+                now
+                - monitor.session_started_monotonic
+                - paused_seconds
+            ),
+        )
+
+    def _mini_preview_pixmap(self):
+        """Return a copy of MonitoringPage's already-rendered preview."""
+
+        pixmap = self.monitoring_page.preview_label.pixmap()
+
+        if pixmap is None or pixmap.isNull():
+            return None
+
+        return pixmap.copy()
+
+    def _mini_status_text(self) -> str:
+        monitor = self.monitoring_page
+
+        if monitor.session_id is None:
+            return "Monitoring is not running"
+
+        if monitor.network_stop_pending:
+            return "Stop pending | NETWORK GAP"
+
+        if monitor.network_gap_active:
+            return (
+                "Paused | NETWORK GAP"
+                if monitor.is_paused
+                else "Running locally | NETWORK GAP"
+            )
+
+        if monitor.camera_gap_started_at is not None:
+            return "CAMERA DATA GAP"
+
+        return (
+            "Monitoring paused"
+            if monitor.is_paused
+            else "Camera and detection are running"
+        )
+
+    def _on_monitoring_state_changed(self) -> None:
+        self._sync_mini_pause_clock()
+        self.update_monitoring_controls()
+
+    def show_mini_monitoring(self) -> None:
+        """
+        Hide MainWindow and show Mini UI. The existing MonitoringPage keeps
+        running unchanged; no camera/reference/pipeline object is recreated.
+        """
+
+        monitor = self.monitoring_page
+
+        if monitor.session_id is None:
+            return
+
+        self._sync_mini_pause_clock()
+        self._sync_monitoring_tray_state()
+
+        self.hide()
+        self.mini_controller.show_controller()
+
+    def _restore_from_mini(self) -> None:
+        self.mini_controller.hide_controller()
+
+        self.showNormal()
+        self.show()
+
+        if self.monitoring_page.session_id is not None:
+            self.pages.setCurrentWidget(
+                self.monitoring_page
+            )
+
+        self.raise_()
+        self.activateWindow()
+
+    def _mini_pause_resume(self) -> None:
+        monitor = self.monitoring_page
+
+        if monitor.session_id is None:
+            return
+
+        monitor.handle_pause_resume()
+        self._sync_mini_pause_clock()
+        self.update_monitoring_controls()
+        self.mini_controller.refresh_state()
+
+    def _end_from_mini(self) -> None:
+        monitor = self.monitoring_page
+
+        if monitor.session_id is None:
+            return
+
+        # Restore first so Backend/network errors and the Summary page are
+        # visible to the user. This does not restart the camera.
+        self._restore_from_mini()
+        monitor.handle_stop()
+
+    def _mini_hidden(self) -> None:
+        """
+        X on Mini restores the full PostGuard window.
+
+        Monitoring continues unchanged. This is UI-only and does
+        not recreate the camera, baseline, movement guard, or session.
+        """
+        self._restore_from_mini()
+
+    def _setup_monitoring_tray(self) -> None:
+        self.monitoring_tray = QSystemTrayIcon(self)
+        self.monitoring_tray.setToolTip(
+            "PostGuard Monitoring"
+        )
+
+        tray_icon = self.windowIcon()
+        if not tray_icon.isNull():
+            self.monitoring_tray.setIcon(
+                tray_icon
+            )
+
+        tray_menu = QMenu(self)
+
+        self.tray_restore_action = tray_menu.addAction(
+            "Restore PostGuard"
+        )
+        self.tray_pause_action = tray_menu.addAction(
+            "Pause Monitoring"
+        )
+        self.tray_end_action = tray_menu.addAction(
+            "End Monitoring"
+        )
+
+        tray_menu.addSeparator()
+
+        self.tray_exit_action = tray_menu.addAction(
+            "Exit PostGuard"
+        )
+
+        self.monitoring_tray.setContextMenu(
+            tray_menu
+        )
+
+        self.tray_restore_action.triggered.connect(
+            self._restore_from_tray
+        )
+        self.tray_pause_action.triggered.connect(
+            self._mini_pause_resume
+        )
+        self.tray_end_action.triggered.connect(
+            self._end_from_tray
+        )
+        self.tray_exit_action.triggered.connect(
+            self._exit_from_tray
+        )
+
+        self.monitoring_tray.activated.connect(
+            self._on_tray_activated
+        )
+
+    def _sync_monitoring_tray_state(self) -> None:
+        monitor = self.monitoring_page
+        active = monitor.session_id is not None
+
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            if active:
+                if not self.monitoring_tray.isVisible():
+                    self.monitoring_tray.show()
+            elif self.monitoring_tray.isVisible():
+                self.monitoring_tray.hide()
+
+        can_pause = (
+            active
+            and not monitor.is_stopping
+            and not monitor.network_stop_pending
+            and monitor.capture is not None
+            and not monitor.network_gap_active
+            and monitor.camera_gap_started_at is None
+        )
+
+        self.tray_pause_action.setEnabled(
+            can_pause
+        )
+        self.tray_pause_action.setText(
+            "Resume Monitoring"
+            if monitor.is_paused
+            else "Pause Monitoring"
+        )
+
+        self.tray_end_action.setEnabled(
+            active
+            and not monitor.is_stopping
+            and not monitor.network_stop_pending
+        )
+
+    def _restore_from_tray(self) -> None:
+        self._restore_from_mini()
+
+    def _end_from_tray(self) -> None:
+        self._restore_from_mini()
+
+        if self.monitoring_page.session_id is not None:
+            self.monitoring_page.handle_stop()
+
+    def _exit_from_tray(self) -> None:
+        """Explicit Exit keeps the original finish/save-before-exit policy."""
+
+        self._restore_from_mini()
+
+        if not self._finish_before_exit():
+            return
+
+        self._exit_ready = True
+        TokenStore.clear_token()
+        self.mini_controller.hide_controller()
+        self.monitoring_tray.hide()
+        self.close()
+
+    def _on_tray_activated(self, reason) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self._restore_from_tray()
+
     def closeEvent(self, event):
+        """
+        Close PostGuard using the existing safe session-finalization policy.
+
+        Closing the MainWindow is different from minimizing Monitoring:
+        - Minimize Monitoring / tray keeps the current session alive.
+        - Closing the MainWindow explicitly exits PostGuard.
+        - An active session must be ended and saved before credentials
+        are cleared and the application is allowed to close.
+        """
         if not self._finish_before_exit():
             event.ignore()
             return
+
         self._exit_ready = True
+
         TokenStore.clear_token()
+
+        self.mini_controller.hide_controller()
+
+        if self.monitoring_tray.isVisible():
+            self.monitoring_tray.hide()
+
         event.accept()
 
     # ============================================
@@ -971,6 +1366,11 @@ class MainWindow(QMainWindow):
             self.pages.setCurrentWidget(
                 self.camera_setup_page
             )
+            return
+
+        self._ensure_mini_clock_session()
+        self._sync_monitoring_tray_state()
+        self.update_monitoring_controls()
 
     # ============================================
     # Session Summary
@@ -980,6 +1380,16 @@ class MainWindow(QMainWindow):
         self,
         summary: dict
     ) -> None:
+
+        self.mini_controller.hide_controller()
+        self._ensure_mini_clock_session()
+        self._sync_monitoring_tray_state()
+
+        if not self.isVisible():
+            self.showNormal()
+            self.show()
+            self.raise_()
+            self.activateWindow()
 
         # Display Session Information
         self.session_summary_page.set_summary(
