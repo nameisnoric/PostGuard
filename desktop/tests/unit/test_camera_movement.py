@@ -1303,5 +1303,184 @@ class CameraMovementGuardTests(
         )
 
 
+    def test_persistent_reference_loss_stays_unavailable(
+        self,
+    ):
+        """
+        Regression: body motion may temporarily destroy optical-flow
+        correspondence. Persistent loss must never become CAMERA_MOVED.
+        """
+
+        guard = self.make_pipeline_guard()
+        guard._reference_tracking_confirmed = True
+
+        result = None
+
+        for _ in range(
+            guard.config.reference_loss_confirmation_samples
+            + 10
+        ):
+            result = guard._reference_lost(
+                "INSUFFICIENT_TRACKED_POINTS",
+                tracked_points=0,
+            )
+
+            self.assertEqual(
+                result["status"],
+                STATUS_UNAVAILABLE,
+            )
+
+            self.assertFalse(
+                guard.moved
+            )
+
+            self.assertNotEqual(
+                result.get("reason"),
+                "CONFIRMED_CAMERA_REFERENCE_LOSS",
+            )
+
+        self.assertGreaterEqual(
+            result["reference_loss_count"],
+            guard.config.reference_loss_confirmation_samples,
+        )
+
+    def test_reference_loss_clears_stale_movement_votes_without_moving(
+        self,
+    ):
+        """Unavailable samples must not count as movement evidence."""
+
+        guard = self.make_pipeline_guard()
+        guard._reference_tracking_confirmed = True
+
+        for _ in range(
+            guard.config.confirmation_window
+            + 2
+        ):
+            result = guard._reference_lost(
+                "GLOBAL_TRANSFORM_UNAVAILABLE"
+            )
+
+        self.assertEqual(
+            result["status"],
+            STATUS_UNAVAILABLE,
+        )
+        self.assertEqual(
+            result["movement_votes"],
+            0,
+        )
+        self.assertFalse(
+            guard.moved
+        )
+
+    def test_orb_fallback_detects_large_translation(self):
+        """
+        Large camera movement may destroy LK correspondence.
+        ORB fallback must still recover geometric movement evidence.
+        """
+
+        guard = CameraMovementGuard(
+            CameraMovementConfig(
+                warmup_samples=0,
+                sample_every_frames=1,
+                min_runtime_regions=2,
+                confirmation_window=3,
+                confirmation_hits=2,
+            )
+        )
+
+        reference = room_frame()
+        gray, mask = guard._prepare(reference)
+
+        self.assertTrue(
+            guard._capture_reference(
+                gray,
+                mask,
+            )
+        )
+
+        matrix = np.float32(
+            [
+                [1.0, 0.0, 55.0],
+                [0.0, 1.0, 0.0],
+            ]
+        )
+
+        shifted = cv2.warpAffine(
+            reference,
+            matrix,
+            (
+                reference.shape[1],
+                reference.shape[0],
+            ),
+        )
+
+        shifted_gray, shifted_mask = guard._prepare(
+            shifted
+        )
+
+        evidence = guard._fallback_geometric_evidence(
+            shifted_gray,
+            shifted_mask,
+        )
+
+        self.assertIsNotNone(
+            evidence
+        )
+
+        self.assertTrue(
+            evidence["evidence_valid"]
+        )
+
+        self.assertTrue(
+            evidence["movement"]
+        )
+
+        self.assertEqual(
+            evidence["source"],
+            "ORB_FALLBACK",
+        )
+
+    def test_orb_fallback_keeps_same_scene_stable(self):
+        """
+        Fallback matching must not turn a stable scene into movement.
+        """
+
+        guard = CameraMovementGuard(
+            CameraMovementConfig(
+                warmup_samples=0,
+                sample_every_frames=1,
+                min_runtime_regions=2,
+            )
+        )
+
+        reference = room_frame()
+        gray, mask = guard._prepare(reference)
+
+        self.assertTrue(
+            guard._capture_reference(
+                gray,
+                mask,
+            )
+        )
+
+        evidence = guard._fallback_geometric_evidence(
+            gray,
+            mask,
+        )
+
+        self.assertIsNotNone(
+            evidence
+        )
+
+        self.assertTrue(
+            evidence["evidence_valid"]
+        )
+
+        self.assertFalse(
+            evidence["movement"]
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()

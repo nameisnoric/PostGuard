@@ -5,17 +5,12 @@ Policy
 The guard detects camera-reference invalidation rather than every tiny
 physical vibration.
 
-A Session is invalidated when either:
+A Session is invalidated only when a reliable global transform shows
+significant camera movement and the movement confirmation policy passes.
 
-1. A reliable global transform shows significant camera movement, OR
-2. The previously locked background reference is persistently lost
-   while valid camera frames are still being received.
-
-Persistent reference loss is important because a large laptop/webcam
-movement may move the scene so far that LK optical flow can no longer
-calculate a reliable transform.
-
-Transient tracking loss does NOT trigger CAMERA_MOVED.
+Tracking/reference loss is an availability problem. It may make movement
+evaluation temporarily UNAVAILABLE, but it is not geometric evidence that
+the camera moved and must never confirm CAMERA_MOVED by itself.
 """
 
 from __future__ import annotations
@@ -151,6 +146,20 @@ class CameraMovementConfig:
     # --------------------------------------------------------
 
     reference_loss_confirmation_samples: int = 12
+
+    # --------------------------------------------------------
+    # Large-movement fallback
+    #
+    # When LK loses the original reference completely, ORB
+    # descriptor matching provides a second geometric path.
+    # Reference loss by itself still never means MOVED.
+    # --------------------------------------------------------
+
+    fallback_orb_features: int = 900
+    fallback_ratio_test: float = 0.78
+    fallback_min_matches: int = 16
+    fallback_min_inliers: int = 10
+    fallback_min_inlier_ratio: float = 0.50
 
 
 class CameraMovementGuard:
@@ -346,6 +355,43 @@ class CameraMovementGuard:
                 "must be positive"
             )
 
+        if self.config.fallback_orb_features < 100:
+            raise ValueError(
+                "fallback_orb_features is too small"
+            )
+
+        if not (
+            0.5
+            <=
+            self.config.fallback_ratio_test
+            <
+            1.0
+        ):
+            raise ValueError(
+                "fallback_ratio_test must be in [0.5, 1.0)"
+            )
+
+        if self.config.fallback_min_matches < 4:
+            raise ValueError(
+                "fallback_min_matches is too small"
+            )
+
+        if self.config.fallback_min_inliers < 4:
+            raise ValueError(
+                "fallback_min_inliers is too small"
+            )
+
+        if not (
+            0.0
+            <
+            self.config.fallback_min_inlier_ratio
+            <=
+            1.0
+        ):
+            raise ValueError(
+                "fallback_min_inlier_ratio must be in (0, 1]"
+            )
+
     # ========================================================
     # STATE
     # ========================================================
@@ -369,6 +415,11 @@ class CameraMovementGuard:
 
         self._reference_points = None
 
+        # Secondary large-movement reference. ORB is used only
+        # when LK cannot provide enough tracked points.
+        self._reference_orb_keypoints = None
+        self._reference_orb_descriptors = None
+
         self._reference_region_counts = {
             name: 0
             for name in REGION_NAMES
@@ -382,6 +433,11 @@ class CameraMovementGuard:
 
         # Consecutive valid-frame tracking failures.
         self._reference_loss_count = 0
+
+        # Reference-loss confirmation is disabled until the
+        # captured reference has produced at least one usable
+        # runtime global transform.
+        self._reference_tracking_confirmed = False
 
         self._latched = False
 
@@ -858,6 +914,29 @@ class CameraMovementGuard:
             points.copy()
         )
 
+        orb = cv2.ORB_create(
+            nfeatures=self.config.fallback_orb_features
+        )
+
+        orb_keypoints, orb_descriptors = (
+            orb.detectAndCompute(
+                self._reference_gray,
+                mask,
+            )
+        )
+
+        self._reference_orb_keypoints = (
+            orb_keypoints
+            if orb_keypoints is not None
+            else []
+        )
+
+        self._reference_orb_descriptors = (
+            orb_descriptors.copy()
+            if orb_descriptors is not None
+            else None
+        )
+
         self._reference_region_counts = dict(
             region_support[
                 "counts"
@@ -873,7 +952,7 @@ class CameraMovementGuard:
         self._movement_votes.clear()
 
         self._reference_loss_count = 0
-
+        self._reference_tracking_confirmed = False
         return True
 
     # ========================================================
@@ -1019,6 +1098,374 @@ class CameraMovementGuard:
         }
 
     # ========================================================
+    # FALLBACK GEOMETRIC MATCHING
+    # ========================================================
+
+    def _fallback_geometric_evidence(
+        self,
+        gray,
+        mask,
+    ) -> dict | None:
+        """
+        Try to recover geometric evidence after LK tracking loss.
+
+        ORB descriptor matching is intentionally used only as a
+        fallback. A missing/weak match returns None and therefore
+        remains UNAVAILABLE. Only a valid RANSAC transform may
+        contribute a movement vote.
+        """
+
+        if (
+            self._reference_orb_descriptors is None
+            or
+            not self._reference_orb_keypoints
+        ):
+            return None
+
+        orb = cv2.ORB_create(
+            nfeatures=self.config.fallback_orb_features
+        )
+
+        current_keypoints, current_descriptors = (
+            orb.detectAndCompute(
+                gray,
+                mask,
+            )
+        )
+
+        if (
+            current_descriptors is None
+            or
+            current_keypoints is None
+            or
+            len(current_keypoints) < 4
+        ):
+            return None
+
+        matcher = cv2.BFMatcher(
+            cv2.NORM_HAMMING,
+            crossCheck=False,
+        )
+
+        pairs = matcher.knnMatch(
+            self._reference_orb_descriptors,
+            current_descriptors,
+            k=2,
+        )
+
+        good = []
+
+        for pair in pairs:
+            if len(pair) < 2:
+                continue
+
+            best, second = pair
+
+            if (
+                best.distance
+                <
+                self.config.fallback_ratio_test
+                *
+                second.distance
+            ):
+                good.append(
+                    best
+                )
+
+        if (
+            len(good)
+            <
+            self.config.fallback_min_matches
+        ):
+            return None
+
+        reference_points = np.float32(
+            [
+                self._reference_orb_keypoints[
+                    match.queryIdx
+                ].pt
+                for match in good
+            ]
+        )
+
+        current_points = np.float32(
+            [
+                current_keypoints[
+                    match.trainIdx
+                ].pt
+                for match in good
+            ]
+        )
+
+        matrix, inliers = (
+            cv2.estimateAffinePartial2D(
+                reference_points,
+                current_points,
+                method=cv2.RANSAC,
+                ransacReprojThreshold=4.0,
+                maxIters=3000,
+                confidence=0.99,
+                refineIters=10,
+            )
+        )
+
+        if (
+            matrix is None
+            or
+            inliers is None
+        ):
+            return None
+
+        inlier_mask = (
+            inliers.reshape(-1)
+            ==
+            1
+        )
+
+        inlier_count = int(
+            np.count_nonzero(
+                inlier_mask
+            )
+        )
+
+        match_count = int(
+            len(good)
+        )
+
+        inlier_ratio = (
+            inlier_count
+            /
+            max(
+                1,
+                match_count,
+            )
+        )
+
+        if (
+            inlier_count
+            <
+            self.config.fallback_min_inliers
+            or
+            inlier_ratio
+            <
+            self.config.fallback_min_inlier_ratio
+        ):
+            return None
+
+        reference_inliers = (
+            reference_points[
+                inlier_mask
+            ]
+        )
+
+        spatial = (
+            self._runtime_region_support(
+                reference_inliers,
+                gray.shape[1],
+                gray.shape[0],
+            )
+        )
+
+        if not spatial[
+            "spatial_support_valid"
+        ]:
+            return None
+
+        a = float(
+            matrix[0, 0]
+        )
+
+        b = float(
+            matrix[1, 0]
+        )
+
+        translation_x = float(
+            matrix[0, 2]
+        )
+
+        translation_y = float(
+            matrix[1, 2]
+        )
+
+        translation_px = math.hypot(
+            translation_x,
+            translation_y,
+        )
+
+        diagonal = math.hypot(
+            gray.shape[1],
+            gray.shape[0],
+        )
+
+        translation_ratio = (
+            translation_px
+            /
+            max(
+                diagonal,
+                1.0,
+            )
+        )
+
+        scale = math.hypot(
+            a,
+            b,
+        )
+
+        scale_change = abs(
+            scale
+            -
+            1.0
+        )
+
+        rotation_deg = math.degrees(
+            math.atan2(
+                b,
+                a,
+            )
+        )
+
+        policy = (
+            self._movement_policy(
+                translation_ratio=translation_ratio,
+                rotation_deg=rotation_deg,
+                scale_change=scale_change,
+            )
+        )
+
+        return {
+            "source":
+                "ORB_FALLBACK",
+
+            "tracked_points":
+                match_count,
+
+            "inlier_count":
+                inlier_count,
+
+            "inlier_ratio":
+                float(
+                    inlier_ratio
+                ),
+
+            "translation_px":
+                float(
+                    translation_px
+                ),
+
+            "translation_ratio":
+                float(
+                    translation_ratio
+                ),
+
+            "rotation_deg":
+                float(
+                    rotation_deg
+                ),
+
+            "scale":
+                float(
+                    scale
+                ),
+
+            "scale_change":
+                float(
+                    scale_change
+                ),
+
+            "evidence_valid":
+                True,
+
+            **spatial,
+            **policy,
+        }
+
+    def _use_fallback_evidence(
+        self,
+        evidence: dict,
+    ) -> dict:
+        """
+        Feed valid fallback geometry through the same temporal
+        confirmation window as the normal LK/RANSAC path.
+        """
+
+        candidate = bool(
+            evidence.get(
+                "movement"
+            )
+        )
+
+        self._movement_votes.append(
+            candidate
+        )
+
+        movement_hits = int(
+            sum(
+                self._movement_votes
+            )
+        )
+
+        self._clear_reference_loss()
+
+        result = {
+            "status":
+                STATUS_STABLE,
+
+            "reason":
+                (
+                    "MOVEMENT_CANDIDATE_FALLBACK"
+                    if candidate
+                    else
+                    "STABLE_FALLBACK"
+                ),
+
+            "reference_loss_count":
+                0,
+
+            "movement_votes":
+                movement_hits,
+
+            "movement_window":
+                int(
+                    len(
+                        self._movement_votes
+                    )
+                ),
+
+            **evidence,
+        }
+
+        if (
+            len(
+                self._movement_votes
+            )
+            >=
+            self.config.confirmation_window
+            and
+            movement_hits
+            >=
+            self.config.confirmation_hits
+        ):
+            self._latched = True
+
+            result[
+                "status"
+            ] = STATUS_MOVED
+
+            result[
+                "reason"
+            ] = (
+                "CONFIRMED_GLOBAL_CAMERA_MOVEMENT_FALLBACK"
+            )
+
+        self.last_result = (
+            result
+        )
+
+        return dict(
+            result
+        )
+
+    # ========================================================
     # REFERENCE LOSS
     # ========================================================
 
@@ -1030,20 +1477,29 @@ class CameraMovementGuard:
     ) -> dict:
         """
         Handle a valid frame where the locked background
-        reference can no longer be tracked.
+        reference cannot currently be tracked reliably.
 
-        A single loss does not mean camera movement.
+        IMPORTANT:
+        tracking/reference loss means movement evidence is
+        unavailable. It is never sufficient evidence to latch
+        STATUS_MOVED, regardless of how long the loss lasts.
 
-        Repeated consecutive loss means the Camera Reference
-        can no longer safely be used for Personal Baseline.
+        The diagnostic loss counter is kept for logging and
+        compatibility only. Actual camera movement can still be
+        confirmed by the normal geometric movement path.
         """
 
-        self._reference_loss_count += 1
-
-        # Movement votes are not used while reference is lost.
+        # Missing transform data is not a movement vote.
+        # Append False so stale candidate votes cannot survive
+        # indefinitely across a period without usable evidence.
         self._movement_votes.append(
             False
         )
+
+        if self._reference_tracking_confirmed:
+            self._reference_loss_count += 1
+        else:
+            self._reference_loss_count = 0
 
         result = {
             "status":
@@ -1057,10 +1513,20 @@ class CameraMovementGuard:
                     self._reference_loss_count
                 ),
 
+            # Compatibility / diagnostic metadata only.
+            # Reaching this value does NOT mean CAMERA_MOVED.
             "reference_loss_required":
                 int(
                     self.config.reference_loss_confirmation_samples
                 ),
+
+            "reference_loss_armed":
+                bool(
+                    self._reference_tracking_confirmed
+                ),
+
+            "reference_lost":
+                True,
 
             "movement_votes":
                 int(
@@ -1079,51 +1545,6 @@ class CameraMovementGuard:
             "tracked_points":
                 tracked_points,
         }
-
-        if (
-            self._reference_loss_count
-            >=
-            self.config.reference_loss_confirmation_samples
-        ):
-
-            self._latched = True
-
-            result[
-                "status"
-            ] = (
-                STATUS_MOVED
-            )
-
-            result[
-                "reason"
-            ] = (
-                "CONFIRMED_CAMERA_REFERENCE_LOSS"
-            )
-
-            result[
-                "reference_lost"
-            ] = True
-
-            # UI compatibility.
-            result[
-                "translation_px"
-            ] = 0.0
-
-            result[
-                "translation_ratio"
-            ] = 0.0
-
-            result[
-                "rotation_deg"
-            ] = 0.0
-
-            result[
-                "scale"
-            ] = 1.0
-
-            result[
-                "scale_change"
-            ] = 0.0
 
         self.last_result = (
             result
@@ -1464,6 +1885,18 @@ class CameraMovementGuard:
             self.config.min_tracked_points
         ):
 
+            fallback = (
+                self._fallback_geometric_evidence(
+                    gray,
+                    mask,
+                )
+            )
+
+            if fallback is not None:
+                return self._use_fallback_evidence(
+                    fallback
+                )
+
             return self._reference_lost(
                 "INSUFFICIENT_TRACKED_POINTS",
 
@@ -1497,6 +1930,18 @@ class CameraMovementGuard:
             inliers is None
         ):
 
+            fallback = (
+                self._fallback_geometric_evidence(
+                    gray,
+                    mask,
+                )
+            )
+
+            if fallback is not None:
+                return self._use_fallback_evidence(
+                    fallback
+                )
+
             return self._reference_lost(
                 "GLOBAL_TRANSFORM_UNAVAILABLE",
 
@@ -1504,7 +1949,7 @@ class CameraMovementGuard:
                     tracked_count
                 ),
             )
-
+        self._reference_tracking_confirmed = True
         inlier_mask = (
             inliers.reshape(
                 -1
