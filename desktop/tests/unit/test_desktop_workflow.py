@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
-from PySide6.QtWidgets import QApplication, QSizePolicy
+from PySide6.QtWidgets import QApplication, QSizePolicy, QMessageBox
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtTest import QTest
 from app.core.token_store import TokenStore
@@ -600,6 +600,114 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.end.return_value = response({"session_id": 3, "status": "COMPLETED"})
         self.window.global_stop_button.click()
         self.assertEqual(self.window.session_summary_page.current_summary["detection_count"], 1)
+    def test_stale_session_yes_interrupts_and_opens_camera_setup(self):
+        stale = {
+            "session_id": 77,
+            "status": "RUNNING",
+        }
+
+        self.find_unclosed_sessions.return_value = [
+            stale
+        ]
+
+        with patch(
+            "app.ui.windows.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ), patch(
+            "app.ui.windows.main_window.interrupt_previous_session"
+        ) as interrupt_previous_session:
+
+            self.window.show_monitor()
+
+        interrupt_previous_session.assert_called_once_with(
+            77
+        )
+
+        self.assertIs(
+            self.window.pages.currentWidget(),
+            self.window.camera_setup_page,
+        )
+
+
+    def test_stale_session_no_keeps_session_unresolved(self):
+        stale = {
+            "session_id": 77,
+            "status": "PAUSED",
+        }
+
+        self.find_unclosed_sessions.return_value = [
+            stale
+        ]
+
+        with patch(
+            "app.ui.windows.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ), patch(
+            "app.ui.windows.main_window.interrupt_previous_session"
+        ) as interrupt_previous_session:
+
+            self.window.show_monitor()
+
+        interrupt_previous_session.assert_not_called()
+
+        self.assertIs(
+            self.window.pages.currentWidget(),
+            self.window.dashboard_page,
+        )
+
+        self.assertIn(
+            "Previous session unresolved",
+            self.window.monitoring_status_label.text(),
+        )
+
+        # กด Monitor อีกรอบต้องตรวจ session ค้างใหม่
+        with patch(
+            "app.ui.windows.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ):
+            self.window.show_monitor()
+
+        self.assertGreaterEqual(
+            self.find_unclosed_sessions.call_count,
+            2,
+        )
+
+
+    def test_stale_session_interrupt_failure_blocks_new_monitoring(self):
+        stale = {
+            "session_id": 77,
+            "status": "RUNNING",
+        }
+
+        self.find_unclosed_sessions.return_value = [
+            stale
+        ]
+
+        with patch(
+            "app.ui.windows.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ), patch(
+            "app.ui.windows.main_window.interrupt_previous_session",
+            side_effect=RuntimeError(
+                "Cannot interrupt previous session"
+            ),
+        ) as interrupt_previous_session:
+
+            self.window.show_monitor()
+
+        interrupt_previous_session.assert_called_once_with(
+            77
+        )
+
+        self.assertIs(
+            self.window.pages.currentWidget(),
+            self.window.dashboard_page,
+        )
+
+        self.assertIn(
+            "Session check failed",
+            self.window.monitoring_status_label.text(),
+        )
 
 
 if __name__ == "__main__":
