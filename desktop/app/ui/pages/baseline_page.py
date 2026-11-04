@@ -56,14 +56,199 @@ def add_detail_rows(layout, rows):
         layout.addWidget(value_label, row, 1)
 
 
+def _normalized_reason(value) -> str:
+    return str(value or "").strip().upper()
+
+
+def _rejections_indicate_visibility_problem(
+    rejection_names: list[str],
+) -> bool:
+    """
+    Detect rejection reasons that indicate incomplete posture observations.
+
+    This is intentionally described as a visibility/detection problem.
+    It does not claim that lighting is the confirmed cause.
+    """
+    visibility_tokens = (
+        "MISSING",
+        "NOT_FOUND",
+        "NO_FACE",
+        "NO_POSE",
+        "LANDMARK",
+        "FACE_NOT",
+        "POSE_NOT",
+        "INSUFFICIENT",
+        "OUT_OF_FRAME",
+    )
+
+    return any(
+        token in reason
+        for reason in rejection_names
+        for token in visibility_tokens
+    )
+
+
+def _rejections_indicate_contract_problem(
+    rejection_names: list[str],
+) -> bool:
+    contract_tokens = (
+        "INVALID_CONTRACT",
+        "INVALID_DETECTION_RESULT_CONTRACT",
+        "INVALID_FEATURES_CONTRACT",
+        "UNSUPPORTED_CONTRACT_VERSION",
+        "UNSUPPORTED_STATUS",
+        "INVALID_UNIT",
+        "INVALID_VALUE",
+    )
+
+    return any(
+        token in reason
+        for reason in rejection_names
+        for token in contract_tokens
+    )
+
+
+def build_baseline_failure_message(result: dict) -> str:
+    """
+    Convert Personal Baseline technical/debug reasons into user-facing guidance.
+
+    This function changes presentation only. It does not change validation
+    thresholds, collector state, or session safety rules.
+    """
+    if not isinstance(result, dict):
+        return (
+            "ไม่สามารถสร้างค่าท่าทางอ้างอิงได้ "
+            "กรุณาตรวจสอบตำแหน่งกล้องและลองใหม่อีกครั้ง"
+        )
+
+    failure_reason = _normalized_reason(
+        result.get("failure_reason")
+    )
+
+    validation = result.get("validation")
+    if not isinstance(validation, dict):
+        validation = {}
+
+    issues = {
+        _normalized_reason(issue)
+        for issue in validation.get("issues", [])
+        if issue
+    }
+
+    rejection_reasons = result.get("rejection_reasons")
+    if not isinstance(rejection_reasons, dict):
+        rejection_reasons = {}
+
+    rejection_names = [
+        _normalized_reason(reason)
+        for reason, _count in sorted(
+            rejection_reasons.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        if reason
+    ]
+
+    unstable_issues = {
+        "SHOULDER_TILT_UNSTABLE",
+        "NECK_LATERAL_UNSTABLE",
+        "NECK_FLEXION_UNSTABLE",
+        "EYE_DISTANCE_UNSTABLE",
+    }
+
+    if issues & unstable_issues:
+        return (
+            "ท่าทางมีการเปลี่ยนแปลงระหว่างการเก็บค่าอ้างอิง "
+            "กรุณานั่งในท่าทำงานตามปกติ ผ่อนคลายศีรษะและหัวไหล่ "
+            "และพยายามอยู่นิ่งระหว่างการปรับเทียบ"
+        )
+
+    if "LOW_VALID_RATIO" in issues:
+        return (
+            "ระบบได้รับข้อมูลท่าทางที่สามารถใช้สร้างค่าอ้างอิงได้ไม่เพียงพอ "
+            "กรุณาจัดใบหน้าและหัวไหล่ให้อยู่ในภาพอย่างชัดเจน "
+            "แล้วลองปรับเทียบอีกครั้ง"
+        )
+
+    if (
+        failure_reason == "CALIBRATION_TIMEOUT"
+        or "CALIBRATION_TIMEOUT" in issues
+    ):
+        if _rejections_indicate_visibility_problem(
+            rejection_names
+        ):
+            return (
+                "ระบบไม่สามารถเก็บข้อมูลท่าทางที่เพียงพอภายในเวลาที่กำหนด "
+                "กรุณาจัดใบหน้าและหัวไหล่ให้อยู่ในภาพ "
+                "จากนั้นลองปรับเทียบอีกครั้ง"
+            )
+
+        if _rejections_indicate_contract_problem(
+            rejection_names
+        ):
+            return (
+                "ข้อมูลจากระบบตรวจจับไม่พร้อมสำหรับการสร้างค่าอ้างอิง "
+                "กรุณาลองปรับเทียบใหม่ หากยังเกิดปัญหาให้กลับไปเตรียมกล้องอีกครั้ง"
+            )
+
+        return (
+            "ระบบไม่สามารถเก็บข้อมูลท่าทางที่เพียงพอภายในเวลาที่กำหนด "
+            "กรุณานั่งในท่าปกติและอยู่นิ่งระหว่างการปรับเทียบ "
+            "แล้วลองใหม่อีกครั้ง"
+        )
+
+    if _rejections_indicate_visibility_problem(
+        rejection_names
+    ):
+        return (
+            "ระบบตรวจจับใบหน้าและหัวไหล่ได้ไม่ครบถ้วน "
+            "กรุณาจัดตำแหน่งให้ใบหน้าและหัวไหล่อยู่ภายในภาพ "
+            "แล้วลองปรับเทียบอีกครั้ง"
+        )
+
+    if _rejections_indicate_contract_problem(
+        rejection_names
+    ):
+        return (
+            "ข้อมูลจากระบบตรวจจับไม่พร้อมสำหรับการสร้างค่าอ้างอิง "
+            "กรุณาลองปรับเทียบใหม่ หากยังเกิดปัญหาให้กลับไปเตรียมกล้องอีกครั้ง"
+        )
+
+    if failure_reason == "VALIDATION_FAILED":
+        return (
+            "ข้อมูลที่เก็บได้ยังไม่เหมาะสำหรับใช้เป็นค่าท่าทางอ้างอิง "
+            "กรุณานั่งในท่าทำงานตามปกติและอยู่นิ่ง "
+            "แล้วลองปรับเทียบอีกครั้ง"
+        )
+
+    return (
+        "ไม่สามารถสร้างค่าท่าทางอ้างอิงได้ "
+        "กรุณาตรวจสอบว่ากล้องเห็นใบหน้าและหัวไหล่ชัดเจน "
+        "จากนั้นลองปรับเทียบอีกครั้ง"
+    )
+
+
 class CalibrationCompletedDialog(QDialog):
-    """Show calculated values before the user saves them to the database."""
+    """
+    Ask the user whether a technically valid Personal Baseline candidate
+    represents the posture they want to use as the session reference.
+
+    User confirmation is not medical validation.
+    """
+
+    DECISION_USE = "USE"
+    DECISION_RECALIBRATE = "RECALIBRATE"
+    DECISION_UNSURE = "UNSURE"
 
     def __init__(self, result, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PostGuard - ปรับเทียบสำเร็จ")
+        self.decision = None
+
+        self.setWindowTitle(
+            "PostGuard - ตรวจสอบค่าท่าทางอ้างอิง"
+        )
         self.setModal(True)
-        self.setFixedWidth(460)
+        self.setFixedWidth(500)
         self.setStyleSheet(APP_QSS)
 
         layout = QVBoxLayout(self)
@@ -74,16 +259,20 @@ class CalibrationCompletedDialog(QDialog):
         icon.setProperty("role", "infoIcon")
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon.setFixedSize(50, 50)
-        layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(
+            icon,
+            alignment=Qt.AlignmentFlag.AlignHCenter,
+        )
 
-        title = QLabel("ปรับเทียบสำเร็จ")
+        title = QLabel("ตรวจสอบค่าท่าทางอ้างอิง")
         title.setProperty("role", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         note = QLabel(
-            "Technical validation passed. Confirm that this is your natural "
-            "starting posture."
+            "ระบบเก็บข้อมูลได้ตามเงื่อนไขทางเทคนิคแล้ว\n"
+            "โปรดตรวจสอบว่านี่เป็นท่านั่งตามปกติที่คุณต้องการใช้ "
+            "เป็นค่าอ้างอิงสำหรับการตรวจจับครั้งนี้"
         )
         note.setProperty("role", "muted")
         note.setWordWrap(True)
@@ -94,33 +283,92 @@ class CalibrationCompletedDialog(QDialog):
         card.setProperty("card", True)
         details = QGridLayout(card)
         details.setContentsMargins(18, 16, 18, 16)
-        add_detail_rows(details, (
-            ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
-            ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
-            ("Neck flexion", f"{result['neck_flexion']:+.2f}°"),
-            ("Eye distance", f"{result['eye_distance']:.2f} px"),
-            ("Samples", result["sample_count"]),
-            ("Valid frames", f"{result['valid_ratio']:.0%}"),
-        ))
+
+        add_detail_rows(
+            details,
+            (
+                (
+                    "ความเอียงของหัวไหล่",
+                    f"{result['shoulder_tilt']:+.2f}°",
+                ),
+                (
+                    "ความเอียงคอด้านข้าง",
+                    f"{result['neck_lateral_tilt']:+.2f}°",
+                ),
+                (
+                    "การก้มเงยของคอ",
+                    f"{result['neck_flexion']:+.2f}°",
+                ),
+                (
+                    "ระยะตาในภาพ",
+                    f"{result['eye_distance']:.2f} px",
+                ),
+                (
+                    "จำนวนข้อมูลที่ใช้",
+                    result["sample_count"],
+                ),
+                (
+                    "สัดส่วนข้อมูลที่ใช้ได้",
+                    f"{result['valid_ratio']:.0%}",
+                ),
+            ),
+        )
         layout.addWidget(card)
 
         state = QLabel(
-            'การยืนยันค่าอ้างอิงนี้ไม่ได้หมายความว่าท่าทางปลอดภัยตามหลักการแพทย์'
+            "การยืนยันหมายถึงคุณยอมรับค่าที่วัดได้เป็นท่าทางอ้างอิง "
+            "ไม่ได้หมายความว่าระบบยืนยันว่าท่านี้ถูกต้องหรือปลอดภัย "
+            "ตามหลักการแพทย์"
         )
         state.setProperty("role", "muted")
         state.setWordWrap(True)
         state.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(state)
 
+        unsure_note = QLabel(
+            "หากไม่แน่ใจ แนะนำให้วัดใหม่อีกครั้งเพื่อให้ได้ "
+            "ค่าท่าทางที่คุณมั่นใจมากขึ้น"
+        )
+        unsure_note.setProperty("role", "muted")
+        unsure_note.setWordWrap(True)
+        unsure_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(unsure_note)
+
         actions = QHBoxLayout()
-        retry = QPushButton("ปรับเทียบอีกครั้ง")
-        retry.clicked.connect(self.reject)
+        actions.setSpacing(8)
+
+        retry = QPushButton("วัดใหม่")
+        retry.clicked.connect(
+            self._choose_recalibrate
+        )
+
+        unsure = QPushButton("ไม่แน่ใจ")
+        unsure.clicked.connect(
+            self._choose_unsure
+        )
+
         done = QPushButton("ใช้ค่าอ้างอิงนี้")
         done.setProperty("variant", "primary")
-        done.clicked.connect(self.accept)
+        done.clicked.connect(
+            self._choose_use
+        )
+
         actions.addWidget(retry)
+        actions.addWidget(unsure)
         actions.addWidget(done)
         layout.addLayout(actions)
+
+    def _choose_use(self) -> None:
+        self.decision = self.DECISION_USE
+        self.accept()
+
+    def _choose_recalibrate(self) -> None:
+        self.decision = self.DECISION_RECALIBRATE
+        self.reject()
+
+    def _choose_unsure(self) -> None:
+        self.decision = self.DECISION_UNSURE
+        self.reject()
 
 
 class BaselineSavedDialog(QDialog):
@@ -161,12 +409,12 @@ class BaselineSavedDialog(QDialog):
         details = QGridLayout(card)
         details.setContentsMargins(18, 16, 18, 16)
         rows = (
-            ("Baseline ID", baseline_id),
-            ("Camera ID", camera_id),
-            ("Shoulder tilt", f"{result['shoulder_tilt']:+.2f}°"),
-            ("Neck lateral tilt", f"{result['neck_lateral_tilt']:+.2f}°"),
-            ("Neck flexion", f"{result['neck_flexion']:+.2f}°"),
-            ("Eye distance", f"{result['eye_distance']:.2f} px"),
+            ("รหัสค่าอ้างอิง", baseline_id),
+            ("รหัสกล้อง", camera_id),
+            ("ความเอียงของหัวไหล่", f"{result['shoulder_tilt']:+.2f}°"),
+            ("ความเอียงคอด้านข้าง", f"{result['neck_lateral_tilt']:+.2f}°"),
+            ("การก้มเงยของคอ", f"{result['neck_flexion']:+.2f}°"),
+            ("ระยะตาในภาพ", f"{result['eye_distance']:.2f} px"),
         )
         add_detail_rows(details, rows)
         layout.addWidget(card)
@@ -331,10 +579,10 @@ class BaselinePage(QWidget):
         )
 
         self.instruction_label = QLabel(
-            "1. Sit in your normal working position.\n"
-            "2. Keep your head and shoulders relaxed.\n"
-            "3. Face the camera directly.\n"
-            "4. Keep your posture steady during calibration."
+            "1. นั่งในท่าทำงานตามปกติ\n"
+            "2. ผ่อนคลายศีรษะและหัวไหล่\n"
+            "3. หันหน้าเข้าหากล้องและให้ใบหน้าและหัวไหล่อยู่ในภาพ\n"
+            "4. อยู่นิ่งระหว่างที่ระบบเก็บค่าท่าทางอ้างอิง"
         )
 
         self.status_label = QLabel(
@@ -398,7 +646,7 @@ class BaselinePage(QWidget):
         self.save_button.setEnabled(False)
         
         self.monitor_button = QPushButton(
-            "Start Monitoring"
+            "เริ่มตรวจจับ"
         )
         self.monitor_button.setProperty("variant", "primary")
         self.monitor_button.setEnabled(False)
@@ -533,9 +781,9 @@ class BaselinePage(QWidget):
             self.calibrate_button.setEnabled(False)
             return
         self.camera_reference_label.setText(
-            "Camera preparation: Ready | "
-            f"Scale {camera_reference.get('scale_avg', 0):.2f} px/mm | "
-            f"Roll {camera_reference.get('card_roll_deg', 0):+.2f}°"
+            "การเตรียมกล้อง: พร้อมใช้งาน | "
+            f"สเกล {camera_reference.get('scale_avg', 0):.2f} px/mm | "
+            f"มุมกล้อง {camera_reference.get('card_roll_deg', 0):+.2f}°"
         )
 
         print(
@@ -694,9 +942,10 @@ class BaselinePage(QWidget):
         self.calibrate_button.setEnabled(False)
 
         self.status_label.setText(
-            "Status: Calibrating 0/"
-            f"{self.required_samples} · 0.0/"
-            f"{self.baseline_collector.config.min_calibration_seconds:.0f} s"
+            "สถานะ: กำลังเก็บข้อมูล "
+            f"0/{self.required_samples} เฟรมที่ใช้ได้ · "
+            "0.0/"
+            f"{self.baseline_collector.config.min_calibration_seconds:.0f} วินาที"
         )
         
     def collect_calibration_sample(
@@ -720,8 +969,10 @@ class BaselinePage(QWidget):
             )
             rejected = status.get("rejected_frames", 0)
             self.status_label.setText(
-                f"Status: Calibrating {count}/{target} valid frames · "
-                f"{elapsed:.1f}/{minimum:.0f} s · Rejected {rejected}"
+                "สถานะ: กำลังเก็บข้อมูล "
+                f"{count}/{target} เฟรมที่ใช้ได้ · "
+                f"{elapsed:.1f}/{minimum:.0f} วินาที · "
+                f"ข้าม {rejected} เฟรม"
             )
             return
 
@@ -731,16 +982,16 @@ class BaselinePage(QWidget):
         self.baseline_collection_result = status
 
         if state == BASELINE_FAILED:
-            issues = status.get("validation", {}).get("issues", [])
-            reason = status.get("failure_reason") or (
-                ", ".join(issues) if issues else "Technical validation failed"
+            message = build_baseline_failure_message(
+                status
             )
-            self.status_label.setText(f"Status: Baseline failed · {reason}")
+            self.status_label.setText(
+                "สถานะ: ไม่สามารถสร้างค่าท่าทางอ้างอิงได้"
+            )
             QMessageBox.warning(
                 self,
-                'ค่าท่าทางอ้างอิงส่วนบุคคล',
-                "The baseline could not be validated. Keep your face and shoulders "
-                f"visible, then try again.\n\nReason: {reason}",
+                "ไม่สามารถสร้างค่าท่าทางอ้างอิง",
+                message,
             )
             return
 
@@ -755,7 +1006,7 @@ class BaselinePage(QWidget):
             "valid_ratio": status.get("valid_ratio", 0.0),
         }
         self.status_label.setText(
-            "Status: Technical validation passed · Waiting for your confirmation"
+            "สถานะ: เก็บข้อมูลสำเร็จ · รอการยืนยันค่าท่าทางอ้างอิง"
         )
         self.calibration_dialog = CalibrationCompletedDialog(dialog_result, self)
         self.calibration_dialog.accepted.connect(self.confirm_baseline)
@@ -787,20 +1038,53 @@ class BaselinePage(QWidget):
         self.status_label.setText('สถานะ: ยืนยันค่าท่าทางอ้างอิงแล้ว พร้อมบันทึก')
 
     def reject_baseline(self) -> None:
-        """Discard the candidate while keeping technical validation distinct."""
+        """
+        Discard a technically valid candidate because the user does not
+        want to use it as the session reference.
+
+        User rejection remains separate from technical validation.
+        """
+        decision = None
+
+        if hasattr(
+            self,
+            "calibration_dialog",
+        ):
+            decision = getattr(
+                self.calibration_dialog,
+                "decision",
+                None,
+            )
+
         if (
             self.baseline_collection_result
             and self.baseline_collection_result.get("status")
             == BASELINE_NEED_CONFIRMATION
         ):
             try:
-                self.baseline_collection_result = self.baseline_collector.reject()
+                self.baseline_collection_result = (
+                    self.baseline_collector.reject()
+                )
             except RuntimeError:
                 pass
+
         self.baseline_result = None
         self.save_button.setEnabled(False)
-        self.status_label.setText("Status: Baseline rejected · Select Recalibrate to try again")
-    
+
+        if (
+            decision
+            == CalibrationCompletedDialog.DECISION_UNSURE
+        ):
+            self.status_label.setText(
+                "สถานะ: ยังไม่ได้ยืนยันค่าอ้างอิง · "
+                "แนะนำให้ปรับเทียบอีกครั้ง"
+            )
+        else:
+            self.status_label.setText(
+                "สถานะ: ไม่ใช้ค่าที่วัดได้ · "
+                "กดปรับเทียบใหม่เพื่อเก็บค่าอีกครั้ง"
+            )
+
     # =========================================================
     # Save Personal Baseline
     # =========================================================
@@ -1064,15 +1348,15 @@ class BaselinePage(QWidget):
                 ]
 
                 pose_text = (
-                    "Detected"
+                    "ตรวจพบ"
                     if pose_detected
-                    else "Not Found"
+                    else "ไม่พบ"
                 )
 
                 face_text = (
-                    "Detected"
+                    "ตรวจพบ"
                     if face_detected
-                    else "Not Found"
+                    else "ไม่พบ"
                 )
 
                 self.detection_label.setText(
@@ -1091,7 +1375,7 @@ class BaselinePage(QWidget):
                 if shoulder_tilt is not None:
 
                     self.shoulder_tilt_label.setText(
-                        f"Shoulder Tilt: "
+                        "ความเอียงไหล่: "
                         f"{shoulder_tilt:+.2f}°"
                     )
 
@@ -1116,7 +1400,7 @@ class BaselinePage(QWidget):
                     ]
 
                     self.neck_tilt_label.setText(
-                        f"Neck Lateral Tilt: "
+                        "ความเอียงคอด้านข้าง: "
                         f"{neck_angle:+.2f}°"
                     )
 
