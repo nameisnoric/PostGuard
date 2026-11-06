@@ -67,7 +67,10 @@ from app.ui.dialogs.eye_alert_dialog import (
 )
 from app.ui.components.monitoring import (
     MonitoringControls,
+    MonitoringEyeCard,
     MonitoringHeader,
+    MonitoringPostureCard,
+    MonitoringRiskCard,
     MonitoringVideoCard,
 )
 from app.services.camera_setup.camera_movement import (
@@ -791,112 +794,118 @@ class MonitoringPage(QWidget):
 
     def _create_detection_group(
         self,
-    ) -> QGroupBox:
+    ) -> QWidget:
+        """
+        Create presentation cards for posture and eye monitoring.
 
-        detection_group = QGroupBox(
-            "ผลการตรวจจับแบบเรียลไทม์"
+        Existing Monitoring logic continues writing to the same
+        self.* label names through compatibility references.
+        """
+
+        container = QWidget(
+            self
         )
 
-        detection_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
+        layout = QVBoxLayout(
+            container
         )
 
-        detection_layout = QVBoxLayout(
-            detection_group
+        layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
         )
 
-        self.detection_label = QLabel(
-            "ท่าทาง: กำลังรอ | ใบหน้า: กำลังรอ"
+        layout.setSpacing(
+            10,
         )
 
-        self.shoulder_label = QLabel(
-            "ความเอียงไหล่: --"
+        # ====================================================
+        # POSTURE CARD
+        # ====================================================
+
+        self.posture_card = MonitoringPostureCard(
+            container
         )
 
-        self.neck_label = QLabel(
-            "ความเอียงคอด้านข้าง: --"
+        self.detection_label = (
+            self.posture_card.detection_label
         )
 
-        self.flexion_label = QLabel(
-            "มุมก้ม/เงยคอ: --"
-        )
-        self.screen_distance_label = QLabel(
-            "ระยะห่างหน้าจอ: --"
+        self.shoulder_label = (
+            self.posture_card.shoulder_label
         )
 
-        self.screen_distance_label.setWordWrap(
-            True
+        self.neck_label = (
+            self.posture_card.neck_label
         )
 
-        # ========================================================
-        # EYE / BLINK
-        # ========================================================
-
-        self.right_eye_state_label = QLabel(
-            "ตาขวา: --"
+        self.flexion_label = (
+            self.posture_card.flexion_label
         )
 
-        self.left_eye_state_label = QLabel(
-            "ตาซ้าย: --"
+        self.screen_distance_label = (
+            self.posture_card.screen_distance_label
         )
 
-        self.eye_state_label = QLabel(
-            "สถานะตารวม: --"
+        self.shoulder_difference_label = (
+            self.posture_card.shoulder_difference_label
         )
 
-        self.eye_pattern_label = QLabel(
-            "รูปแบบตา: --"
+        self.neck_difference_label = (
+            self.posture_card.neck_difference_label
         )
 
-        self.eye_openness_label = QLabel(
-            "ค่าการเปิดตา: --"
+        self.flexion_difference_label = (
+            self.posture_card.flexion_difference_label
         )
 
-        self.blink_count_label = QLabel(
-            "จำนวนการกระพริบตา: 0"
+        # ====================================================
+        # EYE CARD
+        # ====================================================
+
+        self.eye_card = MonitoringEyeCard(
+            container
         )
 
-        # ========================================================
-        # BASELINE DIFFERENCE
-        # ========================================================
-
-        self.shoulder_difference_label = QLabel(
-            "ผลต่างจาก Baseline ไหล่: --"
+        self.right_eye_state_label = (
+            self.eye_card.right_eye_state_label
         )
 
-        self.neck_difference_label = QLabel(
-            "ผลต่างจาก Baseline คอด้านข้าง: --"
+        self.left_eye_state_label = (
+            self.eye_card.left_eye_state_label
         )
 
-        self.flexion_difference_label = QLabel(
-            "ผลต่างจาก Baseline ก้ม/เงยคอ: --"
+        self.eye_state_label = (
+            self.eye_card.eye_state_label
         )
 
-        for label in (
-            self.detection_label,
-            self.shoulder_label,
-            self.neck_label,
-            self.flexion_label,
-            self.screen_distance_label,
+        self.eye_pattern_label = (
+            self.eye_card.eye_pattern_label
+        )
 
-            self.right_eye_state_label,
-            self.left_eye_state_label,
-            self.eye_state_label,
-            self.eye_pattern_label,
-            self.eye_openness_label,
-            self.blink_count_label,
+        self.eye_openness_label = (
+            self.eye_card.eye_openness_label
+        )
 
-            self.shoulder_difference_label,
-            self.neck_difference_label,
-            self.flexion_difference_label,
-        ):
+        self.blink_count_label = (
+            self.eye_card.blink_count_label
+        )
 
-            detection_layout.addWidget(
-                label
-            )
+        # ====================================================
+        # LAYOUT
+        # ====================================================
 
-        return detection_group
+        layout.addWidget(
+            self.posture_card
+        )
+
+        layout.addWidget(
+            self.eye_card
+        )
+
+        return container
 
     # ========================================================
     # RISK GROUP
@@ -904,83 +913,49 @@ class MonitoringPage(QWidget):
 
     def _create_risk_group(
         self,
-    ) -> QGroupBox:
+    ) -> MonitoringRiskCard:
+        """
+        Create the risk presentation card.
 
-        risk_group = QGroupBox(
-            "การประเมินความเสี่ยง PostGuard"
+        All risk calculations remain inside the validated
+        PostGuard risk pipeline.
+        """
+
+        self.risk_card = MonitoringRiskCard(
+            self
         )
 
-        risk_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
+        # Existing Monitoring logic compatibility.
+
+        self.assessment_label = (
+            self.risk_card.assessment_label
         )
 
-        risk_layout = QVBoxLayout(
-            risk_group
+        self.factor_label = (
+            self.risk_card.factor_label
         )
 
-        self.assessment_label = QLabel(
-            "การประเมินท่าทาง: กำลังรอข้อมูล"
+        self.duration_label = (
+            self.risk_card.duration_label
         )
 
-        self.factor_label = QLabel(
-            "ปัจจัยด้านท่าทาง: -"
+        self.risk_label = (
+            self.risk_card.risk_label
         )
 
-        self.factor_label.setWordWrap(
-            True
+        self.event_label = (
+            self.risk_card.event_label
         )
 
-        self.duration_label = QLabel(
-            "ปัจจัยต่อเนื่องนานที่สุด: -"
+        self.alert_label = (
+            self.risk_card.alert_label
         )
 
-        self.risk_label = QLabel(
-            "ระดับความเสี่ยง: -"
+        self.risk_note_label = (
+            self.risk_card.risk_note_label
         )
 
-        self.event_label = QLabel(
-            "เหตุการณ์ความเสี่ยง: -"
-        )
-
-        self.alert_label = QLabel(
-            "การแจ้งเตือน: กำลังรอข้อมูล"
-        )
-
-        self.alert_label.setWordWrap(
-            True
-        )
-
-        self.risk_note_label = QLabel(
-            "ระดับความเสี่ยงนี้เป็นการประเมินของต้นแบบ PostGuard "
-            "ตามเกณฑ์ที่ออกแบบสำหรับระบบ ไม่ใช่ RULA ฉบับเต็ม, "
-            "ระดับการดำเนินการของ RULA หรือการวินิจฉัยทางการแพทย์"
-        )
-
-        self.risk_note_label.setWordWrap(
-            True
-        )
-
-        self.risk_note_label.setProperty(
-            "role",
-            "muted",
-        )
-
-        for label in (
-            self.assessment_label,
-            self.factor_label,
-            self.duration_label,
-            self.risk_label,
-            self.event_label,
-            self.alert_label,
-            self.risk_note_label,
-        ):
-
-            risk_layout.addWidget(
-                label
-            )
-
-        return risk_group
+        return self.risk_card
 
     # ========================================================
     # BUTTONS
