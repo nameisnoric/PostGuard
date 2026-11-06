@@ -67,6 +67,7 @@ from app.ui.dialogs.eye_alert_dialog import (
 )
 from app.ui.components.monitoring import (
     MonitoringControls,
+    MonitoringDebugPanel,
     MonitoringEyeCard,
     MonitoringHeader,
     MonitoringPostureCard,
@@ -571,24 +572,20 @@ class MonitoringPage(QWidget):
 
         self._setup_preview()
 
-        # Hidden compatibility container.
-        #
-        # Give it a permanent Qt parent so the labels used by
-        # existing Monitoring logic are not destroyed.
-        info_group = (
-            self._create_information_group(
-                parent=content,
-            )
-        )
-
-        info_group.hide()
-
         detection_group = (
             self._create_detection_group()
         )
 
         risk_group = (
             self._create_risk_group()
+        )
+
+        debug_panel = (
+            self._create_debug_panel()
+        )
+
+        controls = (
+            self._create_controls()
         )
 
         controls = (
@@ -669,6 +666,10 @@ class MonitoringPage(QWidget):
             risk_group
         )
 
+        metrics_layout.addWidget(
+            debug_panel
+        )
+
         metrics_layout.addStretch()
 
         columns.addWidget(
@@ -685,81 +686,6 @@ class MonitoringPage(QWidget):
             columns,
             1,
         )
-
-    # ========================================================
-    # INFORMATION GROUP
-    # ========================================================
-
-    def _create_information_group(
-        self,
-        parent=None,
-    ) -> QGroupBox:
-        """
-        Create hidden internal labels still used by the existing
-        Monitoring logic.
-
-        Important:
-        - Camera / Session / Baseline summary labels now live in
-          MonitoringHeader.
-        - These labels remain only for compatibility with the
-          validated Monitoring logic.
-        - The group receives a Qt parent so its widgets stay alive
-          even while the group is hidden.
-        """
-
-        info_group = QGroupBox(
-            "รายละเอียดระบบ",
-            parent,
-        )
-
-        info_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
-        )
-
-        info_layout = QVBoxLayout(
-            info_group
-        )
-
-        # ====================================================
-        # BASELINE DETAIL
-        # ====================================================
-
-        self.baseline_shoulder_label = QLabel(
-            "ค่าพื้นฐานความเอียงไหล่: -",
-            info_group,
-        )
-
-        self.baseline_neck_label = QLabel(
-            "ค่าพื้นฐานความเอียงคอด้านข้าง: -",
-            info_group,
-        )
-
-        self.baseline_flexion_label = QLabel(
-            "ค่าพื้นฐานมุมก้ม/เงยคอ: -",
-            info_group,
-        )
-
-        # ====================================================
-        # INTERNAL STATUS
-        # ====================================================
-
-        self.status_label = QLabel(
-            "สถานะ: ยังไม่เริ่ม",
-            info_group,
-        )
-
-        for label in (
-            self.baseline_shoulder_label,
-            self.baseline_neck_label,
-            self.baseline_flexion_label,
-            self.status_label,
-        ):
-            info_layout.addWidget(
-                label
-            )
-
-        return info_group
 
     # ========================================================
     # CAMERA PREVIEW
@@ -906,6 +832,42 @@ class MonitoringPage(QWidget):
         )
 
         return container
+    
+    def _create_debug_panel(
+        self,
+    ) -> MonitoringDebugPanel:
+        """
+        Create the expandable Monitoring system-detail panel.
+
+        Existing Monitoring logic continues writing to the same
+        label names through compatibility references.
+        """
+
+        self.debug_panel = MonitoringDebugPanel(
+            self
+        )
+
+        # ====================================================
+        # EXISTING LOGIC COMPATIBILITY
+        # ====================================================
+
+        self.status_label = (
+            self.debug_panel.status_label
+        )
+
+        self.baseline_shoulder_label = (
+            self.debug_panel.baseline_shoulder_label
+        )
+
+        self.baseline_neck_label = (
+            self.debug_panel.baseline_neck_label
+        )
+
+        self.baseline_flexion_label = (
+            self.debug_panel.baseline_flexion_label
+        )
+
+        return self.debug_panel
 
     # ========================================================
     # RISK GROUP

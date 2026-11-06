@@ -8,6 +8,9 @@ Business logic must remain outside this package.
 from app.ui.components.monitoring.monitoring_controls import (
     MonitoringControls,
 )
+from app.ui.components.monitoring.monitoring_debug_panel import (
+    MonitoringDebugPanel,
+)
 from app.ui.components.monitoring.monitoring_eye_card import (
     MonitoringEyeCard,
 )
@@ -27,6 +30,7 @@ from app.ui.components.monitoring.monitoring_video_card import (
 
 __all__ = [
     "MonitoringControls",
+    "MonitoringDebugPanel",
     "MonitoringEyeCard",
     "MonitoringHeader",
     "MonitoringPostureCard",
