@@ -227,8 +227,24 @@ class DesktopWorkflowTests(unittest.TestCase):
         self.assertEqual(preview.maximumWidth(), 960)
         self.assertEqual(baseline.maximumWidth(), 720)
         self.assertEqual(calibration.maximumWidth(), 820)
-        self.assertEqual(monitor.size().width(), 720)
-        self.assertEqual(monitor.size().height(), 405)
+        self.assertGreaterEqual(
+            monitor.size().width(),
+            480,
+        )
+
+        self.assertLessEqual(
+            monitor.size().width(),
+            960,
+        )
+        self.assertGreaterEqual(
+            monitor.size().height(),
+            270,
+        )
+
+        self.assertLessEqual(
+            monitor.size().height(),
+            540,
+        )
         self.assertEqual(
             self.window.history_page.alert_history_button.text(),
             "การแจ้งเตือนทั้งหมด",

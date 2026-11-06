@@ -67,6 +67,8 @@ from app.ui.dialogs.eye_alert_dialog import (
 )
 from app.ui.components.monitoring import (
     MonitoringControls,
+    MonitoringHeader,
+    MonitoringVideoCard,
 )
 from app.services.camera_setup.camera_movement import (
     CameraMovementConfig,
@@ -471,6 +473,36 @@ class MonitoringPage(QWidget):
             False
         )
 
+    def _create_monitoring_header(
+        self,
+    ) -> MonitoringHeader:
+        """
+        Create the Monitoring page header.
+
+        Existing label references are retained so current
+        Monitoring logic does not need to be rewritten.
+        """
+
+        self.monitoring_header = MonitoringHeader(
+            self
+        )
+
+        # Existing Monitoring logic writes to these names.
+        # They now point directly to the visible Header labels.
+
+        self.camera_label = (
+            self.monitoring_header.camera_label
+        )
+
+        self.baseline_label = (
+            self.monitoring_header.baseline_label
+        )
+
+        self.session_label = (
+            self.monitoring_header.session_label
+        )
+
+        return self.monitoring_header
     # ========================================================
     # UI
     # ========================================================
@@ -530,30 +562,23 @@ class MonitoringPage(QWidget):
             content
         )
 
-        self.title_label = QLabel(
-            "การตรวจจับแบบเรียลไทม์"
-        )
-
-        self.title_label.setProperty(
-            "role",
-            "title",
-        )
-
-        self.description_label = QLabel(
-            "การตรวจจับ → การประเมินท่าทาง → ตรวจสอบความต่อเนื่อง → "
-            "ประเมินความเสี่ยง → เหตุการณ์ความเสี่ยง → การแจ้งเตือน"
-        )
-
-        self.description_label.setProperty(
-            "role",
-            "muted",
-        )
-
-        info_group = (
-            self._create_information_group()
+        monitoring_header = (
+            self._create_monitoring_header()
         )
 
         self._setup_preview()
+
+        # Hidden compatibility container.
+        #
+        # Give it a permanent Qt parent so the labels used by
+        # existing Monitoring logic are not destroyed.
+        info_group = (
+            self._create_information_group(
+                parent=content,
+            )
+        )
+
+        info_group.hide()
 
         detection_group = (
             self._create_detection_group()
@@ -568,11 +593,7 @@ class MonitoringPage(QWidget):
         )
 
         layout.addWidget(
-            self.title_label
-        )
-
-        layout.addWidget(
-            self.description_label
+            monitoring_header
         )
 
         columns = QHBoxLayout()
@@ -587,34 +608,24 @@ class MonitoringPage(QWidget):
 
         camera_panel = QFrame()
 
-        camera_panel.setProperty(
-            "card",
-            True,
-        )
-
         camera_layout = QVBoxLayout(
             camera_panel
         )
 
         camera_layout.setContentsMargins(
-            14,
-            14,
-            14,
-            14,
+            0,
+            0,
+            0,
+            0,
         )
 
         camera_layout.setSpacing(
-            10
+            10,
         )
 
         camera_layout.addWidget(
-            info_group
-        )
-
-        camera_layout.addWidget(
-            self.preview_label,
+            self.video_card,
             1,
-            Qt.AlignmentFlag.AlignCenter,
         )
 
         camera_layout.addWidget(
@@ -678,10 +689,24 @@ class MonitoringPage(QWidget):
 
     def _create_information_group(
         self,
+        parent=None,
     ) -> QGroupBox:
+        """
+        Create hidden internal labels still used by the existing
+        Monitoring logic.
+
+        Important:
+        - Camera / Session / Baseline summary labels now live in
+          MonitoringHeader.
+        - These labels remain only for compatibility with the
+          validated Monitoring logic.
+        - The group receives a Qt parent so its widgets stay alive
+          even while the group is hidden.
+        """
 
         info_group = QGroupBox(
-            "ข้อมูลการตรวจจับ"
+            "รายละเอียดระบบ",
+            parent,
         )
 
         info_group.setSizePolicy(
@@ -693,38 +718,35 @@ class MonitoringPage(QWidget):
             info_group
         )
 
-        self.camera_label = QLabel(
-            "กล้อง: -"
-        )
-
-        self.baseline_label = QLabel(
-            "รหัสค่าท่าทางอ้างอิง: -"
-        )
-
-        self.session_label = QLabel(
-            "รหัสเซสชัน: -"
-        )
+        # ====================================================
+        # BASELINE DETAIL
+        # ====================================================
 
         self.baseline_shoulder_label = QLabel(
-            "ค่าพื้นฐานความเอียงไหล่: -"
+            "ค่าพื้นฐานความเอียงไหล่: -",
+            info_group,
         )
 
         self.baseline_neck_label = QLabel(
-            "ค่าพื้นฐานความเอียงคอด้านข้าง: -"
+            "ค่าพื้นฐานความเอียงคอด้านข้าง: -",
+            info_group,
         )
 
         self.baseline_flexion_label = QLabel(
-            "ค่าพื้นฐานมุมก้ม/เงยคอ: -"
+            "ค่าพื้นฐานมุมก้ม/เงยคอ: -",
+            info_group,
         )
 
+        # ====================================================
+        # INTERNAL STATUS
+        # ====================================================
+
         self.status_label = QLabel(
-            "สถานะ: ยังไม่เริ่ม"
+            "สถานะ: ยังไม่เริ่ม",
+            info_group,
         )
 
         for label in (
-            self.camera_label,
-            self.baseline_label,
-            self.session_label,
             self.baseline_shoulder_label,
             self.baseline_neck_label,
             self.baseline_flexion_label,
@@ -743,28 +765,24 @@ class MonitoringPage(QWidget):
     def _setup_preview(
         self,
     ) -> None:
+        """
+        Create Monitoring camera presentation.
 
-        self.preview_label = QLabel(
-            "ภาพการตรวจจับจะแสดงที่นี่"
+        Camera capture and rendering logic remain owned by
+        MonitoringPage. This method only creates the visible card.
+        """
+
+        self.video_card = MonitoringVideoCard(
+            self
         )
 
-        self.preview_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-
-        self.preview_label.setFixedSize(
-            720,
-            405,
-        )
-
-        self.preview_label.setSizePolicy(
-            QSizePolicy.Policy.Fixed,
-            QSizePolicy.Policy.Fixed,
-        )
-
-        self.preview_label.setProperty(
-            "preview",
-            True,
+        # Existing Monitoring rendering code writes directly
+        # to self.preview_label.
+        #
+        # Keep that reference pointing to the preview inside
+        # the reusable UI card.
+        self.preview_label = (
+            self.video_card.preview_label
         )
 
     # ========================================================
