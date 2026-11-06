@@ -70,7 +70,7 @@ class MonitoringVideoCard(QFrame):
 
         self.title_label.setProperty(
             "role",
-            "sectionTitle",
+            "heading",
         )
 
         self.camera_state_label = QLabel(

@@ -68,6 +68,10 @@ class MonitoringControls(QFrame):
         self.pause_button = QPushButton(
             "หยุดชั่วคราว"
         )
+        self.pause_button.setProperty(
+            "variant",
+            "primary",
+        )
 
         self.pause_button.setEnabled(
             False

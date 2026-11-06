@@ -58,7 +58,7 @@ class MonitoringPostureCard(QFrame):
 
         self.title_label.setProperty(
             "role",
-            "sectionTitle",
+            "heading",
         )
 
         self.detection_label = QLabel(

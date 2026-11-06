@@ -59,7 +59,6 @@ class SessionSummaryPage(
 
         self.current_session_id = None
         self.current_summary = None
-
         self.risk_score_buckets = []
 
         # ====================================================
@@ -78,10 +77,7 @@ class SessionSummaryPage(
         )
 
         scroll_area = QScrollArea()
-
-        scroll_area.setWidgetResizable(
-            True
-        )
+        scroll_area.setWidgetResizable(True)
 
         scroll_area.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -92,42 +88,33 @@ class SessionSummaryPage(
         )
 
         content = QWidget()
+        content.setProperty("page", True)
 
-        content.setProperty(
-            "page",
-            True,
-        )
-
-        layout = QVBoxLayout(
-            content
-        )
+        layout = QVBoxLayout(content)
 
         layout.setContentsMargins(
-            24,
-            18,
-            24,
-            20,
+            28,
+            22,
+            28,
+            28,
         )
 
-        layout.setSpacing(
-            14
-        )
+        layout.setSpacing(16)
 
         layout.setSizeConstraint(
             QLayout.SizeConstraint.SetMinimumSize
         )
 
-        scroll_area.setWidget(
-            content
-        )
-
-        page_layout.addWidget(
-            scroll_area
-        )
+        scroll_area.setWidget(content)
+        page_layout.addWidget(scroll_area)
 
         # ====================================================
         # HEADER
         # ====================================================
+
+        header = QHBoxLayout()
+
+        header_copy = QVBoxLayout()
 
         self.title_label = QLabel(
             "สรุปผลเซสชัน"
@@ -139,11 +126,8 @@ class SessionSummaryPage(
         )
 
         self.description_label = QLabel(
-            (
-                "สรุปผลการตรวจจับ "
-                "ความเสี่ยงด้านท่าทาง และ "
-                "PostGuard Risk Score"
-            )
+            "ภาพรวมการใช้งาน ท่าทาง สายตา "
+            "ความเสี่ยง และการแจ้งเตือนในเซสชันนี้"
         )
 
         self.description_label.setProperty(
@@ -151,29 +135,74 @@ class SessionSummaryPage(
             "muted",
         )
 
-        # ====================================================
-        # SESSION INFORMATION
-        # ====================================================
-
-        info_group = QGroupBox(
-            "ข้อมูลเซสชัน"
+        header_copy.addWidget(
+            self.title_label
         )
 
-        info_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
+        header_copy.addWidget(
+            self.description_label
         )
 
-        info_layout = QVBoxLayout(
-            info_group
-        )
-
-        self.session_label = QLabel(
-            "รหัสเซสชัน: --"
+        header.addLayout(
+            header_copy,
+            1,
         )
 
         self.database_label = QLabel(
             "สถานะเซสชัน: --"
+        )
+
+        self.database_label.setProperty(
+            "role",
+            "positive",
+        )
+
+        header.addWidget(
+            self.database_label,
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+
+        layout.addLayout(header)
+
+        # ====================================================
+        # SESSION OVERVIEW
+        # ====================================================
+
+        session_card = QFrame()
+        session_card.setProperty("card", True)
+
+        session_layout = QVBoxLayout(
+            session_card
+        )
+
+        session_layout.setContentsMargins(
+            20,
+            18,
+            20,
+            18,
+        )
+
+        session_layout.setSpacing(12)
+
+        session_heading = QLabel(
+            "ภาพรวมการใช้งาน"
+        )
+
+        session_heading.setProperty(
+            "role",
+            "heading",
+        )
+
+        session_layout.addWidget(
+            session_heading
+        )
+
+        session_top = QHBoxLayout()
+        session_top.setSpacing(12)
+
+        self.session_label = QLabel(
+            "รหัสเซสชัน: --"
         )
 
         self.camera_label = QLabel(
@@ -181,19 +210,75 @@ class SessionSummaryPage(
         )
 
         self.baseline_label = QLabel(
-            "รหัสค่าท่าทางอ้างอิง: --"
+            "ค่าท่าทางอ้างอิง: --"
         )
 
-        self.start_label = QLabel(
-            "เริ่มเมื่อ: --"
+        for label in (
+            self.session_label,
+            self.camera_label,
+            self.baseline_label,
+        ):
+            label.setProperty(
+                "role",
+                "metricSmall",
+            )
+
+            session_top.addWidget(
+                label,
+                1,
+            )
+
+        session_layout.addLayout(
+            session_top
         )
 
-        self.end_label = QLabel(
-            "สิ้นสุดเมื่อ: --"
+        timing = QHBoxLayout()
+        timing.setSpacing(12)
+
+        time_card = QFrame()
+        time_card.setProperty(
+            "cardTone",
+            "blue",
+        )
+
+        time_layout = QVBoxLayout(
+            time_card
         )
 
         self.duration_label = QLabel(
             "ระยะเวลา: --"
+        )
+
+        self.duration_label.setProperty(
+            "role",
+            "metric",
+        )
+
+        duration_hint = QLabel(
+            "เวลาตรวจจับจริง"
+        )
+
+        duration_hint.setProperty(
+            "role",
+            "muted",
+        )
+
+        time_layout.addWidget(
+            self.duration_label
+        )
+
+        time_layout.addWidget(
+            duration_hint
+        )
+
+        pause_card = QFrame()
+        pause_card.setProperty(
+            "cardTone",
+            "amber",
+        )
+
+        pause_layout = QVBoxLayout(
+            pause_card
         )
 
         self.paused_duration_label = QLabel(
@@ -204,37 +289,104 @@ class SessionSummaryPage(
             "จำนวนครั้งที่หยุด: --"
         )
 
-        for widget in (
-            self.session_label,
-            self.database_label,
-            self.camera_label,
-            self.baseline_label,
-            self.start_label,
-            self.end_label,
-            self.duration_label,
-            self.paused_duration_label,
-            self.pause_count_label,
-        ):
-            info_layout.addWidget(
-                widget
-            )
-
-        # ====================================================
-        # DETECTION SUMMARY
-        # ====================================================
-
-        detection_group = QGroupBox(
-            "สรุปผลการตรวจจับ"
+        pause_layout.addWidget(
+            self.paused_duration_label
         )
 
-        detection_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
+        pause_layout.addWidget(
+            self.pause_count_label
+        )
+
+        timing.addWidget(
+            time_card,
+            1,
+        )
+
+        timing.addWidget(
+            pause_card,
+            1,
+        )
+
+        session_layout.addLayout(
+            timing
+        )
+
+        dates = QHBoxLayout()
+
+        self.start_label = QLabel(
+            "เริ่มเมื่อ: --"
+        )
+
+        self.end_label = QLabel(
+            "สิ้นสุดเมื่อ: --"
+        )
+
+        self.start_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        self.end_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        dates.addWidget(
+            self.start_label
+        )
+
+        dates.addStretch()
+
+        dates.addWidget(
+            self.end_label
+        )
+
+        session_layout.addLayout(
+            dates
+        )
+
+        layout.addWidget(
+            session_card
+        )
+
+        # ====================================================
+        # DETECTION OVERVIEW
+        # ====================================================
+
+        detection_card = QFrame()
+        detection_card.setProperty(
+            "card",
+            True,
         )
 
         detection_layout = QVBoxLayout(
-            detection_group
+            detection_card
         )
+
+        detection_layout.setContentsMargins(
+            20,
+            18,
+            20,
+            18,
+        )
+
+        detection_layout.setSpacing(12)
+
+        detection_title = QLabel(
+            "ผลการตรวจจับ"
+        )
+
+        detection_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        detection_layout.addWidget(
+            detection_title
+        )
+
+        detection_metrics = QHBoxLayout()
+        detection_metrics.setSpacing(10)
 
         self.count_label = QLabel(
             "รอบการตรวจจับ: --"
@@ -248,54 +400,204 @@ class SessionSummaryPage(
             "ตรวจพบใบหน้า: --"
         )
 
-        self.shoulder_label = QLabel(
-            "ความเอียงไหล่เฉลี่ย: --"
+        for label, tone in (
+            (
+                self.count_label,
+                "blue",
+            ),
+            (
+                self.pose_label,
+                "green",
+            ),
+            (
+                self.face_label,
+                "cyan",
+            ),
+        ):
+            card = QFrame()
+            card.setProperty(
+                "cardTone",
+                tone,
+            )
+
+            card_layout = QVBoxLayout(
+                card
+            )
+
+            label.setProperty(
+                "role",
+                "metricSmall",
+            )
+
+            card_layout.addWidget(
+                label
+            )
+
+            detection_metrics.addWidget(
+                card,
+                1,
+            )
+
+        detection_layout.addLayout(
+            detection_metrics
         )
 
-        self.neck_label = QLabel(
-            "ความเอียงคอเฉลี่ย: --"
+        posture_row = QHBoxLayout()
+        posture_row.setSpacing(10)
+
+        shoulder_card = QFrame()
+        shoulder_card.setProperty(
+            "cardTone",
+            "purple",
+        )
+
+        shoulder_layout = QVBoxLayout(
+            shoulder_card
+        )
+
+        shoulder_title = QLabel(
+            "ไหล่"
+        )
+
+        shoulder_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        self.shoulder_label = QLabel(
+            "ความเอียงไหล่เฉลี่ย: --"
         )
 
         self.baseline_shoulder_label = QLabel(
             "ค่าอ้างอิงไหล่: --"
         )
 
+        self.baseline_shoulder_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        shoulder_layout.addWidget(
+            shoulder_title
+        )
+
+        shoulder_layout.addWidget(
+            self.shoulder_label
+        )
+
+        shoulder_layout.addWidget(
+            self.baseline_shoulder_label
+        )
+
+        neck_card = QFrame()
+        neck_card.setProperty(
+            "cardTone",
+            "cyan",
+        )
+
+        neck_layout = QVBoxLayout(
+            neck_card
+        )
+
+        neck_title = QLabel(
+            "คอ"
+        )
+
+        neck_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        self.neck_label = QLabel(
+            "ความเอียงคอเฉลี่ย: --"
+        )
+
         self.baseline_neck_label = QLabel(
             "ค่าอ้างอิงคอ: --"
         )
 
-        for widget in (
-            self.count_label,
-            self.pose_label,
-            self.face_label,
-            self.shoulder_label,
-            self.neck_label,
-            self.baseline_shoulder_label,
-            self.baseline_neck_label,
-        ):
-            detection_layout.addWidget(
-                widget
-            )
+        self.baseline_neck_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        neck_layout.addWidget(
+            neck_title
+        )
+
+        neck_layout.addWidget(
+            self.neck_label
+        )
+
+        neck_layout.addWidget(
+            self.baseline_neck_label
+        )
+
+        posture_row.addWidget(
+            shoulder_card,
+            1,
+        )
+
+        posture_row.addWidget(
+            neck_card,
+            1,
+        )
+
+        detection_layout.addLayout(
+            posture_row
+        )
+
+        layout.addWidget(
+            detection_card
+        )
 
         # ====================================================
-        # RISK SCORE SUMMARY
+        # RISK SCORE
         # ====================================================
 
-        risk_score_group = QGroupBox(
-            "PostGuard Risk Score"
+        risk_score_group = QFrame()
+        risk_score_group.setProperty(
+            "card",
+            True,
         )
 
         risk_score_layout = QVBoxLayout(
             risk_score_group
         )
 
+        risk_score_layout.setContentsMargins(
+            20,
+            18,
+            20,
+            18,
+        )
+
+        risk_title = QLabel(
+            "PostGuard Risk Score"
+        )
+
+        risk_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        risk_score_layout.addWidget(
+            risk_title
+        )
+
         score_cards = QHBoxLayout()
+        score_cards.setSpacing(10)
 
         self.average_score_card = (
             self._create_score_card(
-                "เฉลี่ย",
+                "คะแนนเฉลี่ย",
                 "--",
             )
+        )
+
+        self.average_score_card.setProperty(
+            "cardTone",
+            "blue",
         )
 
         self.minimum_score_card = (
@@ -305,11 +607,21 @@ class SessionSummaryPage(
             )
         )
 
+        self.minimum_score_card.setProperty(
+            "cardTone",
+            "green",
+        )
+
         self.maximum_score_card = (
             self._create_score_card(
                 "สูงสุด",
                 "--",
             )
+        )
+
+        self.maximum_score_card.setProperty(
+            "cardTone",
+            "amber",
         )
 
         score_cards.addWidget(
@@ -328,6 +640,8 @@ class SessionSummaryPage(
             score_cards
         )
 
+        # Existing update targets.
+        # Hidden because cards above already show the same values.
         self.average_risk_label = QLabel(
             "คะแนนความเสี่ยงเฉลี่ย: N/A"
         )
@@ -340,6 +654,10 @@ class SessionSummaryPage(
             "คะแนนความเสี่ยงสูงสุด: N/A"
         )
 
+        self.average_risk_label.hide()
+        self.minimum_risk_label.hide()
+        self.maximum_risk_label.hide()
+
         self.risk_score_method_label = QLabel(
             "วิธีคำนวณคะแนน: N/A"
         )
@@ -349,26 +667,46 @@ class SessionSummaryPage(
             "muted",
         )
 
-        for widget in (
-            self.average_risk_label,
-            self.minimum_risk_label,
-            self.maximum_risk_label,
-            self.risk_score_method_label,
-        ):
-            risk_score_layout.addWidget(
-                widget
-            )
+        risk_score_layout.addWidget(
+            self.risk_score_method_label
+        )
+
+        layout.addWidget(
+            risk_score_group
+        )
 
         # ====================================================
-        # RISK SCORE GRAPH
+        # RISK CHART
         # ====================================================
 
-        chart_group = QGroupBox(
-            "Risk Score ตลอดเซสชัน"
+        chart_group = QFrame()
+        chart_group.setProperty(
+            "card",
+            True,
         )
 
         chart_layout = QVBoxLayout(
             chart_group
+        )
+
+        chart_layout.setContentsMargins(
+            20,
+            18,
+            20,
+            18,
+        )
+
+        chart_title = QLabel(
+            "แนวโน้มความเสี่ยงตลอดเซสชัน"
+        )
+
+        chart_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        chart_layout.addWidget(
+            chart_title
         )
 
         self.risk_score_chart = (
@@ -396,37 +734,293 @@ class SessionSummaryPage(
             self.chart_status_label
         )
 
-        # ====================================================
-        # REPORT SUMMARY
-        # ====================================================
-
-        report_group = QGroupBox(
-            "ข้อมูลสรุปในรายงาน"
+        layout.addWidget(
+            chart_group
         )
 
-        report_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
+        # ====================================================
+        # USER-FACING SESSION INSIGHTS
+        # ====================================================
+
+        insight_row = QHBoxLayout()
+        insight_row.setSpacing(12)
+
+        # ----------------------------------------------------
+        # EYE
+        # ----------------------------------------------------
+
+        eye_card = QFrame()
+        eye_card.setProperty(
+            "cardTone",
+            "cyan",
         )
 
-        report_layout = QVBoxLayout(
-            report_group
+        eye_layout = QVBoxLayout(
+            eye_card
+        )
+
+        eye_title = QLabel(
+            "สายตาและการกระพริบตา"
+        )
+
+        eye_title.setProperty(
+            "role",
+            "heading",
         )
 
         self.blink_rate_label = QLabel(
             "อัตราการกะพริบตา: N/A"
         )
 
-        self.report_alert_count_label = QLabel(
-            "การแจ้งเตือนท่าทางที่บันทึก: --"
+        self.blink_rate_label.setProperty(
+            "role",
+            "metricSmall",
         )
 
         self.eye_alert_count_label = QLabel(
-            "การแจ้งเตือนการกระพริบตาที่บันทึก: --"
+            "การแจ้งเตือนการกระพริบตา: --"
+        )
+
+        self.eye_alert_count_label.setWordWrap(
+            True
+        )
+
+        eye_layout.addWidget(
+            eye_title
+        )
+
+        eye_layout.addWidget(
+            self.blink_rate_label
+        )
+
+        eye_layout.addWidget(
+            self.eye_alert_count_label
+        )
+
+        # ----------------------------------------------------
+        # ALERT
+        # ----------------------------------------------------
+
+        alert_summary_card = QFrame()
+        alert_summary_card.setProperty(
+            "cardTone",
+            "amber",
+        )
+
+        alert_summary_layout = QVBoxLayout(
+            alert_summary_card
+        )
+
+        alert_summary_title = QLabel(
+            "การแจ้งเตือน"
+        )
+
+        alert_summary_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        self.report_alert_count_label = QLabel(
+            "การแจ้งเตือนท่าทาง: --"
+        )
+
+        self.report_alert_count_label.setProperty(
+            "role",
+            "metricSmall",
         )
 
         self.frequent_event_label = QLabel(
-            "การแจ้งเตือนที่พบบ่อยที่สุด: N/A"
+            "รายการที่พบบ่อยที่สุด: N/A"
+        )
+
+        self.frequent_event_label.setWordWrap(
+            True
+        )
+
+        alert_summary_layout.addWidget(
+            alert_summary_title
+        )
+
+        alert_summary_layout.addWidget(
+            self.report_alert_count_label
+        )
+
+        alert_summary_layout.addWidget(
+            self.frequent_event_label
+        )
+
+        insight_row.addWidget(
+            eye_card,
+            1,
+        )
+
+        insight_row.addWidget(
+            alert_summary_card,
+            1,
+        )
+
+        layout.addLayout(
+            insight_row
+        )
+
+        # ====================================================
+        # RISK EVENT SUMMARY
+        # ====================================================
+
+        alert_group = QFrame()
+        alert_group.setProperty(
+            "card",
+            True,
+        )
+
+        alert_layout = QVBoxLayout(
+            alert_group
+        )
+
+        alert_layout.setContentsMargins(
+            20,
+            18,
+            20,
+            18,
+        )
+
+        alert_heading = QLabel(
+            "เหตุการณ์ความเสี่ยง"
+        )
+
+        alert_heading.setProperty(
+            "role",
+            "heading",
+        )
+
+        alert_layout.addWidget(
+            alert_heading
+        )
+
+        alert_metrics = QHBoxLayout()
+        alert_metrics.setSpacing(10)
+
+        self.alert_total_label = QLabel(
+            "การแจ้งเตือนทั้งหมด: --"
+        )
+
+        self.alert_closed_label = QLabel(
+            "สิ้นสุดแล้ว: --"
+        )
+
+        self.alert_active_label = QLabel(
+            "กำลังเกิดขึ้น: --"
+        )
+
+        self.alert_duration_label = QLabel(
+            "ระยะเวลาความเสี่ยงรวม: --"
+        )
+
+        for label in (
+            self.alert_total_label,
+            self.alert_closed_label,
+            self.alert_active_label,
+            self.alert_duration_label,
+        ):
+            metric = QFrame()
+            metric.setProperty(
+                "cardTone",
+                "blue",
+            )
+
+            metric_layout = QVBoxLayout(
+                metric
+            )
+
+            label.setWordWrap(True)
+
+            metric_layout.addWidget(
+                label
+            )
+
+            alert_metrics.addWidget(
+                metric,
+                1,
+            )
+
+        alert_layout.addLayout(
+            alert_metrics
+        )
+
+        self.alert_error_label = QLabel("")
+        self.alert_error_label.setWordWrap(True)
+
+        self.alert_error_label.setProperty(
+            "role",
+            "dangerText",
+        )
+
+        alert_layout.addWidget(
+            self.alert_error_label
+        )
+
+        alert_buttons = QHBoxLayout()
+
+        self.refresh_alerts_button = QPushButton(
+            "รีเฟรชข้อมูล"
+        )
+
+        self.refresh_alerts_button.clicked.connect(
+            self.refresh_alerts
+        )
+
+        self.view_alerts_button = QPushButton(
+            "ดูประวัติการแจ้งเตือน"
+        )
+
+        self.view_alerts_button.setProperty(
+            "variant",
+            "primary",
+        )
+
+        self.view_alerts_button.clicked.connect(
+            self.open_alert_history
+        )
+
+        alert_buttons.addStretch()
+
+        alert_buttons.addWidget(
+            self.refresh_alerts_button
+        )
+
+        alert_buttons.addWidget(
+            self.view_alerts_button
+        )
+
+        alert_layout.addLayout(
+            alert_buttons
+        )
+
+        layout.addWidget(
+            alert_group
+        )
+
+        # ====================================================
+        # TECHNICAL DETAIL
+        # ====================================================
+
+        detail_card = QFrame()
+        detail_card.setProperty(
+            "card",
+            True,
+        )
+
+        detail_layout = QVBoxLayout(
+            detail_card
+        )
+
+        detail_heading = QLabel(
+            "รายละเอียดเพิ่มเติม"
+        )
+
+        detail_heading.setProperty(
+            "role",
+            "heading",
         )
 
         self.risk_breakdown_label = QLabel(
@@ -437,16 +1031,22 @@ class SessionSummaryPage(
             True
         )
 
-        for widget in (
-            self.blink_rate_label,
-            self.report_alert_count_label,
-            self.eye_alert_count_label,
-            self.frequent_event_label,
-            self.risk_breakdown_label,
-        ):
-            report_layout.addWidget(
-                widget
-            )
+        self.risk_breakdown_label.setProperty(
+            "role",
+            "muted",
+        )
+
+        detail_layout.addWidget(
+            detail_heading
+        )
+
+        detail_layout.addWidget(
+            self.risk_breakdown_label
+        )
+
+        layout.addWidget(
+            detail_card
+        )
 
         # ====================================================
         # SAVE STATUS
@@ -493,109 +1093,29 @@ class SessionSummaryPage(
             self.retry_button
         )
 
-        # ====================================================
-        # ALERT / RISK EVENTS
-        # ====================================================
-
-        alert_group = QGroupBox(
-            "เหตุการณ์ความเสี่ยงและการแจ้งเตือน"
-        )
-
-        alert_group.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Maximum,
-        )
-
-        alert_layout = QVBoxLayout(
-            alert_group
-        )
-
-        self.alert_total_label = QLabel(
-            "การแจ้งเตือนทั้งหมด: --"
-        )
-
-        self.alert_closed_label = QLabel(
-            "เหตุการณ์ความเสี่ยงที่สิ้นสุดแล้ว: --"
-        )
-
-        self.alert_active_label = QLabel(
-            "เหตุการณ์ความเสี่ยงที่ยังทำงานอยู่: --"
-        )
-
-        self.alert_duration_label = QLabel(
-            "ระยะเวลาความเสี่ยงรวม: --"
-        )
-
-        self.alert_error_label = QLabel(
-            ""
-        )
-
-        self.alert_error_label.setWordWrap(
-            True
-        )
-
-        for widget in (
-            self.alert_total_label,
-            self.alert_closed_label,
-            self.alert_active_label,
-            self.alert_duration_label,
-            self.alert_error_label,
-        ):
-            alert_layout.addWidget(
-                widget
-            )
-
-        alert_buttons = QHBoxLayout()
-
-        self.refresh_alerts_button = QPushButton(
-            "รีเฟรชสรุปการแจ้งเตือน"
-        )
-
-        self.refresh_alerts_button.clicked.connect(
-            self.refresh_alerts
-        )
-
-        self.view_alerts_button = QPushButton(
-            "ดูประวัติการแจ้งเตือน"
-        )
-
-        self.view_alerts_button.clicked.connect(
-            self.open_alert_history
-        )
-
-        alert_buttons.addWidget(
-            self.refresh_alerts_button
-        )
-
-        alert_buttons.addWidget(
-            self.view_alerts_button
-        )
-
-        alert_layout.addLayout(
-            alert_buttons
+        layout.addWidget(
+            self.save_group
         )
 
         # ====================================================
-        # NOTE
+        # DISCLAIMER
         # ====================================================
 
         self.note_label = QLabel(
-            (
-                "PostGuard Risk Score 0-100 "
-                "เป็นคะแนนนำเสนอที่แปลงมาจาก "
-                "PostGuard Modified RULA สำหรับระบบกล้องด้านหน้า "
-                "ไม่ใช่ความน่าจะเป็นของการบาดเจ็บ "
-                "ไม่ใช่ Full RULA และไม่ใช่การวินิจฉัยทางการแพทย์"
-            )
+            "PostGuard Risk Score เป็นคะแนนสรุปสำหรับระบบต้นแบบ "
+            "ไม่ใช่ความน่าจะเป็นของการบาดเจ็บ "
+            "และไม่ใช่การวินิจฉัยทางการแพทย์"
         )
 
-        self.note_label.setWordWrap(
-            True
-        )
+        self.note_label.setWordWrap(True)
 
         self.note_label.setProperty(
             "role",
             "muted",
+        )
+
+        layout.addWidget(
+            self.note_label
         )
 
         # ====================================================
@@ -603,61 +1123,16 @@ class SessionSummaryPage(
         # ====================================================
 
         self.back_button = QPushButton(
-            "กลับไปหน้าแดชบอร์ด"
+            "กลับไปหน้าภาพรวม"
         )
 
         self.back_button.clicked.connect(
             self.go_back
         )
 
-        # ====================================================
-        # ADD TO PAGE
-        # ====================================================
-
-        layout.addWidget(
-            self.title_label
-        )
-
-        layout.addWidget(
-            self.description_label
-        )
-
-        layout.addWidget(
-            info_group
-        )
-
-        layout.addWidget(
-            detection_group
-        )
-
-        layout.addWidget(
-            risk_score_group
-        )
-
-        layout.addWidget(
-            chart_group
-        )
-
-        layout.addWidget(
-            report_group
-        )
-
-        layout.addWidget(
-            self.save_group
-        )
-
-        layout.addWidget(
-            alert_group
-        )
-
-        layout.addWidget(
-            self.note_label
-        )
-
         layout.addWidget(
             self.back_button
         )
-
     # ========================================================
     # SCORE CARD
     # ========================================================
@@ -1576,21 +2051,36 @@ class SessionSummaryPage(
     def refresh_alerts(
         self,
     ) -> None:
+        """
+        Refresh user-facing risk and alert summary.
+
+        Presentation only.
+        Detection / Risk / Alert policy is not modified here.
+        """
+
         self.alert_total_label.setText(
-            "การแจ้งเตือนทั้งหมด: --"
+            "--"
         )
 
         self.alert_closed_label.setText(
-            "เหตุการณ์ความเสี่ยงที่สิ้นสุดแล้ว: --"
+            "--"
         )
 
         self.alert_active_label.setText(
-            "เหตุการณ์ความเสี่ยงที่ยังทำงานอยู่: --"
+            "--"
         )
 
         self.alert_duration_label.setText(
-            "ระยะเวลาความเสี่ยงรวม: --"
+            "--:--"
         )
+
+        if hasattr(
+            self,
+            "alert_total_detail_label",
+        ):
+            self.alert_total_detail_label.setText(
+                "???????????????..."
+            )
 
         self.alert_error_label.setText(
             ""
@@ -1601,13 +2091,11 @@ class SessionSummaryPage(
         )
 
         if (
-            type(session_id)
-            is not int
-            or
-            session_id <= 0
+            type(session_id) is not int
+            or session_id <= 0
         ):
             self.alert_error_label.setText(
-                "ไม่พบรหัสเซสชันที่ถูกต้อง"
+                "?????????????????????????"
             )
 
             return
@@ -1622,11 +2110,7 @@ class SessionSummaryPage(
 
             if not risk_response.ok:
                 raise RuntimeError(
-                    (
-                        "GET risk-events returned "
-                        f"HTTP "
-                        f"{risk_response.status_code}"
-                    )
+                    "???????????????????????????????????"
                 )
 
             risk_events = (
@@ -1638,7 +2122,7 @@ class SessionSummaryPage(
                 list,
             ):
                 raise ValueError(
-                    "ข้อมูลเหตุการณ์ความเสี่ยงที่ได้รับไม่ถูกต้อง"
+                    "???????????????????????????????????"
                 )
 
             notification_response = (
@@ -1650,11 +2134,7 @@ class SessionSummaryPage(
 
             if not notification_response.ok:
                 raise RuntimeError(
-                    (
-                        "GET alert-notifications returned "
-                        f"HTTP "
-                        f"{notification_response.status_code}"
-                    )
+                    "??????????????????????????????????"
                 )
 
             notifications = (
@@ -1666,10 +2146,7 @@ class SessionSummaryPage(
                 list,
             ):
                 raise ValueError(
-                    (
-                        "ข้อมูลการแจ้งเตือนที่ได้รับ"
-                        "ไม่ถูกต้อง"
-                    )
+                    "??????????????????????????????????"
                 )
 
             eye_response = (
@@ -1681,18 +2158,19 @@ class SessionSummaryPage(
 
             if not eye_response.ok:
                 raise RuntimeError(
-                    "GET eye-alert-notifications returned "
-                    f"HTTP {eye_response.status_code}"
+                    "?????????????????????????????????"
                 )
 
-            eye_notifications = eye_response.json()
+            eye_notifications = (
+                eye_response.json()
+            )
 
             if not isinstance(
                 eye_notifications,
                 list,
             ):
                 raise ValueError(
-                    "ข้อมูลการแจ้งเตือนการกระพริบตาที่ได้รับไม่ถูกต้อง"
+                    "?????????????????????????????????"
                 )
 
         except (
@@ -1702,10 +2180,8 @@ class SessionSummaryPage(
             TypeError,
         ) as error:
             self.alert_error_label.setText(
-                (
-                    "ไม่สามารถโหลดข้อมูล "
-                    "เหตุการณ์ความเสี่ยง / การแจ้งเตือนได้: "
-                    f"{error}"
+                str(
+                    error
                 )
             )
 
@@ -1720,12 +2196,9 @@ class SessionSummaryPage(
                     event,
                     dict,
                 )
-                and
-                event.get(
+                and event.get(
                     "status"
-                )
-                ==
-                "RESOLVED"
+                ) == "RESOLVED"
             )
         ]
 
@@ -1738,12 +2211,9 @@ class SessionSummaryPage(
                     event,
                     dict,
                 )
-                and
-                event.get(
+                and event.get(
                     "status"
-                )
-                ==
-                "ACTIVE"
+                ) == "ACTIVE"
             )
         ]
 
@@ -1760,13 +2230,9 @@ class SessionSummaryPage(
                 "duration_seconds"
             )
 
-            if (
-                type(duration)
-                in
-                (
-                    int,
-                    float,
-                )
+            if type(duration) in (
+                int,
+                float,
             ):
                 total_risk_seconds += max(
                     0.0,
@@ -1779,131 +2245,133 @@ class SessionSummaryPage(
             notifications
         )
 
-        eye_notification_count = len(
-            eye_notifications
-        )
-
-        eye_first_count = sum(
-            1
-            for notification
-            in eye_notifications
-            if (
-                isinstance(notification, dict)
-                and notification.get("alert_type") == "FIRST"
-            )
-        )
-
-        eye_repeat_count = sum(
-            1
-            for notification
-            in eye_notifications
-            if (
-                isinstance(notification, dict)
-                and notification.get("alert_type") == "REPEAT"
-            )
-        )
-
         first_count = sum(
             1
-            for notification
-            in notifications
+            for item in notifications
             if (
                 isinstance(
-                    notification,
+                    item,
                     dict,
                 )
-                and
-                notification.get(
+                and item.get(
                     "alert_type"
-                )
-                ==
-                "FIRST"
+                ) == "FIRST"
             )
         )
 
         repeat_count = sum(
             1
-            for notification
-            in notifications
+            for item in notifications
             if (
                 isinstance(
-                    notification,
+                    item,
                     dict,
                 )
-                and
-                notification.get(
+                and item.get(
                     "alert_type"
-                )
-                ==
-                "REPEAT"
+                ) == "REPEAT"
             )
         )
 
         escalation_count = sum(
             1
-            for notification
-            in notifications
+            for item in notifications
             if (
                 isinstance(
-                    notification,
+                    item,
                     dict,
                 )
-                and
-                notification.get(
+                and item.get(
                     "alert_type"
-                )
-                ==
-                "ESCALATION"
+                ) == "ESCALATION"
             )
         )
+
+        eye_count = len(
+            eye_notifications
+        )
+
+        eye_first = sum(
+            1
+            for item in eye_notifications
+            if (
+                isinstance(
+                    item,
+                    dict,
+                )
+                and item.get(
+                    "alert_type"
+                ) == "FIRST"
+            )
+        )
+
+        eye_repeat = sum(
+            1
+            for item in eye_notifications
+            if (
+                isinstance(
+                    item,
+                    dict,
+                )
+                and item.get(
+                    "alert_type"
+                ) == "REPEAT"
+            )
+        )
+
+        # ====================================================
+        # USER-FACING VALUES
+        # ====================================================
 
         self.alert_total_label.setText(
-            (
-                "การแจ้งเตือนท่าทาง: "
-                f"{notification_count} ครั้ง "
-                f"(ครั้งแรก {first_count}, "
-                f"ซ้ำ {repeat_count}, "
-                "ระดับความเสี่ยงเพิ่มขึ้น "
-                f"{escalation_count}) "
-                "| การแจ้งเตือนการกระพริบตา: "
-                f"{eye_notification_count} ครั้ง "
-                f"(ครั้งแรก {eye_first_count}, "
-                f"ซ้ำ {eye_repeat_count})"
+            str(
+                notification_count
             )
         )
 
+        if hasattr(
+            self,
+            "alert_total_detail_label",
+        ):
+            self.alert_total_detail_label.setText(
+                (
+                    f"???????? {first_count}  ?  "
+                    f"??? {repeat_count}  ?  "
+                    f"?????????? {escalation_count}\n"
+                    f"????? {eye_count} ????? "
+                    f"(???????? {eye_first}, "
+                    f"??? {eye_repeat})"
+                )
+            )
+
         self.alert_closed_label.setText(
-            (
-                "เหตุการณ์ความเสี่ยงที่สิ้นสุดแล้ว: "
-                f"{len(resolved_events)} ครั้ง"
+            str(
+                len(
+                    resolved_events
+                )
             )
         )
 
         self.alert_active_label.setText(
-            (
-                "เหตุการณ์ความเสี่ยงที่ยังทำงานอยู่: "
-                f"{len(active_events)} ครั้ง"
+            str(
+                len(
+                    active_events
+                )
             )
         )
 
         minutes = int(
-            total_risk_seconds
-            //
-            60
+            total_risk_seconds // 60
         )
 
         seconds = int(
-            total_risk_seconds
-            %
-            60
+            total_risk_seconds % 60
         )
 
         self.alert_duration_label.setText(
-            (
-                "ระยะเวลาความเสี่ยงรวม: "
-                f"{minutes:02d}:{seconds:02d}"
-            )
+            f"{minutes:02d}:{seconds:02d}"
         )
+
 
     # ========================================================
     # ALERT HISTORY

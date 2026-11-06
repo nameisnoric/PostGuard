@@ -674,12 +674,12 @@ class MonitoringPage(QWidget):
 
         columns.addWidget(
             camera_panel,
-            3,
+            5,
         )
 
         columns.addWidget(
             metrics_panel,
-            2,
+            3,
         )
 
         layout.addLayout(
@@ -1034,6 +1034,127 @@ class MonitoringPage(QWidget):
             minimize=can_minimize,
             stop=can_control,
         )
+
+    def _refresh_header_status(
+        self,
+    ) -> None:
+        """
+        Refresh user-facing Monitoring status.
+
+        Presentation only.
+
+        This method does not change session, camera,
+        detection or risk state.
+        """
+
+        if not hasattr(
+            self,
+            "monitoring_header",
+        ):
+            return
+
+        # ====================================================
+        # SESSION ENDING
+        # ====================================================
+
+        if (
+            self.network_stop_pending
+            or self.is_stopping
+        ):
+            self.monitoring_header.set_status(
+                "กำลังสิ้นสุด",
+                "warning",
+            )
+
+            if hasattr(
+                self,
+                "video_card",
+            ):
+                self.video_card.set_camera_state(
+                    "กำลังสิ้นสุด"
+                )
+
+            return
+
+        # ====================================================
+        # NOT STARTED
+        # ====================================================
+
+        if self.session_id is None:
+            self.monitoring_header.set_status(
+                "ยังไม่เริ่ม",
+                "neutral",
+            )
+
+            if hasattr(
+                self,
+                "video_card",
+            ):
+                self.video_card.set_camera_state(
+                    "พร้อมตรวจจับ"
+                )
+
+            return
+
+        # ====================================================
+        # DATA GAP
+        # ====================================================
+
+        if (
+            self.network_gap_active
+            or self.camera_gap_started_at is not None
+        ):
+            self.monitoring_header.set_status(
+                "ข้อมูลขาดหาย",
+                "warning",
+            )
+
+            if hasattr(
+                self,
+                "video_card",
+            ):
+                self.video_card.set_camera_state(
+                    "กำลังรอข้อมูล"
+                )
+
+            return
+
+        # ====================================================
+        # PAUSED
+        # ====================================================
+
+        if self.is_paused:
+            self.monitoring_header.set_status(
+                "หยุดชั่วคราว",
+                "warning",
+            )
+
+            if hasattr(
+                self,
+                "video_card",
+            ):
+                self.video_card.set_camera_state(
+                    "หยุดชั่วคราว"
+                )
+
+            return
+
+        # ====================================================
+        # RUNNING
+        # ====================================================
+
+        self.monitoring_header.set_status(
+            "กำลังตรวจจับ",
+            "success",
+        )
+
+        if hasattr(
+            self,
+            "video_card",
+        ):
+            self.video_card.set_camera_state(
+                "กล้องทำงานปกติ"
+            )
 
         # ========================================================
     # NETWORK / BACKEND GAP

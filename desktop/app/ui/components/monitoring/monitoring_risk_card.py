@@ -58,7 +58,7 @@ class MonitoringRiskCard(QFrame):
 
         self.title_label.setProperty(
             "role",
-            "sectionTitle",
+            "heading",
         )
 
         layout.addWidget(
