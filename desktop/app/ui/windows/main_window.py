@@ -32,6 +32,7 @@ from app.ui.pages.history_page import HistoryPage
 from app.ui.pages.profile_page import ProfilePage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.theme import APP_QSS, polish, set_centered_window
+from app.ui.components import StatusBadge
 from app.ui.dialogs.privacy_notice_dialog import PrivacyNoticeDialog
 from app.ui.widgets.monitoring_mini_controller import MonitoringMiniController
 
@@ -104,33 +105,48 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(self.account_button)
         main_layout.addWidget(navigation)
 
+        # ============================================================
+        # ACTIVE SESSION STATUS
+        # ============================================================
+        #
+        # This bar displays status only.
+        #
+        # Session actions live in MonitoringPage under the camera so
+        # the user has one control location and one set of buttons.
+        # ============================================================
+
         self.session_bar = QFrame()
-        self.session_bar.setProperty("variant", "sessionBar")
-        session_layout = QHBoxLayout(self.session_bar)
-        session_layout.setContentsMargins(32, 8, 24, 8)
-        self.monitoring_status_label = QLabel("การตรวจจับ: ยังไม่เริ่ม")
-        self.monitoring_status_label.setProperty("status", "idle")
-        self.global_pause_button = QPushButton("หยุดการตรวจจับชั่วคราว")
-        self.global_mini_button = QPushButton("ย่อหน้าต่างการตรวจจับ")
-        self.global_stop_button = QPushButton("สิ้นสุดการตรวจจับ")
-        self.global_stop_button.setProperty("variant", "danger")
-        session_layout.addWidget(
-            self.monitoring_status_label,
-            1,
+
+        self.session_bar.setProperty(
+            "variant",
+            "sessionBar",
+        )
+
+        session_layout = QHBoxLayout(
+            self.session_bar
+        )
+
+        session_layout.setContentsMargins(
+            32,
+            8,
+            24,
+            8,
+        )
+
+        self.monitoring_status_label = StatusBadge(
+            "ยังไม่เริ่ม",
+            tone="neutral",
         )
 
         session_layout.addWidget(
-            self.global_pause_button
+            self.monitoring_status_label
         )
 
-        session_layout.addWidget(
-            self.global_mini_button
-        )
+        session_layout.addStretch()
 
-        session_layout.addWidget(
-            self.global_stop_button
+        main_layout.addWidget(
+            self.session_bar
         )
-        main_layout.addWidget(self.session_bar)
 
         self.pages = QStackedWidget()
         self.pages.setObjectName("pageStack")
@@ -157,6 +173,31 @@ class MainWindow(QMainWindow):
 
         self.monitoring_page = (
             MonitoringPage()
+        )
+
+        # ============================================================
+        # MONITORING CONTROL COMPATIBILITY REFERENCES
+        # ============================================================
+        #
+        # These are references to the SAME visible buttons inside
+        # MonitoringPage.
+        #
+        # They do not create another button set in MainWindow.
+        #
+        # Existing workflow tests and legacy code may still access
+        # these names.
+        # ============================================================
+
+        self.global_pause_button = (
+            self.monitoring_page.pause_button
+        )
+
+        self.global_mini_button = (
+            self.monitoring_page.mini_button
+        )
+
+        self.global_stop_button = (
+            self.monitoring_page.stop_button
         )
 
         # ============================================================
@@ -312,12 +353,13 @@ class MainWindow(QMainWindow):
         self.monitoring_page.stop_requested.connect(
             self.show_session_summary
         )
-        self.monitoring_page.state_changed.connect(self._on_monitoring_state_changed)
-        self.global_pause_button.clicked.connect(self.monitoring_page.handle_pause_resume)
-        self.global_mini_button.clicked.connect(
+        self.monitoring_page.state_changed.connect(
+            self._on_monitoring_state_changed
+        )
+
+        self.monitoring_page.mini_requested.connect(
             self.show_mini_monitoring
         )
-        self.global_stop_button.clicked.connect(self.monitoring_page.handle_stop)
         self.update_monitoring_controls()
         self.settings_page.load_settings()
         self.settings_page.load_privacy_consent()
@@ -635,94 +677,36 @@ class MainWindow(QMainWindow):
                 "การตรวจจับ: ยังไม่ทำงาน"
             )
 
-        self.monitoring_status_label.setText(
-            status
-        )
 
-        if (
-            active
-            and
-            (
-                monitor.is_paused
-                or
-                monitor.network_gap_active
-                or
-                monitor.network_stop_pending
-            )
-        ):
 
-            status_property = (
-                "paused"
-            )
+        if monitor.network_stop_pending:
+            status_tone = "danger"
+
+        elif monitor.is_stopping:
+            status_tone = "info"
+
+        elif active and monitor.network_gap_active:
+            status_tone = "warning"
+
+        elif active and monitor.camera_gap_started_at is not None:
+            status_tone = "warning"
+
+        elif active and monitor.is_paused:
+            status_tone = "warning"
 
         elif active:
-
-            status_property = (
-                "running"
-            )
+            status_tone = "success"
 
         else:
+            status_tone = "neutral"
 
-            status_property = (
-                "idle"
-            )
 
-        self.monitoring_status_label.setProperty(
-            "status",
-            status_property,
+        self.monitoring_status_label.set_status(
+            status,
+            status_tone,
         )
 
-        polish(
-            self.monitoring_status_label
-        )
-
-        self.global_pause_button.setText(
-            (
-                "ทำการตรวจจับต่อ"
-                if monitor.is_paused
-                else
-                "หยุดการตรวจจับชั่วคราว"
-            )
-        )
-
-        can_control = (
-            active
-            and
-            not monitor.is_stopping
-            and
-            not monitor.network_stop_pending
-        )
-
-        self.session_bar.setVisible(
-            active
-            or
-            monitor.is_stopping
-        )
-
-        # Pause/Resume requires authoritative Backend state.
-        self.global_pause_button.setEnabled(
-            can_control
-            and
-            monitor.capture is not None
-            and
-            not monitor.network_gap_active
-            and
-            monitor.camera_gap_started_at
-            is None
-        )
-
-        # Stop is still allowed during NETWORK GAP.
-        #
-        # If Backend cannot confirm END, MonitoringPage will
-        # enter pending-stop recovery.
-        self.global_stop_button.setEnabled(
-            can_control
-        )
-        self.global_mini_button.setEnabled(
-            active
-            and not monitor.is_stopping
-            and not monitor.network_stop_pending
-        )
+        monitor.refresh_controls()
 
         self._sync_monitoring_tray_state()
 

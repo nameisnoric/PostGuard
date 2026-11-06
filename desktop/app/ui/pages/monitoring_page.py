@@ -65,6 +65,9 @@ from app.services.eye_alert_policy import (
 from app.ui.dialogs.eye_alert_dialog import (
     EyeAlertDialog,
 )
+from app.ui.components.monitoring import (
+    MonitoringControls,
+)
 from app.services.camera_setup.camera_movement import (
     CameraMovementConfig,
     CameraMovementGuard,
@@ -122,6 +125,10 @@ FACTOR_THAI = {
 class MonitoringPage(QWidget):
     stop_requested = Signal(dict)
     state_changed = Signal()
+
+    # UI request only.
+    # MainWindow owns the existing Mini Monitoring behaviour.
+    mini_requested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -556,8 +563,8 @@ class MonitoringPage(QWidget):
             self._create_risk_group()
         )
 
-        button_layout = (
-            self._create_button_layout()
+        controls = (
+            self._create_controls()
         )
 
         layout.addWidget(
@@ -610,8 +617,8 @@ class MonitoringPage(QWidget):
             Qt.AlignmentFlag.AlignCenter,
         )
 
-        camera_layout.addLayout(
-            button_layout
+        camera_layout.addWidget(
+            controls
         )
 
         # ====================================================
@@ -961,60 +968,117 @@ class MonitoringPage(QWidget):
     # BUTTONS
     # ========================================================
 
-    def _create_button_layout(
+    # ========================================================
+    # MONITORING CONTROLS
+    # ========================================================
+
+    # ========================================================
+    # MONITORING CONTROLS
+    # ========================================================
+
+    def _create_controls(
         self,
-    ) -> QHBoxLayout:
+    ) -> MonitoringControls:
+        """
+        Create the single visible Monitoring control bar.
 
-        button_layout = QHBoxLayout()
+        Pause and Stop remain owned by MonitoringPage.
+        Mini-window behaviour remains owned by MainWindow.
+        """
 
-        self.pause_button = QPushButton(
-            "หยุดชั่วคราว"
+        self.controls = MonitoringControls(
+            self
         )
 
-        self.pause_button.setEnabled(
-            False
+        # ====================================================
+        # COMPATIBILITY REFERENCES
+        # ====================================================
+        #
+        # Existing Monitoring production logic already refers
+        # to self.pause_button and self.stop_button.
+        #
+        # These references point to the buttons inside the
+        # shared UI component. They do not create extra buttons.
+        # ====================================================
+
+        self.pause_button = (
+            self.controls.pause_button
         )
 
-        self.pause_button.clicked.connect(
+        self.mini_button = (
+            self.controls.minimize_button
+        )
+
+        self.stop_button = (
+            self.controls.stop_button
+        )
+
+        # ====================================================
+        # USER ACTIONS
+        # ====================================================
+
+        self.controls.pause_requested.connect(
             self.handle_pause_resume
         )
 
-        self.stop_button = QPushButton(
-            "จบการตรวจจับ"
+        self.controls.minimize_requested.connect(
+            self.mini_requested.emit
         )
 
-        self.stop_button.setProperty(
-            "variant",
-            "danger",
-        )
-
-        self.stop_button.setEnabled(
-            False
-        )
-
-        self.stop_button.clicked.connect(
+        self.controls.stop_requested.connect(
             self.handle_stop
         )
 
-        button_layout.addWidget(
-            self.stop_button
+        return self.controls
+
+
+    def refresh_controls(
+        self,
+    ) -> None:
+        """
+        Refresh visible Monitoring controls.
+
+        UI only.
+
+        This method does not:
+        - pause/resume a session
+        - stop a session
+        - change camera state
+        - change risk/detection state
+        """
+
+        active = (
+            self.session_id is not None
         )
 
-        button_layout.addWidget(
-            self.pause_button
+        can_control = (
+            active
+            and not self.is_stopping
+            and not self.network_stop_pending
         )
 
-        button_layout.setStretch(
-            0,
-            1,
+        can_pause = (
+            can_control
+            and self.capture is not None
+            and not self.network_gap_active
+            and self.camera_gap_started_at is None
         )
 
-        button_layout.setStretch(
-            1,
-            1,
+        can_minimize = (
+            active
+            and not self.is_stopping
+            and not self.network_stop_pending
         )
 
-        return button_layout
+        self.controls.set_paused(
+            self.is_paused
+        )
+
+        self.controls.set_controls_enabled(
+            pause=can_pause,
+            minimize=can_minimize,
+            stop=can_control,
+        )
 
         # ========================================================
     # NETWORK / BACKEND GAP

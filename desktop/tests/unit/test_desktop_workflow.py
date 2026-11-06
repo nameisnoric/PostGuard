@@ -482,7 +482,10 @@ class DesktopWorkflowTests(unittest.TestCase):
             self.window.global_pause_button.click()
         self.assertFalse(monitor.timer.isActive())
         self.assertIn("หยุดชั่วคราว", self.window.monitoring_status_label.text())
-        self.assertEqual(self.window.global_pause_button.text(), "ทำการตรวจจับต่อ")
+        self.assertEqual(
+            self.window.global_pause_button.text(),
+            "ทำต่อ",
+        )
         self.window.show_monitor()
         self.assertTrue(monitor.is_paused)
         self.window.show_dashboard()
