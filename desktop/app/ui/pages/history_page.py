@@ -256,6 +256,18 @@ class HistoryPage(
         # HISTORY
         # ====================================================
 
+        history_heading = self._label("เซสชันที่บันทึกไว้", "heading")
+        history_heading.setStyleSheet(
+            "font-size:20px;font-weight:700;color:#0f172a;margin-top:8px;"
+        )
+        layout.addWidget(history_heading)
+        history_note = self._label(
+            "ค้นหา เลือก และเปิดรายงานย้อนหลังจากรายการด้านล่าง",
+            "muted",
+        )
+        history_note.setStyleSheet("font-size:12px;color:#64748b;")
+        layout.addWidget(history_note)
+
         history_card, history_layout = (
             self._card()
         )
@@ -366,8 +378,16 @@ class HistoryPage(
             QAbstractItemView.SelectionMode.SingleSelection
         )
 
-        self.table.setAlternatingRowColors(
-            True
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setDefaultSectionSize(44)
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet(
+            "QTableWidget{background:#fff;alternate-background-color:#f8fafc;"
+            "border:1px solid #dbe4ef;border-radius:10px;gridline-color:transparent;}"
+            "QHeaderView::section{background:#eef3f8;color:#334155;font-size:12px;"
+            "font-weight:700;padding:10px;border:none;border-bottom:1px solid #dbe4ef;}"
+            "QTableWidget::item{padding:8px;border-bottom:1px solid #edf2f7;}"
+            "QTableWidget::item:selected{background:#dbeafe;color:#0f172a;}"
         )
 
         self.table.verticalHeader().setVisible(
@@ -614,35 +634,36 @@ class HistoryPage(
         column,
         title,
     ):
-        tone_by_title = {
-            "เซสชันทั้งหมด": ("blue", "cardValueInfo"),
-            "เสร็จสิ้น": ("green", "cardValueSuccess"),
-            "ถูกขัดจังหวะ": ("red", "cardValueDanger"),
-            "รายงานที่บันทึก": ("blue", "cardValueInfo"),
+        colors = {
+            "เซสชันทั้งหมด": ("#2563eb", "#1d4ed8"),
+            "เสร็จสิ้น": ("#16a34a", "#15803d"),
+            "ถูกขัดจังหวะ": ("#dc2626", "#b91c1c"),
+            "รายงานที่บันทึก": ("#2563eb", "#1d4ed8"),
         }
-
-        tone, value_role = tone_by_title.get(
-            title,
-            ("blue", "cardValueInfo"),
-        )
-
+        accent, value_color = colors.get(title, ("#2563eb", "#1d4ed8"))
         card, card_layout = self._card()
-        card.setProperty("cardTone", tone)
-        card.setMinimumHeight(120)
-
+        card.setMinimumHeight(126)
+        card.setStyleSheet(
+            "QFrame{background:#fff;border:1px solid #dbe4ef;"
+            "border-left:4px solid " + accent + ";border-radius:12px;}"
+        )
         title_label = self._label(title, "cardTitle")
-
-        value = self._label("--", value_role)
+        title_label.setStyleSheet(
+            "font-size:13px;font-weight:650;color:#334155;"
+            "border:none;background:transparent;"
+        )
+        value = self._label("--", "metric")
         value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+        value.setStyleSheet(
+            "font-size:30px;font-weight:800;color:" + value_color + ";"
+            "border:none;background:transparent;"
+        )
         card_layout.addWidget(title_label)
         card_layout.addStretch()
         card_layout.addWidget(value)
         card_layout.addStretch()
-
         grid.addWidget(card, 0, column)
         grid.setColumnStretch(column, 1)
-
         return value
 
     @staticmethod
@@ -674,6 +695,16 @@ class HistoryPage(
         return (
             f"{float(value):.2f}"
         )
+
+    @staticmethod
+    def _status_text(status):
+        return {
+            "COMPLETED": "เสร็จสิ้น",
+            "RUNNING": "กำลังตรวจจับ",
+            "PAUSED": "หยุดชั่วคราว",
+            "INTERRUPTED": "ถูกขัดจังหวะ",
+            "ENDED": "สิ้นสุด",
+        }.get(str(status or "").upper(), str(status or "--"))
 
     # ========================================================
     # SESSION TIME
@@ -1109,9 +1140,8 @@ class HistoryPage(
                     )
                 ),
 
-                session.get(
-                    "status",
-                    "--",
+                self._status_text(
+                    session.get("status", "--")
                 ),
 
                 self._risk_score_text(
@@ -1318,9 +1348,8 @@ class HistoryPage(
                 f"#{session_id}"
             ),
 
-            "status": session.get(
-                "status",
-                "--",
+            "status": self._status_text(
+                session.get("status", "--")
             ),
 
             "started": local_datetime(

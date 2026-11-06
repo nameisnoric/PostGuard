@@ -20,8 +20,8 @@ TOAST_AUTO_CLOSE_MS = 8_000
 
 
 RISK_TEXT = {
-    "MODERATE": "ความเสี่ยงปานกลาง",
-    "HIGH": "ความเสี่ยงสูง",
+    "MODERATE": "\u0e1b\u0e32\u0e19\u0e01\u0e25\u0e32\u0e07 \u00b7 \u0e04\u0e27\u0e23\u0e1b\u0e23\u0e31\u0e1a\u0e17\u0e48\u0e32\u0e17\u0e32\u0e07",
+    "HIGH": "\u0e04\u0e27\u0e32\u0e21\u0e40\u0e2a\u0e35\u0e48\u0e22\u0e07\u0e2a\u0e39\u0e07",
 }
 
 ALERT_TYPE_TEXT = {
@@ -277,8 +277,8 @@ class PostureAlertDialog(QDialog):
         elif normalized_risk == "MODERATE":
 
             message_text = (
-                "ตรวจพบท่าทางที่มีความเสี่ยงต่อเนื่อง "
-                "กรุณาปรับท่าทางให้อยู่ในตำแหน่งที่เหมาะสม"
+                "ท่าทางนี้ค้างนานเกินไป "
+                "ลองปรับท่านั่งเล็กน้อย"
             )
 
         else:

@@ -270,14 +270,95 @@ class CalibrationCompletedDialog(QDialog):
         layout.addWidget(title)
 
         note = QLabel(
-            "ระบบเก็บข้อมูลได้ตามเงื่อนไขทางเทคนิคแล้ว\n"
-            "โปรดตรวจสอบว่านี่เป็นท่านั่งตามปกติที่คุณต้องการใช้ "
-            "เป็นค่าอ้างอิงสำหรับการตรวจจับครั้งนี้"
+            "ท่านี้เป็นท่านั่งทำงานตามปกติของคุณหรือไม่?"
         )
         note.setProperty("role", "muted")
+        note.setStyleSheet(
+            "font-size: 18px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
+        )
         note.setWordWrap(True)
         note.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(note)
+
+        summary_card = QFrame()
+
+        summary_card.setStyleSheet(
+            "QFrame {"
+            "background: #ffffff;"
+            "border: 1px solid #bfdbfe;"
+            "border-left: 4px solid #2563eb;"
+            "border-radius: 12px;"
+            "}"
+        )
+
+        summary_layout = QVBoxLayout(
+            summary_card
+        )
+
+        summary_layout.setContentsMargins(
+            16,
+            14,
+            16,
+            14,
+        )
+
+        summary_title = QLabel(
+            "ระบบจะใช้ท่านี้เป็นจุดอ้างอิง"
+        )
+
+        summary_title.setStyleSheet(
+            "font-size: 17px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
+            "border: none;"
+        )
+
+        summary_text = QLabel(
+            "PostGuard จะใช้ลักษณะหัวไหล่ "
+            "การเอียงคอ และการก้มเงยคอ "
+            "ของท่านี้เป็นจุดเริ่มต้นสำหรับ "
+            "เปรียบเทียบระหว่างการตรวจจับ "
+            "โปรดยืนยันเมื่อท่านี้เป็นท่านั่ง "
+            "ทำงานตามปกติของคุณ"
+        )
+
+        summary_text.setWordWrap(
+            True
+        )
+
+        summary_text.setStyleSheet(
+            "font-size: 12px;"
+            "color: #475569;"
+            "border: none;"
+        )
+
+        summary_layout.addWidget(
+            summary_title
+        )
+
+        summary_layout.addWidget(
+            summary_text
+        )
+
+        layout.addWidget(
+            summary_card
+        )
+
+        technical_title = QLabel(
+            "ค่าที่ระบบวัดได้"
+        )
+
+        technical_title.setStyleSheet(
+            "font-size: 14px;"
+            "font-weight: 700;"
+            "color: #334155;"
+        )
+
+        layout.addWidget(
+            technical_title
+        )
 
         card = QFrame()
         card.setProperty("card", True)
@@ -323,7 +404,7 @@ class CalibrationCompletedDialog(QDialog):
         state.setProperty("role", "muted")
         state.setWordWrap(True)
         state.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(state)
+        state.hide()
 
         unsure_note = QLabel(
             "หากไม่แน่ใจ แนะนำให้วัดใหม่อีกครั้งเพื่อให้ได้ "
@@ -332,7 +413,7 @@ class CalibrationCompletedDialog(QDialog):
         unsure_note.setProperty("role", "muted")
         unsure_note.setWordWrap(True)
         unsure_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(unsure_note)
+        unsure_note.hide()
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -342,12 +423,12 @@ class CalibrationCompletedDialog(QDialog):
             self._choose_recalibrate
         )
 
-        unsure = QPushButton("ไม่แน่ใจ")
+        unsure = QPushButton("ยังไม่แน่ใจ")
         unsure.clicked.connect(
             self._choose_unsure
         )
 
-        done = QPushButton("ใช้ค่าอ้างอิงนี้")
+        done = QPushButton("ใช่ ใช้ท่านี้")
         done.setProperty("variant", "primary")
         done.clicked.connect(
             self._choose_use
@@ -502,6 +583,23 @@ class BaselinePage(QWidget):
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
         )
+        camera_group.setStyleSheet(
+            "QGroupBox {"
+            "font-size: 13px;"
+            "font-weight: 700;"
+            "color: #334155;"
+            "background: #ffffff;"
+            "border: 1px solid #dbe4ef;"
+            "border-radius: 12px;"
+            "margin-top: 12px;"
+            "padding-top: 8px;"
+            "}"
+            "QGroupBox::title {"
+            "subcontrol-origin: margin;"
+            "left: 12px;"
+            "padding: 0 6px;"
+            "}"
+        )
 
         self.camera_name_label = QLabel(
             'กล้อง: ยังไม่ได้เลือก'
@@ -551,8 +649,8 @@ class BaselinePage(QWidget):
         )
 
         self.preview_label.setMinimumSize(
-            420,
-            236
+            640,
+            360
         )
         self.preview_label.setMaximumSize(720, 405)
         self.preview_label.setSizePolicy(
@@ -576,6 +674,24 @@ class BaselinePage(QWidget):
         calibration_group.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Maximum,
+        )
+        calibration_group.setStyleSheet(
+            "QGroupBox {"
+            "font-size: 13px;"
+            "font-weight: 700;"
+            "color: #334155;"
+            "background: #ffffff;"
+            "border: 1px solid #dbe4ef;"
+            "border-left: 4px solid #2563eb;"
+            "border-radius: 12px;"
+            "margin-top: 12px;"
+            "padding-top: 8px;"
+            "}"
+            "QGroupBox::title {"
+            "subcontrol-origin: margin;"
+            "left: 12px;"
+            "padding: 0 6px;"
+            "}"
         )
 
         self.instruction_label = QLabel(
@@ -673,6 +789,17 @@ class BaselinePage(QWidget):
         # Add Widgets
         # -------------------------
 
+        self.title_label.setStyleSheet(
+            "font-size: 28px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
+        )
+
+        self.description_label.setStyleSheet(
+            "font-size: 13px;"
+            "color: #64748b;"
+        )
+
         layout.addWidget(
             self.title_label
         )
@@ -681,18 +808,110 @@ class BaselinePage(QWidget):
             self.description_label
         )
 
-        layout.addWidget(
+        body = QHBoxLayout()
+
+        body.setSpacing(
+            18
+        )
+
+        # ====================================================
+        # Camera
+        # ====================================================
+
+        preview_card = QFrame()
+
+        preview_card.setStyleSheet(
+            "QFrame {"
+            "background: #ffffff;"
+            "border: 1px solid #dbe4ef;"
+            "border-radius: 14px;"
+            "}"
+        )
+
+        preview_layout = QVBoxLayout(
+            preview_card
+        )
+
+        preview_layout.setContentsMargins(
+            14,
+            14,
+            14,
+            14,
+        )
+
+        preview_title = QLabel(
+            "ท่าทางอ้างอิงของคุณ"
+        )
+
+        preview_title.setStyleSheet(
+            "font-size: 17px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
+            "border: none;"
+        )
+
+        preview_note = QLabel(
+            "นั่งในท่าทำงานตามปกติ "
+            "ให้ใบหน้าและหัวไหล่อยู่ในภาพ "
+            "และอยู่นิ่งระหว่างการเก็บค่า"
+        )
+
+        preview_note.setWordWrap(
+            True
+        )
+
+        preview_note.setStyleSheet(
+            "font-size: 11px;"
+            "color: #64748b;"
+            "border: none;"
+        )
+
+        preview_layout.addWidget(
+            preview_title
+        )
+
+        preview_layout.addWidget(
+            preview_note
+        )
+
+        preview_layout.addWidget(
+            self.preview_label,
+            1,
+        )
+
+        # ====================================================
+        # Right Panel
+        # ====================================================
+
+        side = QVBoxLayout()
+
+        side.setSpacing(
+            12
+        )
+
+        side.addWidget(
             camera_group
         )
 
-        preview_row = QHBoxLayout()
-        preview_row.addStretch()
-        preview_row.addWidget(self.preview_label, 1)
-        preview_row.addStretch()
-        layout.addLayout(preview_row, 1)
-
-        layout.addWidget(
+        side.addWidget(
             calibration_group
+        )
+
+        side.addStretch()
+
+        body.addWidget(
+            preview_card,
+            3,
+        )
+
+        body.addLayout(
+            side,
+            2,
+        )
+
+        layout.addLayout(
+            body,
+            1,
         )
 
         layout.addLayout(

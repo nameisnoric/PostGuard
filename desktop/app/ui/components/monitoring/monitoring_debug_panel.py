@@ -102,7 +102,7 @@ class MonitoringDebugPanel(QFrame):
         )
 
         self.status_label = QLabel(
-            "สถานะ: ยังไม่เริ่ม"
+            "สถานะ: กำลังเริ่มตรวจจับ..."
         )
 
         self.status_label.setWordWrap(

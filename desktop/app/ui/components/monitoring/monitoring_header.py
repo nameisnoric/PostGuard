@@ -136,7 +136,7 @@ class MonitoringHeader(QFrame):
         )
 
         self.status_badge = StatusBadge(
-            "ยังไม่เริ่ม",
+            "กำลังเริ่มตรวจจับ...",
             tone="neutral",
         )
 

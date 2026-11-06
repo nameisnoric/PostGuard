@@ -221,12 +221,11 @@ class SessionComparisonDialog(
             "card",
             True,
         )
-        result_card.setProperty(
-            "cardTone",
-            "blue",
-        )
-        result_card.setMinimumHeight(
-            180
+        result_card.setProperty("cardTone", "blue")
+        result_card.setMinimumHeight(190)
+        result_card.setStyleSheet(
+            "QFrame{background:#fff;border:1px solid #dbe4ef;"
+            "border-left:5px solid #2563eb;border-radius:12px;}"
         )
 
         result_layout = QVBoxLayout(
@@ -248,13 +247,20 @@ class SessionComparisonDialog(
             "ผลเปรียบเทียบ: --",
             "cardTitle",
         )
+        self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.progress_label.setStyleSheet(
+            "font-size:26px;font-weight:800;color:#0f172a;"
+            "border:none;background:transparent;"
+        )
 
         self.score_change_label = self._label(
             "คะแนนเฉลี่ย: --",
             "cardValueInfo",
         )
-        self.score_change_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
+        self.score_change_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.score_change_label.setStyleSheet(
+            "font-size:21px;font-weight:750;color:#1d4ed8;"
+            "border:none;background:transparent;"
         )
 
         # Compatibility with earlier tests/code.
@@ -350,8 +356,15 @@ class SessionComparisonDialog(
             False
         )
 
-        self.table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        self.table.setStyleSheet(
+            "QTableWidget{background:#fff;alternate-background-color:#f8fafc;"
+            "border:1px solid #dbe4ef;border-radius:10px;gridline-color:transparent;}"
+            "QHeaderView::section{background:#eef3f8;color:#334155;font-weight:700;"
+            "font-size:12px;padding:9px;border:none;border-bottom:1px solid #dbe4ef;}"
+            "QTableWidget::item{padding:7px;border-bottom:1px solid #edf2f7;}"
         )
 
         metrics = (
@@ -786,16 +799,21 @@ class SessionComparisonDialog(
         tone: str,
         value_role: str,
     ) -> None:
-        self.result_card.setProperty("cardTone", tone)
-        self.score_change_label.setProperty("role", value_role)
-
-        for widget in (
-            self.result_card,
-            self.score_change_label,
-        ):
-            widget.style().unpolish(widget)
-            widget.style().polish(widget)
-            widget.update()
+        palette = {
+            "green": ("#16a34a", "#15803d"),
+            "red": ("#dc2626", "#b91c1c"),
+            "blue": ("#2563eb", "#1d4ed8"),
+            "amber": ("#d97706", "#b45309"),
+        }
+        accent, value_color = palette.get(tone, palette["blue"])
+        self.result_card.setStyleSheet(
+            "QFrame{background:#fff;border:1px solid #dbe4ef;"
+            "border-left:5px solid " + accent + ";border-radius:12px;}"
+        )
+        self.score_change_label.setStyleSheet(
+            "font-size:21px;font-weight:750;color:" + value_color + ";"
+            "border:none;background:transparent;"
+        )
 
     # ========================================================
     # RENDER

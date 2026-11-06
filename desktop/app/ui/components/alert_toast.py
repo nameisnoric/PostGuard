@@ -57,7 +57,7 @@ class AlertToast(QDialog):
             icon_text="!",
             details=[
                 "ก้มคอ",
-                "ความเสี่ยงปานกลาง",
+                "ควรปรับท่าทาง",
             ],
         )
 

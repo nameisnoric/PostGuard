@@ -532,8 +532,21 @@ class MonitoringPage(QWidget):
         )
 
         scroll = QScrollArea()
+
         scroll.setWidgetResizable(
             True
+        )
+
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        scroll.setFrameShape(
+            QFrame.Shape.NoFrame
         )
 
         page_layout.addWidget(
@@ -552,14 +565,14 @@ class MonitoringPage(QWidget):
         )
 
         layout.setContentsMargins(
-            24,
-            20,
-            24,
-            24,
+            14,
+            10,
+            14,
+            12,
         )
 
         layout.setSpacing(
-            12
+            8
         )
 
         scroll.setWidget(
@@ -588,10 +601,6 @@ class MonitoringPage(QWidget):
             self._create_controls()
         )
 
-        controls = (
-            self._create_controls()
-        )
-
         layout.addWidget(
             monitoring_header
         )
@@ -599,7 +608,7 @@ class MonitoringPage(QWidget):
         columns = QHBoxLayout()
 
         columns.setSpacing(
-            16
+            12
         )
 
         # ====================================================
@@ -648,14 +657,14 @@ class MonitoringPage(QWidget):
         )
 
         metrics_layout.setContentsMargins(
-            14,
-            14,
-            14,
-            14,
+            10,
+            10,
+            10,
+            10,
         )
 
         metrics_layout.setSpacing(
-            10
+            8
         )
 
         metrics_layout.addWidget(
@@ -2784,10 +2793,13 @@ class MonitoringPage(QWidget):
         # ASSESSMENT
         # ====================================================
 
+        assessment_status = (
+            assessment.get("status")
+            or "NOT_EVALUATED"
+        )
+
         self.assessment_label.setText(
-            "ผลการประเมิน: "
-            f"{assessment.get('status')} "
-            f"({assessment.get('reason')})"
+            f"ผลการประเมิน: {assessment_status}"
         )
 
         factors = (

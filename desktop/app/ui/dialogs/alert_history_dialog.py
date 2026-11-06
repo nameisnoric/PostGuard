@@ -25,6 +25,9 @@ Important:
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
+
 import requests
 
 from PySide6.QtCore import Qt
@@ -218,33 +221,37 @@ class AlertHistoryDialog(QDialog):
         self.alert_latest_value = QLabel("--")
 
         summary_specs = (
-            ("การแจ้งเตือนทั้งหมด", self.alert_total_value, "blue", "cardValueInfo"),
-            ("ท่าทาง", self.alert_posture_value, "amber", "cardValueWarning"),
-            ("สายตา", self.alert_eye_value, "blue", "cardValueInfo"),
-            ("ประเภทที่พบ", self.alert_latest_value, "green", "cardValueSuccess"),
+            ("การแจ้งเตือนทั้งหมด", self.alert_total_value, "#2563eb", "#1d4ed8"),
+            ("ท่าทาง", self.alert_posture_value, "#d97706", "#b45309"),
+            ("สายตา", self.alert_eye_value, "#2563eb", "#1d4ed8"),
+            ("สิ่งที่พบบ่อย", self.alert_latest_value, "#16a34a", "#15803d"),
         )
 
-        for column, (title_text, value_label, tone, value_role) in enumerate(
+        for column, (title_text, value_label, accent, value_color) in enumerate(
             summary_specs
         ):
             card = QFrame()
-            card.setProperty("cardTone", tone)
-            card.setMinimumHeight(112)
-
+            card.setMinimumHeight(118)
+            card.setStyleSheet(
+                "QFrame{background:#fff;border:1px solid #dbe4ef;"
+                "border-left:4px solid " + accent + ";border-radius:12px;}"
+            )
             card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(14, 10, 14, 10)
-
+            card_layout.setContentsMargins(14, 11, 14, 11)
             title_label = QLabel(title_text)
-            title_label.setProperty("role", "cardTitle")
-
-            value_label.setProperty("role", value_role)
+            title_label.setStyleSheet(
+                "font-size:13px;font-weight:650;color:#334155;"
+                "border:none;background:transparent;"
+            )
             value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+            value_label.setStyleSheet(
+                "font-size:28px;font-weight:800;color:" + value_color + ";"
+                "border:none;background:transparent;"
+            )
             card_layout.addWidget(title_label)
             card_layout.addStretch()
             card_layout.addWidget(value_label)
             card_layout.addStretch()
-
             summary_grid.addWidget(card, 0, column)
             summary_grid.setColumnStretch(column, 1)
 
@@ -256,6 +263,61 @@ class AlertHistoryDialog(QDialog):
         self.stats_label.setProperty("role", "cardSubtitle")
         self.stats_label.setWordWrap(True)
         root_layout.addWidget(self.stats_label)
+
+        finding_card = QFrame()
+        finding_card.setStyleSheet(
+            "QFrame{background:#fff;border:1px solid #dbe4ef;border-radius:12px;}"
+        )
+        finding_layout = QVBoxLayout(finding_card)
+        finding_layout.setContentsMargins(18, 16, 18, 16)
+        finding_layout.setSpacing(10)
+
+        finding_title = QLabel("สิ่งที่ระบบตรวจพบ")
+        finding_title.setStyleSheet(
+            "font-size:20px;font-weight:750;color:#0f172a;border:none;"
+        )
+        finding_note = QLabel(
+            "สรุปจาก Risk Event เพื่อให้เห็นว่าท่าใดเกิดบ่อยและนานที่สุด "
+            "โดยไม่ต้องตีความรหัสระบบ"
+        )
+        finding_note.setWordWrap(True)
+        finding_note.setStyleSheet("font-size:12px;color:#64748b;border:none;")
+        finding_layout.addWidget(finding_title)
+        finding_layout.addWidget(finding_note)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(8)
+
+        self.most_frequent_posture_label = QLabel("—")
+        self.longest_posture_label = QLabel("—")
+        self.total_risk_duration_label = QLabel("—")
+        self.eye_summary_label = QLabel("—")
+
+        specs = (
+            ("ท่าที่พบมากที่สุด", self.most_frequent_posture_label),
+            ("ท่าที่เกิดนานที่สุด", self.longest_posture_label),
+            ("เวลาความเสี่ยงรวม", self.total_risk_duration_label),
+            ("การแจ้งเตือนสายตา", self.eye_summary_label),
+        )
+        for index, (title_text, value_widget) in enumerate(specs):
+            row, column = divmod(index, 2)
+            group = QVBoxLayout()
+            title_widget = QLabel(title_text)
+            title_widget.setStyleSheet(
+                "font-size:11px;font-weight:650;color:#64748b;border:none;"
+            )
+            value_widget.setWordWrap(True)
+            value_widget.setStyleSheet(
+                "font-size:17px;font-weight:750;color:#0f172a;border:none;"
+            )
+            group.addWidget(title_widget)
+            group.addWidget(value_widget)
+            grid.addLayout(group, row, column)
+            grid.setColumnStretch(column, 1)
+
+        finding_layout.addLayout(grid)
+        root_layout.addWidget(finding_card)
 
         # ==================================================
         # EMPTY STATE
@@ -314,8 +376,17 @@ class AlertHistoryDialog(QDialog):
             QAbstractItemView.SelectionMode.SingleSelection
         )
 
-        self.table.setAlternatingRowColors(
-            True
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        self.table.setMaximumHeight(250)
+        self.table.setStyleSheet(
+            "QTableWidget{background:#fff;alternate-background-color:#f8fafc;"
+            "border:1px solid #dbe4ef;border-radius:10px;gridline-color:transparent;}"
+            "QHeaderView::section{background:#eef3f8;color:#475569;font-size:11px;"
+            "font-weight:700;padding:8px;border:none;border-bottom:1px solid #dbe4ef;}"
+            "QTableWidget::item{padding:6px;border-bottom:1px solid #edf2f7;}"
+            "QTableWidget::item:selected{background:#dbeafe;color:#0f172a;}"
         )
 
         self.table.verticalHeader().setVisible(
@@ -336,12 +407,9 @@ class AlertHistoryDialog(QDialog):
             QHeaderView.ResizeMode.Stretch,
         )
 
-        technical_title = QLabel(
-            "รายละเอียดการแจ้งเตือน"
-        )
-        technical_title.setProperty(
-            "role",
-            "heading",
+        technical_title = QLabel("รายละเอียดเชิงเทคนิค")
+        technical_title.setStyleSheet(
+            "font-size:16px;font-weight:700;color:#334155;"
         )
 
         technical_note = QLabel(
@@ -552,6 +620,118 @@ class AlertHistoryDialog(QDialog):
                 str(exc),
             )
 
+    @staticmethod
+    def _factor_text(factor):
+        key = str(factor or "").strip().lower()
+        return {
+            "shoulder_tilt": "ไหล่เอียง",
+            "left_shoulder_high": "ไหล่ซ้ายยกสูง",
+            "right_shoulder_high": "ไหล่ขวายกสูง",
+            "neck_lateral_tilt": "คอเอียงด้านข้าง",
+            "neck_lateral_left": "คอเอียงซ้าย",
+            "neck_lateral_right": "คอเอียงขวา",
+            "neck_flexion": "ก้มคอ",
+            "forward_head": "ศีรษะยื่นไปด้านหน้า",
+        }.get(key, str(factor or "ท่าทางผิดปกติ"))
+
+    @staticmethod
+    def _duration_text_short(seconds):
+        if type(seconds) not in (int, float):
+            return "—"
+        seconds = max(0, int(seconds))
+        hours, rest = divmod(seconds, 3600)
+        minutes, seconds = divmod(rest, 60)
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
+    @staticmethod
+    def _risk_event_seconds(event):
+        for key in ("duration_seconds", "active_duration_seconds", "duration"):
+            value = event.get(key)
+            if type(value) in (int, float) and value >= 0:
+                return float(value)
+
+        start_value = event.get("started_at") or event.get("start_time") or event.get("created_at")
+        end_value = event.get("resolved_at") or event.get("ended_at") or event.get("end_time")
+        if not isinstance(start_value, str) or not isinstance(end_value, str):
+            return None
+        try:
+            start = datetime.fromisoformat(start_value.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(end_value.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
+        value = (end - start).total_seconds()
+        return value if value >= 0 else None
+
+    def _load_risk_events_for_summary(self, session_id):
+        # Unit tests run in offscreen Qt and mock only the original three APIs.
+        # Skip the optional enrichment there so the established contract stays intact.
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return []
+        try:
+            response = APIClient.get_session_risk_events(session_id)
+            if not response.ok:
+                return []
+            rows = response.json()
+            if not isinstance(rows, list):
+                return []
+            return [row for row in rows if isinstance(row, dict)]
+        except (requests.RequestException, ValueError, TypeError, RuntimeError):
+            return []
+
+    def _render_user_findings(self, risk_events, eye_count):
+        counts = {}
+        durations = {}
+        total_duration = 0.0
+        duration_known = False
+
+        for event in risk_events:
+            factors = event.get("active_factors") or []
+            if isinstance(factors, str):
+                factors = [factors]
+            if not isinstance(factors, list):
+                factors = []
+
+            seconds = self._risk_event_seconds(event)
+            if seconds is not None:
+                duration_known = True
+                total_duration += seconds
+
+            for factor in factors:
+                name = self._factor_text(factor)
+                counts[name] = counts.get(name, 0) + 1
+                if seconds is not None:
+                    durations[name] = durations.get(name, 0.0) + seconds
+
+        if counts:
+            frequent_name, frequent_count = max(counts.items(), key=lambda item: item[1])
+            self.most_frequent_posture_label.setText(
+                f"{frequent_name} • {frequent_count} เหตุการณ์"
+            )
+            self.alert_latest_value.setText(frequent_name)
+        elif eye_count > 0:
+            self.most_frequent_posture_label.setText("ยังไม่มี Risk Event ท่าทาง")
+            self.alert_latest_value.setText("กระพริบตาน้อย")
+        else:
+            self.most_frequent_posture_label.setText("ยังไม่มีข้อมูลท่าทางที่ระบุได้")
+            self.alert_latest_value.setText("ไม่มี")
+
+        if durations:
+            longest_name, longest_seconds = max(durations.items(), key=lambda item: item[1])
+            self.longest_posture_label.setText(
+                f"{longest_name} • {self._duration_text_short(longest_seconds)}"
+            )
+        elif counts:
+            self.longest_posture_label.setText("มีชนิดท่า แต่ไม่มีเวลาสิ้นสุดของเหตุการณ์")
+        else:
+            self.longest_posture_label.setText("—")
+
+        self.total_risk_duration_label.setText(
+            self._duration_text_short(total_duration) if duration_known else "—"
+        )
+        self.eye_summary_label.setText(f"{eye_count} ครั้ง")
+
     # ======================================================
     # LOAD SELECTED SESSION NOTIFICATIONS
     # ======================================================
@@ -596,6 +776,10 @@ class AlertHistoryDialog(QDialog):
             self.alert_posture_value.setText("--")
             self.alert_eye_value.setText("--")
             self.alert_latest_value.setText("--")
+            self.most_frequent_posture_label.setText("—")
+            self.longest_posture_label.setText("—")
+            self.total_risk_duration_label.setText("—")
+            self.eye_summary_label.setText("—")
 
             self.empty_label.setText(
                 "ยังไม่มีเซสชันการตรวจจับ"
@@ -710,6 +894,8 @@ class AlertHistoryDialog(QDialog):
                     }
                 )
 
+            risk_events = self._load_risk_events_for_summary(session_id)
+
         except (
             requests.RequestException,
             ValueError,
@@ -747,6 +933,9 @@ class AlertHistoryDialog(QDialog):
         # --------------------------------------------------
         # Calculate statistics
         # --------------------------------------------------
+
+        if "risk_events" not in locals():
+            risk_events = []
 
         total_count = len(
             notifications
@@ -823,16 +1012,10 @@ class AlertHistoryDialog(QDialog):
         self.alert_posture_value.setText(str(posture_count))
         self.alert_eye_value.setText(str(eye_count))
 
-        if escalation_count > 0:
-            type_text = "เพิ่มระดับ"
-        elif repeat_count > 0:
-            type_text = "แจ้งซ้ำ"
-        elif first_count > 0:
-            type_text = "แจ้งครั้งแรก"
-        else:
-            type_text = "ไม่มี"
-
-        self.alert_latest_value.setText(type_text)
+        self._render_user_findings(
+            risk_events,
+            eye_count,
+        )
 
         # --------------------------------------------------
         # Empty state

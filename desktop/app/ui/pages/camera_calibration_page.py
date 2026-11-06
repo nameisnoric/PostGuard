@@ -233,10 +233,10 @@ class CameraCalibrationPage(
         )
 
         layout.setContentsMargins(
-            48,
-            24,
-            48,
             32,
+            22,
+            32,
+            28,
         )
 
         layout.setSpacing(
@@ -254,8 +254,8 @@ class CameraCalibrationPage(
 
         subtitle = QLabel(
             "ขั้นตอน 3 จาก 4  ·  "
-            "PostGuard จะตรวจและปรับแนวภาพจากกล้องให้อัตโนมัติ "
-            "จากนั้นใช้บัตรขนาดมาตรฐานเพื่อสร้างข้อมูลอ้างอิงของกล้อง"
+            "ลองจัดกล้องให้ตรงก่อน แล้ววางบัตรมาตรฐานในกรอบ "
+            "หากภาพยังเอียง ระบบจะช่วยปรับแนวภาพให้"
         )
 
         subtitle.setProperty(
@@ -356,6 +356,23 @@ class CameraCalibrationPage(
             True,
         )
 
+        status_card.setStyleSheet(
+            "QFrame {"
+            "background: #ffffff;"
+            "border: 1px solid #dbe4ef;"
+            "border-left: 4px solid #2563eb;"
+            "border-radius: 14px;"
+            "}"
+        )
+
+        preview_card.setStyleSheet(
+            "QFrame {"
+            "background: #ffffff;"
+            "border: 1px solid #dbe4ef;"
+            "border-radius: 14px;"
+            "}"
+        )
+
         status_layout = QVBoxLayout(
             status_card
         )
@@ -372,12 +389,17 @@ class CameraCalibrationPage(
         )
 
         heading = QLabel(
-            "ข้อมูลอ้างอิงกล้อง"
+            "สิ่งที่ต้องทำตอนนี้"
         )
 
         heading.setProperty(
             "role",
             "heading",
+        )
+        heading.setStyleSheet(
+            "font-size: 20px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
         )
 
         status_layout.addWidget(
@@ -392,6 +414,11 @@ class CameraCalibrationPage(
             "role",
             "muted",
         )
+        self.camera_label.setStyleSheet(
+            "font-size: 12px;"
+            "color: #64748b;"
+            "border: none;"
+        )
 
         self.guidance_label = QLabel(
             "กำลังตรวจและปรับแนวภาพอัตโนมัติ..."
@@ -399,6 +426,18 @@ class CameraCalibrationPage(
 
         self.guidance_label.setWordWrap(
             True
+        )
+        self.guidance_label.setStyleSheet(
+            "font-size: 18px;"
+            "font-weight: 800;"
+            "color: #0f172a;"
+            "padding: 8px 0;"
+        )
+        self.guidance_label.setStyleSheet(
+            "font-size: 16px;"
+            "font-weight: 700;"
+            "color: #0f172a;"
+            "border: none;"
         )
 
         self.progress_label = QLabel(
@@ -408,6 +447,15 @@ class CameraCalibrationPage(
         self.progress_label.setProperty(
             "role",
             "muted",
+        )
+        self.progress_label.setStyleSheet(
+            "font-size: 14px;"
+            "font-weight: 700;"
+            "color: #1d4ed8;"
+            "padding: 7px 10px;"
+            "background: #eff6ff;"
+            "border: 1px solid #bfdbfe;"
+            "border-radius: 8px;"
         )
 
         status_layout.addWidget(
@@ -427,7 +475,7 @@ class CameraCalibrationPage(
         # ====================================================
 
         diagnostic_title = QLabel(
-            "รายละเอียดการปรับแนวภาพ"
+            "รายละเอียดระบบ"
         )
 
         diagnostic_title.setProperty(
@@ -452,26 +500,26 @@ class CameraCalibrationPage(
             self.detected_label,
             self.applied_label,
         ):
+
             label.setProperty(
                 "role",
                 "muted",
             )
 
-        status_layout.addWidget(
-            diagnostic_title
-        )
+            label.setStyleSheet(
+                "font-size: 11px;"
+                "color: #64748b;"
+                "background: transparent;"
+                "border: none;"
+                "padding: 2px 0;"
+            )
 
-        status_layout.addWidget(
-            self.alignment_label
-        )
-
-        status_layout.addWidget(
-            self.detected_label
-        )
-
-        status_layout.addWidget(
-            self.applied_label
-        )
+        # รายละเอียดเชิงเทคนิคยังคงคำนวณตามเดิม
+        # แต่ไม่แย่งสายตาผู้ใช้ในขั้นตอนหลัก
+        diagnostic_title.hide()
+        self.alignment_label.hide()
+        self.detected_label.hide()
+        self.applied_label.hide()
 
         # ====================================================
         # Manual override

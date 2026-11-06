@@ -54,6 +54,43 @@ class CameraSetupPage(QWidget):
         card_layout.addWidget(self.status_label)
 
         self.camera_list = QListWidget()
+        self.camera_list.setMinimumHeight(260)
+        self.camera_list.setSpacing(8)
+        self.camera_list.setStyleSheet(
+            """
+            QListWidget {
+                background: #ffffff;
+                border: 1px solid #dbe4ef;
+                border-radius: 14px;
+                padding: 10px;
+                outline: none;
+                font-size: 17px;
+            }
+
+            QListWidget::item {
+                min-height: 58px;
+                padding: 12px 16px;
+                margin: 3px 2px;
+                border: 1px solid #e2e8f0;
+                border-radius: 10px;
+                background: #ffffff;
+                color: #0f172a;
+            }
+
+            QListWidget::item:hover {
+                background: #f8fafc;
+                border: 1px solid #93c5fd;
+            }
+
+            QListWidget::item:selected {
+                background: #eaf2ff;
+                border: 2px solid #2563eb;
+                color: #1d4ed8;
+                font-weight: 700;
+            }
+            """
+        )
+
         self.camera_list.setMinimumHeight(220)
         self.camera_list.setEnabled(False)
         card_layout.addWidget(self.camera_list)

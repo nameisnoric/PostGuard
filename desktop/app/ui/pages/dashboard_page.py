@@ -515,6 +515,19 @@ class DashboardPage(QWidget):
         # SESSION METRICS
         # ====================================================
 
+        section = self._label("ภาพรวมการใช้งาน", "heading")
+        section.setStyleSheet(
+            "font-size:20px;font-weight:700;color:#0f172a;margin-top:6px;"
+        )
+        layout.addWidget(section)
+
+        section_note = self._label(
+            "ตัวเลขสำคัญจากเซสชันที่บันทึกไว้",
+            "muted",
+        )
+        section_note.setStyleSheet("font-size:12px;color:#64748b;")
+        layout.addWidget(section_note)
+
         summary_grid = QGridLayout()
 
         summary_grid.setHorizontalSpacing(
@@ -549,6 +562,19 @@ class DashboardPage(QWidget):
         # ====================================================
         # SESSION RISK INSIGHT
         # ====================================================
+
+        risk_section = self._label("ความเสี่ยงล่าสุด", "heading")
+        risk_section.setStyleSheet(
+            "font-size:20px;font-weight:700;color:#0f172a;margin-top:10px;"
+        )
+        layout.addWidget(risk_section)
+
+        risk_note = self._label(
+            "คะแนน แนวโน้ม การแจ้งเตือน และเวลาของเซสชันล่าสุด",
+            "muted",
+        )
+        risk_note.setStyleSheet("font-size:12px;color:#64748b;")
+        layout.addWidget(risk_note)
 
         risk_grid = QGridLayout()
 
@@ -707,8 +733,16 @@ class DashboardPage(QWidget):
             QAbstractItemView.SelectionMode.SingleSelection
         )
 
-        self.recent_table.setMinimumHeight(
-            300
+        self.recent_table.setMinimumHeight(300)
+        self.recent_table.verticalHeader().setDefaultSectionSize(42)
+        self.recent_table.setShowGrid(False)
+        self.recent_table.setStyleSheet(
+            "QTableWidget{background:#fff;alternate-background-color:#f8fafc;"
+            "border:1px solid #dbe4ef;border-radius:10px;gridline-color:transparent;}"
+            "QHeaderView::section{background:#eef3f8;color:#334155;font-weight:700;"
+            "font-size:12px;padding:9px;border:none;border-bottom:1px solid #dbe4ef;}"
+            "QTableWidget::item{padding:7px;border-bottom:1px solid #edf2f7;}"
+            "QTableWidget::item:selected{background:#dbeafe;color:#0f172a;}"
         )
 
         self.recent_table.cellDoubleClicked.connect(
@@ -1005,48 +1039,53 @@ class DashboardPage(QWidget):
         title,
         note,
     ):
-        tone_by_title = {
-            "เซสชันที่เสร็จสิ้น": ("green", "cardValueSuccess"),
-            "เวลาตรวจจับจริง": ("blue", "cardValueInfo"),
-            "เซสชันที่ถูกขัดจังหวะ": ("red", "cardValueDanger"),
-            "ความเสี่ยงโดยรวมของเซสชัน": ("blue", "cardValueInfo"),
-            "แนวโน้มความเสี่ยง": ("green", "cardValueSuccess"),
-            "ความเสี่ยงสูงสุดล่าสุด": ("amber", "cardValueWarning"),
-            "การแจ้งเตือนล่าสุด": ("amber", "cardValueWarning"),
-            "ระยะเวลาล่าสุด": ("blue", "cardValueInfo"),
+        colors = {
+            "เซสชันที่เสร็จสิ้น": ("#16a34a", "#15803d"),
+            "เวลาตรวจจับจริง": ("#2563eb", "#1d4ed8"),
+            "เซสชันที่ถูกขัดจังหวะ": ("#dc2626", "#b91c1c"),
+            "ความเสี่ยงโดยรวมของเซสชัน": ("#2563eb", "#1d4ed8"),
+            "แนวโน้มความเสี่ยง": ("#16a34a", "#15803d"),
+            "ความเสี่ยงสูงสุดล่าสุด": ("#d97706", "#b45309"),
+            "การแจ้งเตือนล่าสุด": ("#d97706", "#b45309"),
+            "ระยะเวลาล่าสุด": ("#2563eb", "#1d4ed8"),
         }
+        accent, value_color = colors.get(title, ("#2563eb", "#1d4ed8"))
 
-        tone, value_role = tone_by_title.get(
-            title,
-            ("blue", "cardValueInfo"),
+        card, card_layout = self._card()
+        card.setMinimumHeight(138)
+        card.setStyleSheet(
+            "QFrame{background:#fff;border:1px solid #dbe4ef;"
+            "border-left:4px solid " + accent + ";border-radius:12px;}"
         )
-
-        card, layout = self._card()
-        card.setProperty("cardTone", tone)
-        card.setMinimumHeight(132)
 
         title_label = self._label(title, "cardTitle")
-        title_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        title_label.setStyleSheet(
+            "font-size:13px;font-weight:650;color:#334155;"
+            "border:none;background:transparent;"
         )
 
-        value = self._label("--", value_role)
+        value = self._label("--", "metric")
         value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        value.setStyleSheet(
+            "font-size:30px;font-weight:800;color:" + value_color + ";"
+            "border:none;background:transparent;"
+        )
 
         note_label = self._label(note, "cardSubtitle")
         note_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        note_label.setStyleSheet(
+            "font-size:11px;color:#64748b;border:none;background:transparent;"
+        )
 
-        layout.addWidget(title_label)
-        layout.addStretch()
-        layout.addWidget(value)
-        layout.addWidget(note_label)
-        layout.addStretch()
+        card_layout.addWidget(title_label)
+        card_layout.addStretch()
+        card_layout.addWidget(value)
+        card_layout.addWidget(note_label)
+        card_layout.addStretch()
 
         row, real_column = divmod(column, 3)
-
         grid.addWidget(card, row, real_column)
         grid.setColumnStretch(real_column, 1)
-
         return value
 
     # ========================================================
