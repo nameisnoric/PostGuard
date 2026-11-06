@@ -32,6 +32,8 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -204,19 +206,56 @@ class AlertHistoryDialog(QDialog):
         )
 
         # ==================================================
-        # STATISTICS
+        # USER-FACING SUMMARY
         # ==================================================
+
+        summary_grid = QGridLayout()
+        summary_grid.setHorizontalSpacing(10)
+
+        self.alert_total_value = QLabel("--")
+        self.alert_posture_value = QLabel("--")
+        self.alert_eye_value = QLabel("--")
+        self.alert_latest_value = QLabel("--")
+
+        summary_specs = (
+            ("การแจ้งเตือนทั้งหมด", self.alert_total_value, "blue", "cardValueInfo"),
+            ("ท่าทาง", self.alert_posture_value, "amber", "cardValueWarning"),
+            ("สายตา", self.alert_eye_value, "blue", "cardValueInfo"),
+            ("ประเภทที่พบ", self.alert_latest_value, "green", "cardValueSuccess"),
+        )
+
+        for column, (title_text, value_label, tone, value_role) in enumerate(
+            summary_specs
+        ):
+            card = QFrame()
+            card.setProperty("cardTone", tone)
+            card.setMinimumHeight(112)
+
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(14, 10, 14, 10)
+
+            title_label = QLabel(title_text)
+            title_label.setProperty("role", "cardTitle")
+
+            value_label.setProperty("role", value_role)
+            value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            card_layout.addWidget(title_label)
+            card_layout.addStretch()
+            card_layout.addWidget(value_label)
+            card_layout.addStretch()
+
+            summary_grid.addWidget(card, 0, column)
+            summary_grid.setColumnStretch(column, 1)
+
+        root_layout.addLayout(summary_grid)
 
         self.stats_label = QLabel(
             "เลือกเซสชันเพื่อโหลดประวัติการแจ้งเตือน"
         )
-        self.stats_label.setWordWrap(
-            True
-        )
-
-        root_layout.addWidget(
-            self.stats_label
-        )
+        self.stats_label.setProperty("role", "cardSubtitle")
+        self.stats_label.setWordWrap(True)
+        root_layout.addWidget(self.stats_label)
 
         # ==================================================
         # EMPTY STATE
@@ -297,6 +336,25 @@ class AlertHistoryDialog(QDialog):
             QHeaderView.ResizeMode.Stretch,
         )
 
+        technical_title = QLabel(
+            "รายละเอียดการแจ้งเตือน"
+        )
+        technical_title.setProperty(
+            "role",
+            "heading",
+        )
+
+        technical_note = QLabel(
+            "ข้อมูลด้านล่างเป็นรายละเอียดที่ระบบบันทึกไว้ "
+            "สำหรับตรวจสอบย้อนหลัง"
+        )
+        technical_note.setProperty(
+            "role",
+            "cardSubtitle",
+        )
+
+        root_layout.addWidget(technical_title)
+        root_layout.addWidget(technical_note)
         root_layout.addWidget(
             self.table,
             1,
@@ -534,6 +592,10 @@ class AlertHistoryDialog(QDialog):
             self.stats_label.setText(
                 "ไม่มีเซสชันที่พร้อมแสดง"
             )
+            self.alert_total_value.setText("--")
+            self.alert_posture_value.setText("--")
+            self.alert_eye_value.setText("--")
+            self.alert_latest_value.setText("--")
 
             self.empty_label.setText(
                 "ยังไม่มีเซสชันการตรวจจับ"
@@ -663,6 +725,10 @@ class AlertHistoryDialog(QDialog):
                 "ไม่สามารถเรียกข้อมูลการแจ้งเตือนได้ "
                 "(ไม่ได้หมายความว่าจำนวนการแจ้งเตือนเป็นศูนย์)"
             )
+            self.alert_total_value.setText("--")
+            self.alert_posture_value.setText("--")
+            self.alert_eye_value.setText("--")
+            self.alert_latest_value.setText("--")
 
             self.empty_label.setText(
                 "ไม่สามารถโหลดการแจ้งเตือนได้ "
@@ -752,6 +818,21 @@ class AlertHistoryDialog(QDialog):
         self.stats_label.setText(
             stats_text
         )
+
+        self.alert_total_value.setText(str(total_count))
+        self.alert_posture_value.setText(str(posture_count))
+        self.alert_eye_value.setText(str(eye_count))
+
+        if escalation_count > 0:
+            type_text = "เพิ่มระดับ"
+        elif repeat_count > 0:
+            type_text = "แจ้งซ้ำ"
+        elif first_count > 0:
+            type_text = "แจ้งครั้งแรก"
+        else:
+            type_text = "ไม่มี"
+
+        self.alert_latest_value.setText(type_text)
 
         # --------------------------------------------------
         # Empty state

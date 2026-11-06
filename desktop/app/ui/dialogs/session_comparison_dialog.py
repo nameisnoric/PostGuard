@@ -215,10 +215,18 @@ class SessionComparisonDialog(
         # ====================================================
 
         result_card = QFrame()
+        self.result_card = result_card
 
         result_card.setProperty(
             "card",
             True,
+        )
+        result_card.setProperty(
+            "cardTone",
+            "blue",
+        )
+        result_card.setMinimumHeight(
+            180
         )
 
         result_layout = QVBoxLayout(
@@ -238,12 +246,15 @@ class SessionComparisonDialog(
 
         self.progress_label = self._label(
             "ผลเปรียบเทียบ: --",
-            "heading",
+            "cardTitle",
         )
 
         self.score_change_label = self._label(
             "คะแนนเฉลี่ย: --",
-            "heading",
+            "cardValueInfo",
+        )
+        self.score_change_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
         )
 
         # Compatibility with earlier tests/code.
@@ -766,6 +777,27 @@ class SessionComparisonDialog(
         )
 
     # ========================================================
+    # RESULT PRESENTATION
+    # ========================================================
+
+    def _set_result_presentation(
+        self,
+        *,
+        tone: str,
+        value_role: str,
+    ) -> None:
+        self.result_card.setProperty("cardTone", tone)
+        self.score_change_label.setProperty("role", value_role)
+
+        for widget in (
+            self.result_card,
+            self.score_change_label,
+        ):
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
+
+    # ========================================================
     # RENDER
     # ========================================================
 
@@ -774,6 +806,11 @@ class SessionComparisonDialog(
         result,
     ):
         self._clear_table()
+
+        self._set_result_presentation(
+            tone="blue",
+            value_role="cardValueInfo",
+        )
 
         status = result.get(
             "status"
@@ -916,6 +953,23 @@ class SessionComparisonDialog(
                 "average_risk_score"
             )
         )
+
+        if type(average_delta) in (int, float):
+            if average_delta < 0:
+                self._set_result_presentation(
+                    tone="green",
+                    value_role="cardValueSuccess",
+                )
+            elif average_delta > 0:
+                self._set_result_presentation(
+                    tone="red",
+                    value_role="cardValueDanger",
+                )
+            else:
+                self._set_result_presentation(
+                    tone="blue",
+                    value_role="cardValueInfo",
+                )
 
         if type(
             average_delta

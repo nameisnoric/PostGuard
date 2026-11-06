@@ -887,34 +887,47 @@ class DashboardPage(QWidget):
         )
 
         # ----------------------------------------------------
-        # Blink placeholder
+        # Blink summary
         # ----------------------------------------------------
 
-        blink, blink_layout = (
-            self._card()
-        )
+        blink, blink_layout = self._card()
+        blink.setProperty("cardTone", "blue")
 
         blink_layout.addWidget(
             self._label(
-                "Blink Rate",
-                "heading",
+                "การกระพริบตา",
+                "cardTitle",
             )
         )
 
+        self.latest_blink_value = self._label(
+            "N/A",
+            "cardValueInfo",
+        )
+        self.latest_blink_value.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        self.latest_blink_note = self._label(
+            "ยังไม่มีข้อมูลอัตราการกระพริบตา",
+            "cardSubtitle",
+        )
+        self.latest_blink_note.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        blink_layout.addStretch()
+        blink_layout.addWidget(self.latest_blink_value)
         blink_layout.addWidget(
             self._label(
-                (
-                    "N/A\n"
-                    "ยังไม่ได้เปิดใช้ Blink Rate "
-                    "ในรายงานการใช้งานจริง"
-                ),
-                "muted",
+                "ครั้ง / นาที",
+                "cardSubtitle",
             )
         )
+        blink_layout.addWidget(self.latest_blink_note)
+        blink_layout.addStretch()
 
-        column.addWidget(
-            blink
-        )
+        column.addWidget(blink)
 
         column.addStretch()
 
@@ -992,41 +1005,47 @@ class DashboardPage(QWidget):
         title,
         note,
     ):
+        tone_by_title = {
+            "เซสชันที่เสร็จสิ้น": ("green", "cardValueSuccess"),
+            "เวลาตรวจจับจริง": ("blue", "cardValueInfo"),
+            "เซสชันที่ถูกขัดจังหวะ": ("red", "cardValueDanger"),
+            "ความเสี่ยงโดยรวมของเซสชัน": ("blue", "cardValueInfo"),
+            "แนวโน้มความเสี่ยง": ("green", "cardValueSuccess"),
+            "ความเสี่ยงสูงสุดล่าสุด": ("amber", "cardValueWarning"),
+            "การแจ้งเตือนล่าสุด": ("amber", "cardValueWarning"),
+            "ระยะเวลาล่าสุด": ("blue", "cardValueInfo"),
+        }
+
+        tone, value_role = tone_by_title.get(
+            title,
+            ("blue", "cardValueInfo"),
+        )
+
         card, layout = self._card()
+        card.setProperty("cardTone", tone)
+        card.setMinimumHeight(132)
 
-        layout.addWidget(
-            self._label(
-                title,
-                "muted",
-            )
+        title_label = self._label(title, "cardTitle")
+        title_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
         )
 
-        value = self._label(
-            "--",
-            "metric",
-        )
+        value = self._label("--", value_role)
+        value.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        layout.addWidget(
-            value
-        )
+        note_label = self._label(note, "cardSubtitle")
+        note_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        layout.addWidget(
-            self._label(
-                note,
-                "muted",
-            )
-        )
+        layout.addWidget(title_label)
+        layout.addStretch()
+        layout.addWidget(value)
+        layout.addWidget(note_label)
+        layout.addStretch()
 
-        grid.addWidget(
-            card,
-            0,
-            column,
-        )
+        row, real_column = divmod(column, 3)
 
-        grid.setColumnStretch(
-            column,
-            1,
-        )
+        grid.addWidget(card, row, real_column)
+        grid.setColumnStretch(real_column, 1)
 
         return value
 
@@ -1259,6 +1278,12 @@ class DashboardPage(QWidget):
             self.latest_report_button.setEnabled(
                 False
             )
+
+            if hasattr(self, "latest_blink_value"):
+                self.latest_blink_value.setText("N/A")
+                self.latest_blink_note.setText(
+                    "ไม่สามารถโหลดข้อมูลการกระพริบตาได้"
+                )
 
             self.empty_label.setText(
                 "ไม่สามารถเรียกข้อมูลเซสชันได้"
@@ -1649,6 +1674,12 @@ class DashboardPage(QWidget):
                 False
             )
 
+            if hasattr(self, "latest_blink_value"):
+                self.latest_blink_value.setText("N/A")
+                self.latest_blink_note.setText(
+                    "ยังไม่มีรายงานที่มีข้อมูลการกระพริบตา"
+                )
+
             return
 
         average = summary.get(
@@ -1665,6 +1696,14 @@ class DashboardPage(QWidget):
 
         alerts = summary.get(
             "total_alert_count"
+        )
+
+        blink_rate = summary.get(
+            "blink_rate"
+        )
+
+        eye_alert_count = summary.get(
+            "eye_alert_count"
         )
 
         method = summary.get(
@@ -1758,6 +1797,24 @@ class DashboardPage(QWidget):
         self.latest_report_button.setEnabled(
             can_open
         )
+
+        if hasattr(self, "latest_blink_value"):
+            self.latest_blink_value.setText(
+                number_text(blink_rate)
+            )
+
+            if type(eye_alert_count) is int and eye_alert_count >= 0:
+                self.latest_blink_note.setText(
+                    f"แจ้งเตือนสายตา {eye_alert_count} ครั้ง"
+                )
+            elif blink_rate is None:
+                self.latest_blink_note.setText(
+                    "เซสชันนี้ไม่มีข้อมูล Blink Rate ที่บันทึกไว้"
+                )
+            else:
+                self.latest_blink_note.setText(
+                    "ค่าเฉลี่ยของเซสชันล่าสุด"
+                )
 
     # ========================================================
     # RISK INSIGHT

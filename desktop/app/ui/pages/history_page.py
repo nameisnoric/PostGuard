@@ -286,15 +286,17 @@ class HistoryPage(
             "",
         )
 
-        for status in (
-            "COMPLETED",
-            "RUNNING",
-            "PAUSED",
-            "INTERRUPTED",
-            "ENDED",
-        ):
+        status_options = (
+            ("เสร็จสิ้น", "COMPLETED"),
+            ("กำลังตรวจจับ", "RUNNING"),
+            ("หยุดชั่วคราว", "PAUSED"),
+            ("ถูกขัดจังหวะ", "INTERRUPTED"),
+            ("สิ้นสุด", "ENDED"),
+        )
+
+        for label, status in status_options:
             self.status_filter.addItem(
-                status.title(),
+                label,
                 status,
             )
 
@@ -612,36 +614,34 @@ class HistoryPage(
         column,
         title,
     ):
-        card, card_layout = (
-            self._card()
+        tone_by_title = {
+            "เซสชันทั้งหมด": ("blue", "cardValueInfo"),
+            "เสร็จสิ้น": ("green", "cardValueSuccess"),
+            "ถูกขัดจังหวะ": ("red", "cardValueDanger"),
+            "รายงานที่บันทึก": ("blue", "cardValueInfo"),
+        }
+
+        tone, value_role = tone_by_title.get(
+            title,
+            ("blue", "cardValueInfo"),
         )
 
-        card_layout.addWidget(
-            self._label(
-                title,
-                "muted",
-            )
-        )
+        card, card_layout = self._card()
+        card.setProperty("cardTone", tone)
+        card.setMinimumHeight(120)
 
-        value = self._label(
-            "--",
-            "metric",
-        )
+        title_label = self._label(title, "cardTitle")
 
-        card_layout.addWidget(
-            value
-        )
+        value = self._label("--", value_role)
+        value.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        grid.addWidget(
-            card,
-            0,
-            column,
-        )
+        card_layout.addWidget(title_label)
+        card_layout.addStretch()
+        card_layout.addWidget(value)
+        card_layout.addStretch()
 
-        grid.setColumnStretch(
-            column,
-            1,
-        )
+        grid.addWidget(card, 0, column)
+        grid.setColumnStretch(column, 1)
 
         return value
 
