@@ -96,8 +96,8 @@ DEFAULT_RULES = {
 
     "features": {
         "shoulder_tilt": {
-            "left_high_threshold_deg": -2.0,
-            "right_high_threshold_deg": 4.0,
+            "left_high_threshold_deg": -3.0,
+            "right_high_threshold_deg": 3.0,
             "unit": "deg",
         },
 

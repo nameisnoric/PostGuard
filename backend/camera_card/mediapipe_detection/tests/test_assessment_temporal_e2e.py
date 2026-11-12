@@ -547,7 +547,7 @@ class TestAssessmentTemporalE2E(
 
         left = (
             detection_result(
-                shoulder=-3.0,
+                shoulder=-3.1,
             )
         )
 
@@ -1106,7 +1106,7 @@ class TestAssessmentTemporalE2E(
 
         detection = (
             detection_result(
-                shoulder=4.0,
+                shoulder=3.0,
                 neck=5.0,
                 flexion=10.0,
             )

@@ -160,14 +160,14 @@ class TestCurrentPostureAssessment(
             rule[
                 "left_high_threshold_deg"
             ],
-            -2.0,
+            -3.0,
         )
 
         self.assertEqual(
             rule[
                 "right_high_threshold_deg"
             ],
-            4.0,
+            3.0,
         )
 
 
@@ -300,7 +300,7 @@ class TestCurrentPostureAssessment(
 
         result = assess_current_posture(
             make_detection(
-                shoulder=-2.01
+                shoulder=-3.01
             )
         )
 
@@ -320,7 +320,7 @@ class TestCurrentPostureAssessment(
 
         result = assess_current_posture(
             make_detection(
-                shoulder=4.01
+                shoulder=3.01
             )
         )
 
@@ -340,7 +340,7 @@ class TestCurrentPostureAssessment(
 
         result = assess_current_posture(
             make_detection(
-                shoulder=-2.0
+                shoulder=-3.0
             )
         )
 
@@ -360,7 +360,7 @@ class TestCurrentPostureAssessment(
 
         result = assess_current_posture(
             make_detection(
-                shoulder=4.0
+                shoulder=3.0
             )
         )
 
@@ -1260,7 +1260,7 @@ class TestCurrentPostureAssessment(
             ][
                 "right_high_threshold_deg"
             ],
-            4.0,
+            3.0,
         )
 
 

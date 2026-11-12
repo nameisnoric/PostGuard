@@ -178,7 +178,7 @@ def test_default_rules():
             "left_high_threshold_deg"
         ]
         ==
-        -2.0,
+        -3.0,
     )
 
     check(
@@ -191,7 +191,7 @@ def test_default_rules():
             "right_high_threshold_deg"
         ]
         ==
-        4.0,
+        3.0,
     )
 
     check(
@@ -303,13 +303,13 @@ def test_shoulder_direction():
 
     left = assess_current_posture(
         detection_result(
-            shoulder=-2.1,
+            shoulder=-3.1,
         )
     )
 
     right = assess_current_posture(
         detection_result(
-            shoulder=4.1,
+            shoulder=3.1,
         )
     )
 
@@ -349,18 +349,18 @@ def test_shoulder_boundaries():
 
     left = assess_current_posture(
         detection_result(
-            shoulder=-2.0,
+            shoulder=-3.0,
         )
     )
 
     right = assess_current_posture(
         detection_result(
-            shoulder=4.0,
+            shoulder=3.0,
         )
     )
 
     check(
-        "Exact -2 shoulder remains neutral",
+        "Exact -3 shoulder remains neutral",
         left[
             "features"
         ][
@@ -373,7 +373,7 @@ def test_shoulder_boundaries():
     )
 
     check(
-        "Exact +4 shoulder remains neutral",
+        "Exact +3 shoulder remains neutral",
         right[
             "features"
         ][
