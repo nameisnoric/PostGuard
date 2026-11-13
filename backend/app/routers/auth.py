@@ -19,8 +19,9 @@ from app.schemas.user import (
     RefreshTokenRequest,
 )
 from app.core.security import (
-    hash_password, verify_password, create_access_token, decode_access_token,
-    create_refresh_token, decode_refresh_token, generate_otp, hash_otp,
+    hash_password, verify_password, create_access_token,
+    create_refresh_token, decode_refresh_token_identity,
+    decode_access_token_identity, generate_otp, hash_otp,
     verify_otp, create_password_reset_token, decode_password_reset_token,
 )
 from app.models.password_reset import PasswordResetOTP
@@ -120,8 +121,8 @@ def login_user(
             detail='Invalid email or password'
         )
     #JWT
-    access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    access_token = create_access_token(user.id, user.auth_version)
+    refresh_token = create_refresh_token(user.id, user.auth_version)
 
     return{
         "access_token": access_token,
@@ -136,7 +137,9 @@ def refresh_access_token(
     db: Session = Depends(get_db),
 ):
     try:
-        user_id = decode_refresh_token(token_data.refresh_token)
+        user_id, token_auth_version = decode_refresh_token_identity(
+            token_data.refresh_token
+        )
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -149,10 +152,15 @@ def refresh_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+    if token_auth_version != user.auth_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked",
+        )
 
     return {
-        "access_token": create_access_token(user.id),
-        "refresh_token": create_refresh_token(user.id),
+        "access_token": create_access_token(user.id, user.auth_version),
+        "refresh_token": create_refresh_token(user.id, user.auth_version),
         "token_type": "bearer",
         "expires_in": 30 * 60,
     }
@@ -164,7 +172,7 @@ def get_authenticated_user(
     token = credentials.credentials
 
     try:
-        user_id = decode_access_token(token)
+        user_id, token_auth_version = decode_access_token_identity(token)
 
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError):
         raise HTTPException(
@@ -178,6 +186,11 @@ def get_authenticated_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User Not Found"
+        )
+    if token_auth_version != user.auth_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
         )
 
     return user
@@ -406,6 +419,7 @@ def reset_password(
 
     #เปลี่ยน password 
     user.password_hash = new_password_hash
+    user.auth_version += 1
 
     #ปรับว่า reset token ใช้ไปแล้ว
     reset_record.reset_token_used_at = datetime.now(timezone.utc)

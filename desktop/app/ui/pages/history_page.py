@@ -7,7 +7,6 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -45,18 +44,21 @@ from app.ui.dialogs.saved_session_report_dialog import (
 from app.ui.dialogs.session_comparison_dialog import (
     SessionComparisonDialog,
 )
+from app.ui.utils.session_numbering import (
+    build_session_number_map,
+    session_number_text,
+)
 
 
 class HistoryPage(
     QWidget
 ):
     COLUMNS = (
-        "เซสชัน",
-        "เริ่มเมื่อ",
-        "เวลาตรวจจับ",
-        "สถานะ",
-        "AVG Risk",
-        "MAX Risk",
+        "ครั้งที่",
+        "วันที่และเวลา",
+        "เวลาที่ใช้งาน",
+        "ความเสี่ยงเฉลี่ย",
+        "ความเสี่ยงสูงสุด",
         "รายงาน",
     )
 
@@ -72,6 +74,7 @@ class HistoryPage(
 
         self.sessions = []
         self.visible_sessions = []
+        self.session_numbers = {}
 
         self.summaries = []
         self.summary_by_session_id = {}
@@ -278,8 +281,8 @@ class HistoryPage(
 
         self.search_input.setPlaceholderText(
             (
-                "ค้นหาด้วยเซสชัน, "
-                "รหัสกล้อง หรือรหัสค่าท่าทางอ้างอิง"
+                "ค้นหาด้วยครั้งที่ วันที่ "
+                "หรือรหัสกล้อง"
             )
         )
 
@@ -291,38 +294,9 @@ class HistoryPage(
             self._apply_filters
         )
 
-        self.status_filter = QComboBox()
-
-        self.status_filter.addItem(
-            "ทุกสถานะ",
-            "",
-        )
-
-        status_options = (
-            ("เสร็จสิ้น", "COMPLETED"),
-            ("กำลังตรวจจับ", "RUNNING"),
-            ("หยุดชั่วคราว", "PAUSED"),
-            ("ถูกขัดจังหวะ", "INTERRUPTED"),
-            ("สิ้นสุด", "ENDED"),
-        )
-
-        for label, status in status_options:
-            self.status_filter.addItem(
-                label,
-                status,
-            )
-
-        self.status_filter.currentIndexChanged.connect(
-            self._apply_filters
-        )
-
         controls.addWidget(
             self.search_input,
             1,
-        )
-
-        controls.addWidget(
-            self.status_filter
         )
 
         history_layout.addLayout(
@@ -457,19 +431,18 @@ class HistoryPage(
         self.detail_values = {}
 
         detail_fields = (
-            ("session", "เซสชัน"),
-            ("status", "สถานะ"),
-            ("started", "เริ่มเมื่อ"),
-            ("ended", "สิ้นสุดเมื่อ"),
-            ("active", "เวลาตรวจจับ"),
+            ("session", "ครั้งที่"),
+            ("started", "วันที่และเวลาเริ่ม"),
+            ("ended", "วันที่และเวลาสิ้นสุด"),
+            ("active", "เวลาที่ใช้งาน"),
             ("total", "เวลารวม"),
             ("paused", "เวลาที่หยุดชั่วคราว"),
             ("pauses", "จำนวนครั้งที่หยุดชั่วคราว"),
             ("camera", "รหัสกล้อง"),
             ("baseline", "รหัสค่าท่าทางอ้างอิง"),
-            ("avg_risk", "AVG Risk"),
-            ("min_risk", "MIN Risk"),
-            ("max_risk", "MAX Risk"),
+            ("avg_risk", "ความเสี่ยงเฉลี่ย"),
+            ("min_risk", "ความเสี่ยงต่ำสุด"),
+            ("max_risk", "ความเสี่ยงสูงสุด"),
             ("alerts", "การแจ้งเตือน"),
             ("report", "รายงานที่บันทึกไว้"),
         )
@@ -696,16 +669,6 @@ class HistoryPage(
             f"{float(value):.2f}"
         )
 
-    @staticmethod
-    def _status_text(status):
-        return {
-            "COMPLETED": "เสร็จสิ้น",
-            "RUNNING": "กำลังตรวจจับ",
-            "PAUSED": "หยุดชั่วคราว",
-            "INTERRUPTED": "ถูกขัดจังหวะ",
-            "ENDED": "สิ้นสุด",
-        }.get(str(status or "").upper(), str(status or "--"))
-
     # ========================================================
     # SESSION TIME
     # ========================================================
@@ -762,11 +725,10 @@ class HistoryPage(
             return "ไม่พร้อมใช้งาน"
 
         return (
-            "บันทึกแล้ว"
+            "ดูรายงาน"
             if session_id
             in self.report_session_ids
-            else
-            "ไม่มีข้อมูล"
+            else "ยังไม่มีรายงาน"
         )
 
     def _summary_for_session(
@@ -803,6 +765,7 @@ class HistoryPage(
 
         self.sessions = []
         self.visible_sessions = []
+        self.session_numbers = {}
 
         self.summaries = []
         self.summary_by_session_id = {}
@@ -849,6 +812,7 @@ class HistoryPage(
                 )
 
             self.sessions = sessions
+            self.session_numbers = build_session_number_map(self.sessions)
 
             # ------------------------------------------------
             # Summaries
@@ -1053,24 +1017,11 @@ class HistoryPage(
             .lower()
         )
 
-        wanted_status = (
-            self.status_filter
-            .currentData()
-        )
-
         self.visible_sessions = []
 
         for session in self.sessions:
-            if (
-                wanted_status
-                and
-                session.get(
-                    "status"
-                )
-                !=
-                wanted_status
-            ):
-                continue
+            session_id = session.get("session_id")
+            sequence = self.session_numbers.get(session_id, "")
 
             haystack = " ".join(
                 str(
@@ -1084,8 +1035,10 @@ class HistoryPage(
                     "session_id",
                     "camera_id",
                     "baseline_id",
+                    "started_at",
                 )
-            ).lower()
+            )
+            haystack = f"{sequence} {haystack}".lower()
 
             if (
                 query
@@ -1120,12 +1073,9 @@ class HistoryPage(
             )
 
             values = (
-                (
-                    f"#{session_id}"
-                    if session_id
-                    is not None
-                    else
-                    "--"
+                session_number_text(
+                    session_id,
+                    self.session_numbers,
                 ),
 
                 local_datetime(
@@ -1138,10 +1088,6 @@ class HistoryPage(
                     self._active_seconds(
                         session
                     )
-                ),
-
-                self._status_text(
-                    session.get("status", "--")
                 ),
 
                 self._risk_score_text(
@@ -1211,11 +1157,11 @@ class HistoryPage(
                     f"แสดง "
                     f"{len(self.visible_sessions)} "
                     f"จาก {len(self.sessions)} "
-                    " เซสชัน"
+                    " ครั้ง"
                 )
                 if self.sessions
                 else
-                "ไม่พบเซสชันที่บันทึกไว้"
+                "ยังไม่มีประวัติการตรวจจับ"
             )
         )
 
@@ -1337,19 +1283,16 @@ class HistoryPage(
 
         self.details_hint.setText(
             (
-                "ข้อมูลเซสชันและ Risk Score "
-                "ที่บันทึกไว้ โดยเวลาตรวจจับ "
+                "รายละเอียดการใช้งานและคะแนนความเสี่ยง "
+                "โดยเวลาที่ใช้งาน "
                 "ไม่รวมช่วงหยุดชั่วคราว"
             )
         )
 
         values = {
-            "session": (
-                f"#{session_id}"
-            ),
-
-            "status": self._status_text(
-                session.get("status", "--")
+            "session": session_number_text(
+                session_id,
+                self.session_numbers,
             ),
 
             "started": local_datetime(

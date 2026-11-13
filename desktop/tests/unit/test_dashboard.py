@@ -367,7 +367,15 @@ class DashboardTests(
         self.assertEqual(
             self.page.recent_table.item(
                 0,
-                4,
+                0,
+            ).text(),
+            "2",
+        )
+
+        self.assertEqual(
+            self.page.recent_table.item(
+                0,
+                3,
             ).text(),
             "33.00",
         )
@@ -375,7 +383,15 @@ class DashboardTests(
         self.assertEqual(
             self.page.recent_table.item(
                 1,
-                4,
+                0,
+            ).text(),
+            "1",
+        )
+
+        self.assertEqual(
+            self.page.recent_table.item(
+                1,
+                3,
             ).text(),
             "N/A",
         )

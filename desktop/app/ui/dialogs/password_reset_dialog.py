@@ -13,6 +13,13 @@ from app.ui.theme import APP_QSS
 from app.ui.utils.password_visibility import (
     attach_password_visibility,
 )
+from app.ui.utils.auth_validation import (
+    email_validation_errors,
+    password_validation_errors,
+    password_feedback,
+    response_error_message,
+    validation_message,
+)
 
 class PasswordResetDialog(QDialog):
     def __init__(self, parent=None, email=""):
@@ -63,10 +70,25 @@ class PasswordResetDialog(QDialog):
             attach_password_visibility(
                 field
             )
+        self.password_feedback_label = QLabel(password_feedback(""))
+        self.password_feedback_label.setProperty("role", "muted")
+        self.password_feedback_label.setWordWrap(True)
+        self.password_input.textChanged.connect(
+            lambda value: self.password_feedback_label.setText(password_feedback(value))
+        )
         self.reset_button = QPushButton("บันทึกรหัสผ่านใหม่")
         self.reset_button.setProperty("variant", "primary")
         self.reset_button.clicked.connect(self.save_password)
-        self._add_page("ตั้งรหัสผ่านใหม่", [rules, self.password_input, self.confirm_input, self.reset_button])
+        self._add_page(
+            "ตั้งรหัสผ่านใหม่",
+            [
+                rules,
+                self.password_input,
+                self.password_feedback_label,
+                self.confirm_input,
+                self.reset_button,
+            ],
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
@@ -121,8 +143,11 @@ class PasswordResetDialog(QDialog):
         if self._busy:
             return
         email = self.email_input.text().strip()
-        if not re.fullmatch(r"[^\s@]+@ku\.th", email, re.IGNORECASE):
-            self.status_label.setText('โปรดกรอกอีเมล @ku.th ที่ถูกต้อง')
+        email_errors = email_validation_errors(email)
+        if email_errors:
+            self.status_label.setText(
+                validation_message("อีเมลไม่ถูกต้อง:", email_errors)
+            )
             return
         self._set_busy(True)
         self.status_label.setText('กำลังขอรหัสรีเซ็ต...')
@@ -175,11 +200,23 @@ class PasswordResetDialog(QDialog):
         if self._busy or self.pages.currentIndex() != 2 or not self._reset_token:
             return
         password = self.password_input.text()
+        if not password:
+            self.status_label.setText("กรุณากรอกรหัสผ่านใหม่")
+            return
+        password_errors = password_validation_errors(password)
+        if password_errors:
+            self.status_label.setText(
+                validation_message("รหัสผ่านใหม่ไม่ผ่านเงื่อนไข:", password_errors)
+            )
+            self.password_input.setFocus()
+            return
+        if not self.confirm_input.text():
+            self.status_label.setText("กรุณากรอกยืนยันรหัสผ่านใหม่")
+            self.confirm_input.setFocus()
+            return
         if password != self.confirm_input.text():
             self.status_label.setText('รหัสผ่านไม่ตรงกัน')
-            return
-        if len(password) < 8 or any(not re.search(pattern, password) for pattern in (r"[A-Z]", r"[a-z]", r"\d", r"[^A-Za-z0-9]")):
-            self.status_label.setText('โปรดตั้งรหัสผ่านให้ครบตามเงื่อนไขด้านบน')
+            self.confirm_input.setFocus()
             return
         self._set_busy(True)
         try:
@@ -190,7 +227,10 @@ class PasswordResetDialog(QDialog):
                 self.status_label.setText("สิทธิ์สำหรับรีเซ็ตรหัสผ่านหมดอายุหรือถูกใช้ไปแล้ว หากเคยตั้งรหัสผ่านใหม่แล้วให้ลองเข้าสู่ระบบ หรือขอ OTP ใหม่")
                 return
             if response.status_code != 200:
-                self.status_label.setText("ไม่สามารถยืนยันการตั้งรหัสผ่านใหม่ได้ กรุณาตรวจสอบเงื่อนไขของรหัสผ่านแล้วลองอีกครั้ง")
+                self.status_label.setText(response_error_message(
+                    response,
+                    "ไม่สามารถตั้งรหัสผ่านใหม่ได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง",
+                ))
                 return
             self._json_object(response)
             self._clear_credentials()

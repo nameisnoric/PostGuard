@@ -19,6 +19,11 @@ from app.ui.theme import APP_QSS, set_centered_window
 from app.ui.utils.password_visibility import (
     attach_password_visibility,
 )
+from app.ui.utils.auth_validation import (
+    email_validation_errors,
+    response_error_message,
+    validation_message,
+)
 
 class LoginWindow(QWidget):
 
@@ -90,10 +95,11 @@ class LoginWindow(QWidget):
         email = self.email_input.text().strip()
         password = self.password_input.text()
 
-        if not email or not password:
-            self.show_error(
-                "กรุณากรอกอีเมลและรหัสผ่าน"
-            )
+        errors = email_validation_errors(email)
+        if not password:
+            errors.append("กรุณากรอกรหัสผ่าน")
+        if errors:
+            self.show_error(validation_message("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง:", errors))
             return
 
         try:
@@ -109,9 +115,10 @@ class LoginWindow(QWidget):
             return
 
         if response.status_code != 200:
-            self.show_error(
-                "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
-            )
+            self.show_error(response_error_message(
+                response,
+                "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+            ))
             return
 
         login_data = response.json()

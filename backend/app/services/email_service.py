@@ -58,3 +58,17 @@ def send_registration_otp(
     }
 
     return resend.Emails.send(params)
+
+
+def send_password_changed_notice(email: str):
+    params: resend.Email.SendParams = {
+        "from": RESEND_FROM_EMAIL,
+        "to": [email],
+        "subject": "Your PostGuard password was changed",
+        "html": """
+            <h2>PostGuard password changed</h2>
+            <p>The password for your PostGuard account was changed successfully.</p>
+            <p>If you did not make this change, reset your password immediately.</p>
+        """,
+    }
+    return resend.Emails.send(params)

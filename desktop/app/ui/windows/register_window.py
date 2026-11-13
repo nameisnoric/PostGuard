@@ -17,6 +17,13 @@ from app.ui.theme import APP_QSS, set_centered_window
 from app.ui.utils.password_visibility import (
     attach_password_visibility,
 )
+from app.ui.utils.auth_validation import (
+    email_validation_errors,
+    password_validation_errors,
+    password_feedback,
+    response_error_message,
+    validation_message,
+)
 
 class RegisterWindow(QWidget):
 
@@ -88,6 +95,12 @@ class RegisterWindow(QWidget):
         attach_password_visibility(
             self.password_input
         )
+        self.password_feedback_label = QLabel(password_feedback(""))
+        self.password_feedback_label.setProperty("role", "muted")
+        self.password_feedback_label.setWordWrap(True)
+        self.password_input.textChanged.connect(
+            lambda value: self.password_feedback_label.setText(password_feedback(value))
+        )
 
         self.confirm_password_input = QLineEdit()
         self.confirm_password_input.setPlaceholderText(
@@ -136,6 +149,8 @@ class RegisterWindow(QWidget):
         ):
             layout.addWidget(QLabel(label))
             layout.addWidget(field)
+            if field is self.password_input:
+                layout.addWidget(self.password_feedback_label)
         layout.addSpacing(6)
         layout.addWidget(self.register_button)
         layout.addWidget(self.back_button)
@@ -187,16 +202,26 @@ class RegisterWindow(QWidget):
         # Basic validation
         # -------------------------
 
-        if (
-            not full_name
-            or not username
-            or not email
-            or not password
-            or not confirm_password
-        ):
+        missing_fields = []
+        if not full_name:
+            missing_fields.append("กรุณากรอกชื่อและนามสกุล")
+        if not username:
+            missing_fields.append("กรุณากรอกชื่อผู้ใช้")
+        missing_fields.extend(email_validation_errors(email))
+        if not password:
+            missing_fields.append("กรุณากรอกรหัสผ่าน")
+        if not confirm_password:
+            missing_fields.append("กรุณากรอกยืนยันรหัสผ่าน")
+        if missing_fields:
+            self.show_error(validation_message("กรอกข้อมูลไม่ครบหรือไม่ถูกต้อง:", missing_fields))
+            return
+
+        password_errors = password_validation_errors(password)
+        if password_errors:
             self.show_error(
-                "กรุณากรอกข้อมูลให้ครบทุกช่อง"
+                validation_message("รหัสผ่านไม่ผ่านเงื่อนไข:", password_errors)
             )
+            self.password_input.setFocus()
             return
 
         if password != confirm_password:
@@ -227,9 +252,9 @@ class RegisterWindow(QWidget):
             try:
                 error_data = response.json()
 
-                message = error_data.get(
-                    "detail",
-                    "ไม่สามารถส่งรหัส OTP ได้"
+                message = response_error_message(
+                    response,
+                    "ไม่สามารถส่งรหัส OTP ได้",
                 )
 
             except ValueError:

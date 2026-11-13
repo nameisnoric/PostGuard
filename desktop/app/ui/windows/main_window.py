@@ -307,6 +307,7 @@ class MainWindow(QMainWindow):
         self.settings_page.privacy_consent_changed.connect(
             self._privacy_consent_changed
         )
+        self.settings_page.password_changed.connect(self.logout)
         self.pages.currentChanged.connect(self._sync_navigation)
 
         # ========================================

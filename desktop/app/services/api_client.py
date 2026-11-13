@@ -425,6 +425,19 @@ class APIClient:
             },
         )
 
+    @staticmethod
+    def change_password(
+        current_password: str,
+        new_password: str,
+    ):
+        return APIClient.put(
+            "/users/me/password",
+            {
+                "current_password": current_password,
+                "new_password": new_password,
+            },
+        )
+
     # ========================================================
     # ACCOUNT
     # ========================================================

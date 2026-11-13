@@ -46,6 +46,10 @@ from app.ui.session_risk_trend_chart import (
 from app.ui.dialogs.saved_session_report_dialog import (
     SavedSessionReportDialog,
 )
+from app.ui.utils.session_numbering import (
+    build_session_number_map,
+    session_number_text,
+)
 
 
 # ============================================================
@@ -682,7 +686,7 @@ class DashboardPage(QWidget):
 
         layout.addWidget(
             self._label(
-                "เซสชันล่าสุด",
+                "การตรวจจับล่าสุด",
                 "heading",
             )
         )
@@ -690,7 +694,7 @@ class DashboardPage(QWidget):
         layout.addWidget(
             self._label(
                 (
-                    "ดับเบิลคลิกเซสชัน "
+                    "ดับเบิลคลิกรายการ "
                     "เพื่อเปิดรายงานที่บันทึกไว้โดยตรง"
                 ),
                 "muted",
@@ -699,17 +703,16 @@ class DashboardPage(QWidget):
 
         self.recent_table = QTableWidget(
             0,
-            6,
+            5,
         )
 
         self.recent_table.setHorizontalHeaderLabels(
             [
-                "เซสชัน",
-                "เริ่มเมื่อ",
-                "สถานะ",
-                "เวลาตรวจจับ",
-                "AVG Risk",
-                "MAX Risk",
+                "ครั้งที่",
+                "วันที่และเวลา",
+                "เวลาที่ใช้งาน",
+                "ความเสี่ยงเฉลี่ย",
+                "ความเสี่ยงสูงสุด",
             ]
         )
 
@@ -1345,6 +1348,8 @@ class DashboardPage(QWidget):
             or []
         )
 
+        self.session_numbers = build_session_number_map(self.sessions)
+
         self.summaries = list(
             summaries
             or []
@@ -1544,21 +1549,12 @@ class DashboardPage(QWidget):
             )
 
             values = (
-                (
-                    session_id
-                    if session_id is not None
-                    else "N/A"
-                ),
+                session_number_text(session_id, self.session_numbers),
 
                 local_datetime_text(
                     session.get(
                         "started_at"
                     )
-                ),
-
-                session.get(
-                    "status",
-                    "N/A",
                 ),
 
                 duration_text(

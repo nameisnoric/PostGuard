@@ -28,7 +28,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTE = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, auth_version: int = 0) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTE
     )
@@ -36,6 +36,7 @@ def create_access_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
         "purpose": "access",
+        "auth_version": auth_version,
         "exp": expire
     }
 
@@ -47,7 +48,7 @@ def create_access_token(user_id: int) -> str:
 
     return token
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: int, auth_version: int = 0) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         days=REFRESH_TOKEN_EXPIRE_DAYS
     )
@@ -55,6 +56,7 @@ def create_refresh_token(user_id: int) -> str:
         {
             "sub": str(user_id),
             "purpose": "refresh",
+            "auth_version": auth_version,
             "exp": expire,
         },
         SECRET_KEY,
@@ -62,15 +64,26 @@ def create_refresh_token(user_id: int) -> str:
     )
 
 def decode_refresh_token(token: str) -> int:
+    user_id, _auth_version = decode_refresh_token_identity(token)
+    return user_id
+
+def decode_refresh_token_identity(token: str) -> tuple[int, int]:
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     if payload.get("purpose") != "refresh":
         raise ValueError("Invalid refresh token")
     user_id = payload.get("sub")
     if user_id is None:
         raise ValueError("Invalid refresh token")
-    return int(user_id)
+    auth_version = payload.get("auth_version", 0)
+    if type(auth_version) is not int or auth_version < 0:
+        raise ValueError("Invalid refresh token")
+    return int(user_id), auth_version
 
 def decode_access_token(token: str) -> int:
+    user_id, _auth_version = decode_access_token_identity(token)
+    return user_id
+
+def decode_access_token_identity(token: str) -> tuple[int, int]:
     payload = jwt.decode(
         token,
         SECRET_KEY,
@@ -85,7 +98,10 @@ def decode_access_token(token: str) -> int:
     if user_id is None:
         raise ValueError("Invalid Token")
     
-    return int(user_id)
+    auth_version = payload.get("auth_version", 0)
+    if type(auth_version) is not int or auth_version < 0:
+        raise ValueError("Invalid access token")
+    return int(user_id), auth_version
 
 #OTP
 def generate_otp() -> str:

@@ -247,7 +247,15 @@ class SavedReportTests(
         self.assertEqual(
             page.table.item(
                 0,
-                4,
+                0,
+            ).text(),
+            "1",
+        )
+
+        self.assertEqual(
+            page.table.item(
+                0,
+                3,
             ).text(),
             "21.25",
         )
@@ -255,7 +263,7 @@ class SavedReportTests(
         self.assertEqual(
             page.table.item(
                 0,
-                5,
+                4,
             ).text(),
             "83.00",
         )
@@ -263,9 +271,9 @@ class SavedReportTests(
         self.assertEqual(
             page.table.item(
                 0,
-                6,
+                5,
             ).text(),
-            "บันทึกแล้ว",
+            "ดูรายงาน",
         )
 
         page.deleteLater()
@@ -505,7 +513,7 @@ class SavedReportTests(
         self.assertEqual(
             page.table.item(
                 0,
-                4,
+                3,
             ).text(),
             "N/A",
         )
