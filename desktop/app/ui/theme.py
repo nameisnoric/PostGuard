@@ -498,6 +498,16 @@ QDialog QLabel {
     color: #0f172a;
 }
 
+QDialog#privacyNoticeDialog QCheckBox#privacyConsentCheckbox {
+    color: #0f172a;
+    background: transparent;
+    spacing: 8px;
+}
+
+QDialog#privacyNoticeDialog QCheckBox#privacyConsentCheckbox:disabled {
+    color: #64748b;
+}
+
 
 /* =========================================================
    SCROLL

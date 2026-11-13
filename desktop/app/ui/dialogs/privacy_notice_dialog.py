@@ -1,5 +1,7 @@
 """Privacy Notice shown before PostGuard accesses the camera."""
 
+from pathlib import Path
+
 import requests
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -17,26 +19,42 @@ from app.ui.theme import APP_QSS, set_centered_window
 
 
 PRIVACY_NOTICE_VERSION = "2026-10-20"
+_CHECKBOX_ICON_DIRECTORY = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "icons"
+)
 PRIVACY_NOTICE_HTML = """
-<h2>Camera and posture data</h2>
-<p>PostGuard uses your selected camera to measure posture while monitoring is
-active. Camera frames are processed locally on this device.</p>
+<h2>1. การใช้กล้องและข้อมูลท่าทาง</h2>
+<p>PostGuard ใช้กล้องที่คุณเลือกเพื่อตรวจวัดท่าทางระหว่างการตรวจจับ
+(Monitoring) โดยภาพจากกล้องจะถูกประมวลผลภายในอุปกรณ์ของคุณเท่านั้น
+(Local Processing)</p>
 
-<h2>What is not stored</h2>
-<p>PostGuard does not save or upload camera images or video. Raw frames are
-discarded after local processing.</p>
+<h2>2. ข้อมูลที่ระบบไม่จัดเก็บ</h2>
+<p>PostGuard <b>ไม่บันทึกและไม่อัปโหลดภาพหรือวิดีโอจากกล้อง</b>
+เมื่อประมวลผลเสร็จแล้ว ภาพต้นฉบับแต่ละเฟรมจะถูกทิ้งทันที</p>
 
-<h2>What is stored</h2>
-<p>PostGuard stores only the account, camera configuration, numerical baseline,
-session timing, calculated posture measurements, alert events and reports needed
-to provide your history. These records are associated with your signed-in
-account in the PostGuard database.</p>
+<h2>3. ข้อมูลที่ระบบจัดเก็บ</h2>
+<p>ระบบจัดเก็บเฉพาะข้อมูลที่จำเป็นต่อการทำงานและการแสดงประวัติ ได้แก่</p>
+<ul>
+  <li>ข้อมูลบัญชีผู้ใช้และการตั้งค่าของระบบ</li>
+  <li>การตั้งค่ากล้องและค่า Personal Baseline ในรูปแบบตัวเลข</li>
+  <li>เวลา ระยะเวลา และสถานะของ Monitoring Session</li>
+  <li>ค่าท่าทางและคะแนนความเสี่ยงที่ระบบคำนวณได้</li>
+  <li>เหตุการณ์แจ้งเตือน (Alert Events)</li>
+  <li>รายงานและสรุปผลของแต่ละ Session</li>
+</ul>
+<p>ข้อมูลเหล่านี้จะผูกกับบัญชี PostGuard ที่คุณเข้าสู่ระบบอยู่
+เพื่อให้คุณสามารถดูประวัติและรายงานของตนเองได้</p>
 
-<h2>Your choice</h2>
-<p>You can decline now and continue using account pages without camera access.
-You can review this notice or withdraw consent later in Settings. Withdrawal
-blocks future camera monitoring but does not delete existing history. You can
-request account deletion from Settings.</p>
+<h2>4. ทางเลือกและสิทธิของคุณ</h2>
+<p>คุณสามารถเลือก <b>“ไว้ภายหลัง”</b> ได้ โดยยังใช้งานส่วนบัญชีของระบบได้
+แต่จะยังไม่สามารถเริ่มการตรวจจับด้วยกล้องจนกว่าจะให้ความยินยอม</p>
+<p>ภายหลังคุณสามารถเข้าไปที่หน้าการตั้งค่าเพื่ออ่านประกาศฉบับนี้อีกครั้ง
+ตรวจสอบสถานะ ให้ความยินยอม หรือถอนความยินยอมได้</p>
+<p>การถอนความยินยอมจะป้องกันการตรวจจับด้วยกล้องในอนาคต
+แต่จะไม่ลบประวัติเดิมโดยอัตโนมัติ หากต้องการลบบัญชีและข้อมูลที่เกี่ยวข้อง
+คุณสามารถส่งคำขอลบบัญชีแยกต่างหากได้จากหน้าการตั้งค่า</p>
 """
 
 
@@ -80,6 +98,37 @@ class PrivacyNoticeDialog(QDialog):
         if require_acceptance:
             self.accept_checkbox = QCheckBox(
                 "ฉันเข้าใจและยินยอมให้ประมวลผลข้อมูลจากกล้องตามที่ระบุ"
+            )
+            self.accept_checkbox.setObjectName(
+                "privacyConsentCheckbox"
+            )
+            unchecked_icon = (
+                _CHECKBOX_ICON_DIRECTORY
+                / "checkbox-unchecked.svg"
+            ).as_posix()
+            checked_icon = (
+                _CHECKBOX_ICON_DIRECTORY
+                / "checkbox-checked.svg"
+            ).as_posix()
+            self.accept_checkbox.setStyleSheet(
+                f"""
+                QCheckBox {{
+                    color: #0f172a;
+                    background: transparent;
+                    spacing: 8px;
+                }}
+                QCheckBox::indicator {{
+                    width: 18px;
+                    height: 18px;
+                    image: url(\"{unchecked_icon}\");
+                }}
+                QCheckBox::indicator:checked {{
+                    image: url(\"{checked_icon}\");
+                }}
+                QCheckBox:disabled {{
+                    color: #64748b;
+                }}
+                """
             )
             layout.addWidget(self.accept_checkbox)
             layout.addWidget(self.status_label)
