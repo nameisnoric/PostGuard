@@ -5,7 +5,7 @@ services:
     plan: free
     region: singapore
     rootDir: backend
-    branch: integration/desktop-risk-pipeline
+    branch: deploy/render-exam
     healthCheckPath: /ready
     envVars:
       - key: DATABASE_URL

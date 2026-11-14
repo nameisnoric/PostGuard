@@ -30,8 +30,8 @@ connection details.
 
 The repository root contains `render.yaml` for a free Docker web service in
 Render's Singapore region. In the Render dashboard, create a new Blueprint,
-select this repository and the `integration/desktop-risk-pipeline` branch, then
-enter every environment variable marked `sync: false`.
+select this repository and the `deploy/render-exam` branch, then enter every
+environment variable marked `sync: false`.
 
 Render Free sleeps after an idle period. Before an exam demonstration, open the
 service's `/ready` URL and wait for HTTP 200 before starting the desktop app.
