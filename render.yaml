@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: postguard-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: backend
+    branch: integration/desktop-risk-pipeline
+    healthCheckPath: /ready
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: "PostGuard <no-reply@postguardapp.xyz>"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_AVATAR_BUCKET
+        value: avatars
