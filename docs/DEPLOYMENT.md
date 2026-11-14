@@ -38,15 +38,16 @@ service's `/ready` URL and wait for HTTP 200 before starting the desktop app.
 
 ## Desktop API endpoint
 
-Development defaults to `http://127.0.0.1:8001`. A deployed build must provide:
+The exam branch defaults to its Render service:
 
 ```text
-POSTGUARD_API_BASE_URL=https://api.postguardapp.xyz
+POSTGUARD_API_BASE_URL=https://postguard-api-k8oh.onrender.com
 ```
 
-The production installer or launcher must set this value before starting
-PostGuard. Do not place database, Supabase service-role, Resend, or JWT secrets
-in the desktop package.
+Local development can override it with
+`POSTGUARD_API_BASE_URL=http://127.0.0.1:8001`. A future production installer
+can replace it with `https://api.postguardapp.xyz`. Do not place database,
+Supabase service-role, Resend, or JWT secrets in the desktop package.
 
 ## Release order
 

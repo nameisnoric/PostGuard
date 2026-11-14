@@ -10,11 +10,14 @@ class DesktopConfigTests(unittest.TestCase):
     def tearDown(self):
         importlib.reload(config)
 
-    def test_default_api_url_supports_local_development(self):
+    def test_default_api_url_uses_exam_deployment(self):
         with patch.dict(os.environ, {}, clear=True):
             importlib.reload(config)
 
-        self.assertEqual(config.API_BASE_URL, "http://127.0.0.1:8001")
+        self.assertEqual(
+            config.API_BASE_URL,
+            "https://postguard-api-k8oh.onrender.com",
+        )
 
     def test_api_url_can_be_configured_for_deployment(self):
         with patch.dict(

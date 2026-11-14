@@ -57,6 +57,7 @@ Run the desktop application in a second terminal:
 
 ```powershell
 cd desktop
+$env:POSTGUARD_API_BASE_URL="http://127.0.0.1:8001"
 .\.venv\Scripts\python.exe -m app.main
 ```
 
