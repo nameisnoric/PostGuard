@@ -6,6 +6,7 @@ from app.schemas.eye_alert_notification import EyeAlertNotificationCreate
 class EyeAlertNotificationSchemaTests(unittest.TestCase):
     def test_first(self):
         value = EyeAlertNotificationCreate(
+            runtime_notification_id="eye-first",
             alert_type="FIRST",
             blink_rate=4.0,
             window_blink_count=4,
@@ -15,6 +16,7 @@ class EyeAlertNotificationSchemaTests(unittest.TestCase):
 
     def test_repeat(self):
         value = EyeAlertNotificationCreate(
+            runtime_notification_id="eye-repeat",
             alert_type="REPEAT",
             blink_rate=5.2,
             window_blink_count=5,
@@ -24,6 +26,7 @@ class EyeAlertNotificationSchemaTests(unittest.TestCase):
     def test_negative_rate_rejected(self):
         with self.assertRaises(ValidationError):
             EyeAlertNotificationCreate(
+                runtime_notification_id="eye-negative-rate",
                 alert_type="FIRST",
                 blink_rate=-1.0,
                 window_blink_count=0,
@@ -32,6 +35,7 @@ class EyeAlertNotificationSchemaTests(unittest.TestCase):
     def test_negative_count_rejected(self):
         with self.assertRaises(ValidationError):
             EyeAlertNotificationCreate(
+                runtime_notification_id="eye-negative-count",
                 alert_type="FIRST",
                 blink_rate=0.0,
                 window_blink_count=-1,
@@ -40,7 +44,16 @@ class EyeAlertNotificationSchemaTests(unittest.TestCase):
     def test_escalation_rejected(self):
         with self.assertRaises(ValidationError):
             EyeAlertNotificationCreate(
+                runtime_notification_id="eye-escalation",
                 alert_type="ESCALATION",
+                blink_rate=4.0,
+                window_blink_count=4,
+            )
+
+    def test_runtime_notification_id_is_required(self):
+        with self.assertRaises(ValidationError):
+            EyeAlertNotificationCreate(
+                alert_type="FIRST",
                 blink_rate=4.0,
                 window_blink_count=4,
             )

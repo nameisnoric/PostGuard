@@ -34,6 +34,7 @@ import app.models
 
 from app.models.alert_notification import AlertNotification
 from app.models.camera import Camera
+from app.models.eye_alert_notification import EyeAlertNotification
 from app.models.personal_baseline import PersonalBaseline
 from app.models.risk_event_record import RiskEventRecord
 from app.models.session import PostureSession
@@ -300,6 +301,26 @@ class SessionSummaryTests(unittest.TestCase):
 
         return notification
 
+    def create_eye_notification(
+        self,
+        *,
+        runtime_notification_id,
+        alert_type,
+    ):
+        notification = EyeAlertNotification(
+            session_id=1,
+            runtime_notification_id=runtime_notification_id,
+            alert_type=alert_type,
+            blink_rate=4.0,
+            window_blink_count=4,
+            decision="ALERT",
+            reason="LOW_BLINK_CONFIRMED",
+            emitted_at=datetime.now(timezone.utc),
+        )
+        self.db.add(notification)
+        self.db.flush()
+        return notification
+
     # ========================================================
     # SAVE + READ + DUPLICATE
     # ========================================================
@@ -318,6 +339,15 @@ class SessionSummaryTests(unittest.TestCase):
             event,
             alert_type="FIRST",
             risk_level="MODERATE",
+        )
+
+        self.create_eye_notification(
+            runtime_notification_id="eye-summary-first",
+            alert_type="FIRST",
+        )
+        self.create_eye_notification(
+            runtime_notification_id="eye-summary-repeat",
+            alert_type="REPEAT",
         )
 
         self.db.commit()
@@ -448,6 +478,10 @@ class SessionSummaryTests(unittest.TestCase):
             ],
             "FIRST",
         )
+
+        self.assertEqual(saved["eye_alert_count"], 2)
+        self.assertEqual(saved["eye_first_alert_count"], 1)
+        self.assertEqual(saved["eye_repeat_alert_count"], 1)
 
         # ----------------------------------------------------
         # List summaries

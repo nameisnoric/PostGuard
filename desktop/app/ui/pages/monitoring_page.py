@@ -4,6 +4,7 @@ import math
 import os
 import statistics
 import time
+import uuid
 from datetime import datetime
 
 import cv2
@@ -3866,6 +3867,9 @@ class MonitoringPage(QWidget):
                         APIClient
                         .create_eye_alert_notification(
                             session_id=self.session_id,
+                            runtime_notification_id=(
+                                f"eye-{uuid.uuid4().hex}"
+                            ),
                             alert_type=eye_alert_result.get(
                                 "alert_type"
                             ),

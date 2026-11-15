@@ -1018,6 +1018,7 @@ class APIClient:
     @staticmethod
     def create_eye_alert_notification(
         session_id: int,
+        runtime_notification_id: str,
         alert_type: str,
         blink_rate: float,
         window_blink_count: int,
@@ -1026,6 +1027,7 @@ class APIClient:
         return APIClient.post(
             f"/sessions/{session_id}/eye-alert-notifications",
             {
+                "runtime_notification_id": runtime_notification_id,
                 "alert_type": alert_type,
                 "blink_rate": blink_rate,
                 "window_blink_count": window_blink_count,

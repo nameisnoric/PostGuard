@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -52,8 +53,18 @@ def create_eye_alert_notification(
             detail="Eye reminders can only be created while the session is RUNNING",
         )
 
+    query = select(EyeAlertNotification).where(
+        EyeAlertNotification.session_id == session_id,
+        EyeAlertNotification.runtime_notification_id
+        == request.runtime_notification_id,
+    )
+    existing = db.scalar(query)
+    if existing is not None:
+        return existing
+
     row = EyeAlertNotification(
         session_id=session_id,
+        runtime_notification_id=request.runtime_notification_id,
         alert_type=request.alert_type,
         blink_rate=float(request.blink_rate),
         window_blink_count=request.window_blink_count,
@@ -62,7 +73,14 @@ def create_eye_alert_notification(
         emitted_at=datetime.now(timezone.utc),
     )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(query)
+        if existing is not None:
+            return existing
+        raise
     db.refresh(row)
     return row
 

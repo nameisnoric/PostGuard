@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class EyeAlertNotificationCreate(BaseModel):
+    runtime_notification_id: str = Field(min_length=1, max_length=128)
     alert_type: Literal["FIRST", "REPEAT"]
     blink_rate: float = Field(ge=0.0)
     window_blink_count: int = Field(ge=0, strict=True)
@@ -16,6 +17,7 @@ class EyeAlertNotificationCreate(BaseModel):
 class EyeAlertNotificationResponse(BaseModel):
     eye_notification_id: int
     session_id: int
+    runtime_notification_id: str
     alert_type: str
     blink_rate: float
     window_blink_count: int
