@@ -25,6 +25,10 @@ from app.services.session_comparison_service import (
 )
 
 from app.ui.theme import APP_QSS
+from app.ui.utils.session_numbering import (
+    build_session_number_map,
+    session_number_text,
+)
 
 
 class SessionComparisonDialog(
@@ -57,6 +61,8 @@ class SessionComparisonDialog(
             summaries
             or []
         )
+
+        self.session_numbers = build_session_number_map(self.sessions)
 
         self.candidates = (
             build_comparison_candidates(
@@ -670,7 +676,8 @@ class SessionComparisonDialog(
             )
 
             label = (
-                f"เซสชัน #{session_id} "
+                "ครั้งที่ "
+                f"{session_number_text(session_id, self.session_numbers)} "
                 f"• คะแนนเฉลี่ย {average:.2f}"
             )
 
@@ -740,7 +747,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "ต้องมีอย่างน้อย 2 เซสชัน "
+                    "ต้องมีผลการตรวจจับอย่างน้อย 2 ครั้ง "
                     "ที่มีคะแนนความเสี่ยงจึงจะเปรียบเทียบได้"
                 )
             )
@@ -846,7 +853,7 @@ class SessionComparisonDialog(
             self.explanation_label.setText(
                 (
                     "กรุณาเลือกครั้งก่อนและครั้งล่าสุด "
-                    "ให้เป็นคนละเซสชัน"
+                    "ให้เป็นคนละครั้ง"
                 )
             )
 
@@ -889,7 +896,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "สองเซสชันนี้ใช้วิธีคำนวณคะแนนคนละรุ่น "
+                    "ผลการตรวจจับสองครั้งนี้ใช้วิธีคำนวณคะแนนคนละรุ่น "
                     "จึงไม่ควรนำคะแนนมาเปรียบเทียบกัน"
                 )
             )
@@ -907,7 +914,7 @@ class SessionComparisonDialog(
 
             self.explanation_label.setText(
                 (
-                    "อย่างน้อยหนึ่งเซสชัน "
+                    "ผลการตรวจจับอย่างน้อยหนึ่งครั้ง "
                     "ไม่มีคะแนนความเสี่ยงที่ใช้เปรียบเทียบได้"
                 )
             )
@@ -924,7 +931,7 @@ class SessionComparisonDialog(
             )
 
             self.explanation_label.setText(
-                "ไม่สามารถเปรียบเทียบเซสชันที่เลือกได้"
+                "ไม่สามารถเปรียบเทียบผลการตรวจจับที่เลือกได้"
             )
 
             return

@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>PostGuard — Feature Technical Recap & Code Review</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm 15mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: #172033; background: #fff;
+      font-family: "Leelawadee UI", "Tahoma", sans-serif;
+      font-size: 9.5pt; line-height: 1.55;
+    }
+    h1, h2, h3, h4 { color: #102346; margin: 0; page-break-after: avoid; }
+    h1 { font-size: 25pt; line-height: 1.2; }
+    h2 { font-size: 16pt; border-bottom: 2px solid #2864dc; padding-bottom: 4px; margin: 12px 0 8px; }
+    h3 { font-size: 12.5pt; margin: 10px 0 5px; }
+    h4 { font-size: 10.5pt; margin: 7px 0 3px; }
+    p { margin: 3px 0 7px; }
+    ul, ol { margin: 4px 0 8px 20px; padding: 0; }
+    li { margin: 2px 0; }
+    code { font-family: Consolas, monospace; font-size: 8.4pt; color: #183a72; }
+    .cover { min-height: 250mm; display: flex; flex-direction: column; justify-content: center; padding: 18mm 8mm; }
+    .cover .brand { color: #2864dc; font-size: 13pt; font-weight: 700; letter-spacing: 1px; }
+    .cover .subtitle { font-size: 14pt; color: #50617e; margin-top: 8px; }
+    .cover .meta { margin-top: 28px; border-left: 4px solid #2864dc; padding: 8px 14px; color: #42516c; }
+    .cover .purpose { margin-top: 28px; padding: 14px; border-radius: 10px; background: #eef4ff; }
+    .page-break { page-break-before: always; }
+    .feature { page-break-before: always; }
+    .feature:first-of-type { page-break-before: auto; }
+    .callout { padding: 8px 11px; margin: 8px 0; border-left: 4px solid #2864dc; background: #f1f6ff; }
+    .warning { border-left-color: #e0a000; background: #fff8df; }
+    .success { border-left-color: #16865b; background: #ebfaf3; }
+    .danger { border-left-color: #c0392b; background: #fff0ee; }
+    .flow { font-family: Consolas, monospace; white-space: pre-wrap; padding: 9px 11px; background: #101827; color: #edf4ff; border-radius: 7px; font-size: 8.3pt; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; margin: 7px 0 11px; page-break-inside: avoid; }
+    th, td { border: 1px solid #cbd6e7; padding: 5px 6px; vertical-align: top; }
+    th { background: #eaf1fb; color: #14294d; font-weight: 700; text-align: left; }
+    tr:nth-child(even) td { background: #fafcff; }
+    .compact th, .compact td { padding: 3px 5px; font-size: 8.7pt; }
+    .pill { display: inline-block; border-radius: 9px; padding: 1px 6px; background: #e8efff; color: #2454b8; font-size: 8pt; font-weight: 700; }
+    .small { font-size: 8.3pt; color: #54647e; }
+    .toc td:first-child { width: 9%; text-align: center; font-weight: 700; color: #2864dc; }
+    .toc td:last-child { width: 25%; color: #54647e; }
+    .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 7px; }
+    .kpi-grid td { width: 33%; border: 1px solid #cbd6e7; border-radius: 8px; background: #f8fbff; text-align: center; }
+    .kpi { font-size: 18pt; font-weight: 700; color: #2864dc; }
+    .footer-note { color: #65728a; font-size: 8pt; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">POSTGUARD</div>
+    <h1>Feature Technical Recap<br>&amp; Code Review Guide</h1>
+    <div class="subtitle">สรุปแต่ละฟีเจอร์ว่าใช้อะไร ทำอย่างไร ได้ผลลัพธ์อะไร และย้อนดูโค้ดที่ใด</div>
+    <div class="meta">
+      <b>Repository:</b> nameisnoric/PostGuard<br>
+      <b>Branch ที่ตรวจ:</b> <code>deploy/render-exam</code><br>
+      <b>Commit:</b> <code>285069d — Connect exam desktop to Render API</code><br>
+      <b>วันที่ตรวจ:</b> 15 พฤศจิกายน 2026 (Asia/Bangkok)<br>
+      <b>ขอบเขต:</b> Desktop, Backend API, Vision/Risk pipeline, Database, Tests และ Deployment
+    </div>
+    <div class="purpose">
+      เอกสารนี้เขียนจากโค้ดปัจจุบัน เพื่อใช้เป็นเอกสาร recap หลังพัฒนาและเป็นคู่มือ review code ในอนาคต
+      เน้นความสัมพันธ์ระหว่าง UI → Service → Algorithm/API → Database รวมทั้งบอกข้อจำกัดที่ต้องอธิบายอย่างตรงไปตรงมา
+    </div>
+  </section>
+
+  <section class="page-break">
+    <h2>Executive Summary</h2>
+    <p>PostGuard เป็น Desktop Application สำหรับประเมินท่าทางจากกล้องด้านหน้า โดยประมวลผลภาพภายในเครื่องผู้ใช้ แล้วส่งเฉพาะค่าตัวเลข เหตุการณ์ และรายงานไปยัง Backend ไม่ส่งภาพหรือวิดีโอกล้องขึ้นระบบ</p>
+    <table class="kpi-grid">
+      <tr><td><div class="kpi">52</div>Backend unit tests ผ่าน</td><td><div class="kpi">472</div>Desktop unit tests ผ่าน</td><td><div class="kpi">524</div>รวม automated unit tests</td></tr>
+    </table>
+    <h3>Technology Stack</h3>
+    <table>
+      <tr><th>Layer</th><th>เทคโนโลยี</th><th>หน้าที่</th></tr>
+      <tr><td>Desktop UI</td><td>Python, PySide6</td><td>หน้าต่าง Login, Dashboard, Monitoring, History, Settings, Dialog และ Mini Controller</td></tr>
+      <tr><td>Computer Vision</td><td>OpenCV, MediaPipe Tasks, NumPy</td><td>อ่านกล้อง แก้เอียง ตรวจ landmark และคำนวณค่าท่าทาง</td></tr>
+      <tr><td>Desktop service</td><td>Python service classes</td><td>Baseline, Risk pipeline, Blink, Alert policy, persistence และ API orchestration</td></tr>
+      <tr><td>Backend</td><td>FastAPI, Pydantic, SQLAlchemy</td><td>Authentication, validation, ownership, session lifecycle และ persistence</td></tr>
+      <tr><td>Database</td><td>PostgreSQL/Supabase, Alembic</td><td>บัญชี, baseline, session, risk/alert records, summary, settings และ consent</td></tr>
+      <tr><td>Security/Email</td><td>Argon2, JWT HS256, Resend</td><td>hash รหัสผ่าน, access/refresh token, OTP และแจ้งเปลี่ยนรหัสผ่าน</td></tr>
+      <tr><td>Deploy</td><td>Docker, Render Blueprint</td><td>ให้บริการ Backend HTTPS; Desktop ยังทำงานบน Windows ของผู้ใช้</td></tr>
+    </table>
+    <div class="flow">Camera frame (local)
+  → Camera correction / MediaPipe landmarks
+  → Detection Contract 1.0
+  → Compare with Personal Baseline
+  → Current Posture Assessment
+  → Temporal Tracking
+  → Modified RULA-adapted score + Risk Evaluation
+  → Risk Event
+  → Alert Policy
+  → Popup / Sound + Persist numeric event
+  → Session Summary / Dashboard / History</div>
+    <div class="callout warning"><b>ขอบเขตสำคัญ:</b> คะแนน 0–100 เป็น PostGuard presentation score ที่แปลงจาก Modified RULA-adapted 1–7 สำหรับข้อมูลที่กล้องหน้าจับได้ ไม่ใช่ Full RULA และไม่ใช่การวินิจฉัยทางการแพทย์</div>
+  </section>
+
+  <section class="page-break">
+    <h2>สารบัญฟีเจอร์</h2>
+    <table class="toc compact">
+      <tr><td>01</td><td>Architecture &amp; Privacy by Design</td><td>โครงสร้างและการแยก runtime</td></tr>
+      <tr><td>02</td><td>Register, OTP, Login, JWT Refresh</td><td>บัญชีและ session authentication</td></tr>
+      <tr><td>03</td><td>Password Reset &amp; Change Password</td><td>OTP/reset token และ auth invalidation</td></tr>
+      <tr><td>04</td><td>Profile &amp; Private Avatar</td><td>โปรไฟล์และ Supabase private storage</td></tr>
+      <tr><td>05</td><td>Privacy Consent</td><td>notice version และ monitoring gate</td></tr>
+      <tr><td>06</td><td>Delete / Restore Account</td><td>14-day pending deletion lifecycle</td></tr>
+      <tr><td>07</td><td>Settings &amp; Notification Preferences</td><td>ค่าต่อผู้ใช้และ sound/popup</td></tr>
+      <tr><td>08</td><td>Camera Setup, Scan &amp; Adjustment</td><td>กล้อง การ์ดอ้างอิง และแก้ roll</td></tr>
+      <tr><td>09</td><td>Personal Baseline</td><td>เก็บตัวอย่าง ตรวจคุณภาพ ยืนยัน</td></tr>
+      <tr><td>10</td><td>Posture Detection Contract</td><td>ไหล่ คอ และ eye-distance proxy</td></tr>
+      <tr><td>11</td><td>Blink Detection &amp; Eye Alert</td><td>blink state, rolling window, FIRST/REPEAT</td></tr>
+      <tr><td>12</td><td>Relative Screen Distance</td><td>อัตราส่วนเทียบ baseline</td></tr>
+      <tr><td>13</td><td>Risk Score &amp; Modified RULA</td><td>คะแนน 1–7 และแสดง 0–100</td></tr>
+      <tr><td>14</td><td>Temporal, Risk Event &amp; Alert Lifecycle</td><td>FIRST/REPEAT/ESCALATION/RESOLUTION</td></tr>
+      <tr><td>15</td><td>Camera Loss, Data Gap &amp; Recovery</td><td>กันข้อมูลขาดทำให้แจ้งเตือนผิด</td></tr>
+      <tr><td>16</td><td>Session Lifecycle &amp; Mini Controller</td><td>Start/Pause/Resume/Stop/Minimize</td></tr>
+      <tr><td>17</td><td>Persistence, Summary &amp; Reports</td><td>บันทึกผลแบบ idempotent</td></tr>
+      <tr><td>18</td><td>Dashboard, History &amp; Graph</td><td>สรุปย้อนหลังและแนวโน้มคะแนน</td></tr>
+      <tr><td>19</td><td>Validation Tools &amp; Testing</td><td>v4/v7, ground truth และ test suites</td></tr>
+      <tr><td>20</td><td>Deployment</td><td>Render backend และ desktop runtime</td></tr>
+    </table>
+  </section>
+
+  <section class="feature">
+    <h2>01 — Architecture &amp; Privacy by Design</h2>
+    <h3>ใช้อะไร</h3>
+    <p>แยกเป็น 2 runtime: Desktop PySide6 ประมวลผลกล้องในเครื่อง และ FastAPI Backend จัดการบัญชี/ข้อมูลถาวร ผ่าน <code>APIClient</code> เท่านั้น</p>
+    <h3>ทำอย่างไร</h3>
+    <ul>
+      <li>UI เรียก Desktop services; services เรียก Vision หรือ HTTP API</li>
+      <li>Backend router รับ request → Pydantic schema ตรวจรูปแบบ → service/model → SQLAlchemy transaction</li>
+      <li>Desktop ไม่ import model ฐานข้อมูล และ Backend ไม่ import Desktop UI</li>
+      <li>กล้องเก็บ frame ในหน่วยความจำเฉพาะรอบประมวลผล แล้วทิ้ง raw frame</li>
+    </ul>
+    <h3>ได้อะไร</h3>
+    <p>ส่วนกล้องทำงานได้แม้ Backend อยู่คนละเครื่อง, ลดการส่งข้อมูลอ่อนไหว และสามารถ package Desktop แยกจาก API ได้</p>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์หลัก</th></tr><tr><td>กฎ dependency</td><td><code>docs/PROJECT_STRUCTURE.md</code></td></tr><tr><td>Desktop entry</td><td><code>desktop/app/main.py</code></td></tr><tr><td>Backend entry</td><td><code>backend/app/main.py</code></td></tr><tr><td>HTTP boundary</td><td><code>desktop/app/services/api_client.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>02 — Register, OTP, Login &amp; JWT Refresh</h2>
+    <h3>ใช้อะไร</h3>
+    <p>FastAPI + Pydantic, Argon2 ผ่าน <code>pwdlib</code>, JWT HS256, Resend email และ Desktop windows สำหรับ Register/OTP/Login</p>
+    <h3>ทำอย่างไร</h3>
+    <ol>
+      <li>Register ตรวจ <code>@ku.th</code>, password policy และ confirm password ที่ UI</li>
+      <li>Backend สร้าง OTP 6 หลัก เก็บเฉพาะ OTP hash และเวลาหมดอายุ แล้วส่งผ่าน Resend</li>
+      <li>เมื่อ verify สำเร็จ จึงสร้าง User และเก็บ Argon2 hash ไม่เก็บ plain password</li>
+      <li>Login ตรวจ hash และสถานะบัญชี แล้วออก access token 30 นาที + refresh token 30 วัน</li>
+      <li><code>APIClient</code> แนบ Bearer token และเมื่อเจอ 401 จะ refresh พร้อม retry request ตาม contract</li>
+      <li><code>auth_version</code> ทำให้ token รุ่นเก่าถูกยกเลิกเมื่อมีการเปลี่ยนรหัสผ่าน</li>
+    </ol>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้ KU สมัครและยืนยันอีเมลได้, login ระยะยาวโดยไม่ต้องกรอกรหัสซ้ำบ่อย และ session monitoring ที่ยาวไม่หลุดเพราะ access token หมดอายุปกติ</p>
+    <table class="compact"><tr><th>ส่วน</th><th>ไฟล์</th></tr><tr><td>API</td><td><code>backend/app/routers/auth.py</code></td></tr><tr><td>Security</td><td><code>backend/app/core/security.py</code></td></tr><tr><td>Schema validation</td><td><code>backend/app/schemas/user.py</code></td></tr><tr><td>Desktop</td><td><code>login_window.py</code>, <code>register_window.py</code>, <code>otp_window.py</code>, <code>token_store.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>03 — Password Reset &amp; Change Password</h2>
+    <h3>Forgot password flow</h3>
+    <div class="flow">Email → POST /auth/forgot-password → OTP email
+OTP → POST /auth/verify-reset-otp → short-lived reset token
+New password → POST /auth/reset_password → invalidate used token → login again</div>
+    <p>OTP หมดอายุและใช้ซ้ำไม่ได้; reset token มี JTI สำหรับติดตามการใช้ซ้ำ และไม่ถูกเก็บใน global TokenStore</p>
+    <h3>Change password flow</h3>
+    <p>ผู้ใช้ที่ login อยู่กรอกรหัสเดิม + รหัสใหม่ + ยืนยัน ผ่าน dialog; Backend ตรวจรหัสเดิม, policy และห้ามใช้ค่าเดิม จากนั้นเพิ่ม <code>auth_version</code> และส่งอีเมลแจ้งเตือน</p>
+    <h3>ได้อะไร</h3>
+    <p>รองรับทั้งกรณีลืมรหัสและเปลี่ยนรหัสใน Settings พร้อมปุ่มแสดง/ซ่อนรหัสและข้อความบอกเงื่อนไขที่ผิดใน Desktop</p>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์</th></tr><tr><td>Reset UI</td><td><code>desktop/app/ui/dialogs/password_reset_dialog.py</code></td></tr><tr><td>Change UI</td><td><code>desktop/app/ui/dialogs/change_password_dialog.py</code></td></tr><tr><td>Password helper</td><td><code>desktop/app/ui/utils/password_visibility.py</code>, <code>auth_validation.py</code></td></tr><tr><td>Backend</td><td><code>auth.py</code>, <code>users.py</code>, <code>password_reset.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>04 — Profile &amp; Private Avatar</h2>
+    <h3>ใช้อะไร</h3>
+    <p>Profile API + Pillow สำหรับ normalize รูป + Supabase Storage private bucket ผ่าน service-role key ที่อยู่เฉพาะ Backend</p>
+    <h3>ทำอย่างไร</h3>
+    <ul>
+      <li>แก้ username/full name ด้วย <code>PATCH /users/me</code> และตรวจค่าซ้ำ</li>
+      <li>Avatar รับเฉพาะ JPG/PNG ขนาดไม่เกิน 5 MB, decode/normalize ก่อน upload</li>
+      <li>เก็บ object path ผูกกับ user; Desktop ขอรูปผ่าน authenticated API ไม่ใช้ public URL</li>
+      <li>ลบ avatar ได้โดยลบ object และอ้างอิงในบัญชี</li>
+    </ul>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้มีโปรไฟล์ส่วนตัวและรูปไม่เปิดสาธารณะ; secret ของ Supabase ไม่ถูกฝังใน Desktop</p>
+    <table class="compact"><tr><th>ไฟล์หลัก</th><th>บทบาท</th></tr><tr><td><code>backend/app/routers/users.py</code></td><td>profile/avatar endpoints และ image validation</td></tr><tr><td><code>backend/app/services/avatar_storage.py</code></td><td>upload/download/delete private object</td></tr><tr><td><code>desktop/app/ui/pages/profile_page.py</code></td><td>UI และ confirmation ก่อน save</td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>05 — Privacy Consent</h2>
+    <h3>ทำอย่างไร</h3>
+    <ol>
+      <li>ก่อนเข้า Camera Setup Desktop เรียกสถานะ consent</li>
+      <li>ถ้าไม่เคยยอมรับ/ถอนแล้ว/เวอร์ชันเก่า แสดง Privacy Notice ภาษาไทย</li>
+      <li>ผู้ใช้ต้องติ๊กยืนยัน จึงกด “ให้ความยินยอมและดำเนินการต่อ” ได้</li>
+      <li>Backend บันทึก version, accepted_at, withdrawn_at และตรวจซ้ำก่อน start session</li>
+      <li>ถอน consent ระหว่าง RUNNING/PAUSED ไม่ได้ ต้องจบ session ก่อน</li>
+    </ol>
+    <h3>ได้อะไร</h3>
+    <p>Consent ไม่ได้เป็นเพียง UI แต่เป็น server-side gate; ผู้ใช้ยังใช้ส่วนบัญชีได้เมื่อไม่ยินยอม แต่เปิด Monitoring ไม่ได้</p>
+    <div class="callout"><b>เวอร์ชันปัจจุบัน:</b> <code>2026-10-20</code> ใน <code>backend/app/core/privacy.py</code></div>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์</th></tr><tr><td>Notice UI</td><td><code>privacy_notice_dialog.py</code></td></tr><tr><td>API</td><td><code>backend/app/routers/privacy.py</code></td></tr><tr><td>Session gate</td><td><code>backend/app/routers/sessions.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>06 — Delete / Restore Account</h2>
+    <h3>ทำอย่างไร</h3>
+    <p>ผู้ใช้ขอลบบัญชีจาก Settings → Backend เปลี่ยนเป็น <code>PENDING_DELETION</code> และกำหนดเวลา 14 วัน ผู้ใช้ต้องยืนยันข้อมูลตาม dialog และถูกจำกัดการใช้งานปกติ ระหว่างช่วงรอสามารถยกเลิกคำขอเพื่อ restore ได้ เมื่อถึงกำหนด background purge จะลบข้อมูลที่เกี่ยวข้องและ avatar</p>
+    <h3>ได้อะไร</h3>
+    <p>ลดความเสี่ยงจากการลบผิดทันที มี grace period และยังรองรับการลบถาวรตาม lifecycle</p>
+    <table class="compact"><tr><th>ไฟล์</th><th>หน้าที่</th></tr><tr><td><code>account_deletion_dialog.py</code></td><td>confirmation และข้อความผลกระทบ</td></tr><tr><td><code>backend/app/routers/users.py</code></td><td>request/cancel endpoints</td></tr><tr><td><code>backend/app/services/account_deletion.py</code></td><td>purge due accounts</td></tr><tr><td><code>backend/app/main.py</code></td><td>startup + periodic purge loop</td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>07 — Settings &amp; Notification Preferences</h2>
+    <h3>ข้อมูลที่จัดการ</h3>
+    <p>เปิด/ปิด notification, เปิด/ปิดเสียง, volume 0–100 และ reminder interval 1–60 นาที เก็บแยกต่อ user ใน PostgreSQL</p>
+    <h3>ทำอย่างไร</h3>
+    <p>Settings page โหลดค่าจาก <code>GET /users/me/settings</code>, ให้ผู้ใช้แก้และยืนยันก่อน <code>PUT</code>; Monitoring อ่านค่าเพื่อควบคุม popup/sound โดยเสียงใช้ไฟล์ local <code>posture_alert.wav</code> จึงไม่ต้องส่งข้อมูลกล้องออกไป</p>
+    <h3>ได้อะไร</h3>
+    <p>พฤติกรรมแจ้งเตือนสอดคล้องกับความต้องการรายบุคคล และค่าเดิมตามผู้ใช้ไปเมื่อ login เครื่องอื่น</p>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์</th></tr><tr><td>UI</td><td><code>desktop/app/ui/pages/settings_page.py</code></td></tr><tr><td>Popup/toast</td><td><code>posture_alert_dialog.py</code>, <code>alert_toast.py</code></td></tr><tr><td>Sound</td><td><code>desktop/app/services/alert_sound.py</code></td></tr><tr><td>Persistence</td><td><code>backend/app/routers/settings.py</code>, <code>models/user_settings.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>08 — Camera Setup, Scan &amp; Adjustment</h2>
+    <h3>ใช้อะไร</h3>
+    <p>OpenCV <code>VideoCapture</code>, contour/rectangle detection, การ์ดมาตรฐาน 85.60 × 53.98 mm และ scene/card roll estimation</p>
+    <h3>ทำอย่างไร</h3>
+    <ol>
+      <li>Scan camera index และเปิดอ่าน frame จริงเพื่อยืนยันว่า device ใช้งานได้</li>
+      <li>ตรวจ resolution compatibility และแสดง preview แบบ fixed aspect ratio</li>
+      <li>Camera Preparation ตรวจกรอบการ์ด: aspect ratio, มุมสี่เหลี่ยม, ขนาด, ตำแหน่ง, perspective และความต่อเนื่อง 10 เฟรม</li>
+      <li>คำนวณ pixel/mm scale และ roll; สร้าง camera reference เป็นตัวเลข</li>
+      <li>ใช้ <code>level_frame</code> หมุนภาพแก้ roll และ crop ขอบดำ ก่อนส่งภาพต่อไป Preview/Baseline/Monitoring</li>
+    </ol>
+    <h3>ได้อะไร</h3>
+    <p>ลดความคลาดเคลื่อนจากกล้องตั้งเอียงและบันทึก setup context โดยไม่เก็บภาพการ์ดหรือ transform matrix ลงฐานข้อมูล</p>
+    <table class="compact"><tr><th>งาน</th><th>ไฟล์</th></tr><tr><td>เปิด/scan กล้อง</td><td><code>camera_setup/camera_open.py</code></td></tr><tr><td>การ์ด</td><td><code>card_detection.py</code>, <code>card_validation.py</code>, <code>card_perspective.py</code></td></tr><tr><td>แก้เอียง</td><td><code>camera_roll.py</code>, <code>services/camera_setup/roll_correction.py</code></td></tr><tr><td>UI flow</td><td><code>camera_setup_page.py</code>, <code>camera_preview_page.py</code>, <code>camera_calibration_page.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>09 — Personal Baseline</h2>
+    <h3>ข้อมูลอ้างอิง</h3>
+    <p>Shoulder tilt, neck lateral tilt, neck flexion และ eye-distance proxy จากท่านั่งปกติของผู้ใช้ พร้อม camera reference</p>
+    <h3>กติกาการเก็บ</h3>
+    <table class="compact"><tr><th>เงื่อนไข</th><th>ค่า</th></tr><tr><td>Valid samples</td><td>อย่างน้อย 60</td></tr><tr><td>เวลาครอบคลุม</td><td>อย่างน้อย 15 วินาที; runtime guard 30 วินาที</td></tr><tr><td>Valid ratio</td><td>อย่างน้อย 70%</td></tr><tr><td>SD ไหล่ / คอด้านข้าง</td><td>ไม่เกิน 2°</td></tr><tr><td>SD คอก้มเงย</td><td>ไม่เกิน 3°</td></tr><tr><td>SD eye distance</td><td>ไม่เกิน 5 px</td></tr><tr><td>Context</td><td>Detection Contract 1.0, context VALID</td></tr></table>
+    <h3>ทำอย่างไร</h3>
+    <p><code>PersonalBaselineCollector</code> ปฏิเสธ frame ที่ feature หาย/invalid, คำนวณสถิติและ stability, สร้าง candidate เมื่อผ่าน แล้วรอผู้ใช้ยืนยันก่อนบันทึก Backend Session จะเริ่มได้เฉพาะ baseline ที่ <code>SUCCESS/CONFIRMED</code> และข้อมูลครบ</p>
+    <h3>ได้อะไร</h3>
+    <p>ระบบประเมิน “เปลี่ยนจากท่าปกติของคนนี้เท่าไร” แทนการใช้ค่าคงที่เดียวกับทุกคน และป้องกัน baseline คุณภาพต่ำเข้าสู่ session</p>
+    <div class="callout warning">เกณฑ์คุณภาพ baseline เป็น prototype engineering thresholds ไม่ใช่มาตรฐานทางคลินิก</div>
+    <p class="small">ไฟล์หลัก: <code>desktop/app/vision/baseline/personal_baseline.py</code>, <code>personal_baseline_service.py</code>, <code>baseline_page.py</code>, <code>backend/app/routers/personal_baselines.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>10 — Posture Detection Contract</h2>
+    <h3>ใช้อะไร</h3>
+    <p>MediaPipe Pose/Face Landmarker models + NumPy geometry + validators และ context filter</p>
+    <h3>ค่าที่ตรวจ</h3>
+    <table class="compact"><tr><th>Feature</th><th>วิธีคิดโดยย่อ</th><th>หน่วย/สถานะ</th></tr><tr><td>Shoulder tilt</td><td>มุมเส้นซ้าย–ขวาจาก shoulder landmarks</td><td>deg, validated_prototype</td></tr><tr><td>Neck lateral tilt</td><td>แนวใบหน้าเทียบแนวไหล่/แกนตั้ง</td><td>deg, validated_prototype</td></tr><tr><td>Neck flexion</td><td>face orientation/pitch ที่ผ่าน validity gate</td><td>deg, experimental ได้ในบางบริบท</td></tr><tr><td>Eye distance</td><td>ระยะ landmark รอบดวงตาในภาพ</td><td>px, relative proxy</td></tr><tr><td>Context</td><td>VALID / TRANSITION / UNKNOWN จาก pose stability</td><td>ใช้ gate การประเมิน</td></tr></table>
+    <h3>ทำอย่างไร</h3>
+    <p><code>DetectionService.process_frame()</code> ตรวจ pose/face, อัปเดต context, คำนวณ feature, ใส่ status/reason/unit และคืน Detection Contract 1.0 ค่าที่ใช้ downstream ต้อง finite และผ่าน validator; การไม่พบคนหรือช่วงเคลื่อนไหวไม่ถูกเดาเป็นศูนย์</p>
+    <h3>ได้อะไร</h3>
+    <p>ทุก stage หลัง Detection รู้ว่าค่าใดเชื่อถือได้ ค่าใดทดลอง และเหตุใดจึงประเมินไม่ได้ ลด false conclusion จาก missing data</p>
+    <p class="small">ไฟล์หลัก: <code>detection_service.py</code>, <code>vision/mediapipe_detection/pose/*</code>, <code>face/*</code>, <code>posture/posture_features.py</code>, <code>context_filter.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>11 — Blink Detection &amp; Eye Alert</h2>
+    <h3>Detection</h3>
+    <p>วัด eye openness จาก face landmarks, ใช้ state transition OPEN → CLOSED → OPEN เพื่อนับ blink และกันการหลับตานานเกิน 1 วินาทีไม่ให้ตีความเป็น blink ปกติ</p>
+    <h3>Policy</h3>
+    <table class="compact"><tr><th>ค่า</th><th>Default</th></tr><tr><td>Rolling window</td><td>60 วินาที</td></tr><tr><td>ข้อมูล valid ขั้นต่ำ</td><td>45 วินาที</td></tr><tr><td>Candidate low blink</td><td>&lt; 8 ครั้ง/นาที</td></tr><tr><td>Recovery hysteresis</td><td>≥ 10 ครั้ง/นาที</td></tr><tr><td>ยืนยันก่อน FIRST</td><td>15 วินาที</td></tr><tr><td>REPEAT cooldown</td><td>600 วินาที</td></tr><tr><td>Maximum sample gap</td><td>2 วินาที</td></tr></table>
+    <h3>ได้อะไร</h3>
+    <p>แสดง blink rate หลังมี observation เพียงพอ, แจ้ง FIRST/REPEAT แบบไม่รบกวนถี่ และบันทึก eye notification แยกจาก posture risk</p>
+    <div class="callout warning">ค่า blink เป็น candidate engineering threshold ไม่ใช้วินิจฉัยตาแห้ง ความล้า หรืออาการง่วง</div>
+    <p class="small">ไฟล์หลัก: <code>eye_measurement.py</code>, <code>blink_detection_service.py</code>, <code>blink_statistics.py</code>, <code>eye_alert_policy.py</code>, <code>eye_alert_notifications.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>12 — Relative Screen Distance</h2>
+    <h3>หลักการ</h3>
+    <p>ใช้ <code>ratio = current_eye_distance_px / baseline_eye_distance_px</code> เมื่อหน้าเข้าใกล้กล้อง ดวงตาในภาพจะห่างกันมากขึ้น ระบบจึงประเมินแบบ relative ไม่แปลงเป็นเซนติเมตรโดยไม่มี calibration ทางกายภาพ</p>
+    <h3>State machine</h3>
+    <div class="flow">NORMAL
+  └─ ratio ≥ 1.25 ต่อเนื่อง 3s → TOO_CLOSE
+TOO_CLOSE
+  └─ ratio ≤ 1.15 → NORMAL
+missing/invalid → NOT_EVALUATED / break continuity</div>
+    <p>ค่า enter/exit ต่างกันเพื่อ hysteresis ลดการสลับสถานะเมื่ออยู่ใกล้ threshold และ screen distance แยกจาก RULA score</p>
+    <h3>ได้อะไร</h3>
+    <p>แจ้งเตือนการเข้าใกล้หน้าจอเมื่อเทียบกับท่าตั้งต้นของผู้ใช้ โดยไม่อ้างว่าเป็นระยะจริงหน่วย cm</p>
+    <div class="callout warning">1.25, 1.15 และ 3 วินาทีเป็น configurable policy values ยังไม่ใช่ ergonomic thresholds ที่ผ่าน validation</div>
+    <p class="small">ไฟล์หลัก: <code>relative_screen_distance.py</code>, <code>screen_distance_policy.py</code>, <code>screen_distance_notifications.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>13 — Risk Score &amp; Modified RULA-adapted</h2>
+    <h3>ทำอย่างไร</h3>
+    <ol>
+      <li>เปรียบค่าปัจจุบันกับ baseline และจัด class ท่าทาง</li>
+      <li>ให้คะแนนส่วนที่กล้องหน้าจับได้: คอก้ม/เงย, คอเอียงด้านข้าง, ไหล่ไม่สมดุล และท่าค้าง</li>
+      <li>คะแนนภายในถูก clamp เป็น 1–7</li>
+      <li>แปลงเพื่อผู้ใช้ด้วยสูตร <code>((score - 1) / 6) × 100</code> เป็น 0–100%</li>
+      <li>ถ้า feature จำเป็นขาด จะคืน PARTIAL/NOT_EVALUATED แทนการสร้างคะแนนปลอม</li>
+    </ol>
+    <table class="compact"><tr><th>องค์ประกอบ</th><th>คะแนนโดยย่อ</th></tr><tr><td>Neck base</td><td>neutral 1; flexion 2; extension 3; extreme/invalid class ตาม contract สูงสุด 4</td></tr><tr><td>Neck lateral</td><td>เอียงซ้าย/ขวา +1; neutral +0</td></tr><tr><td>Shoulder asymmetry</td><td>ไหล่ซ้าย/ขวาสูง +1; near-level +0</td></tr><tr><td>Sustained posture</td><td>ค้างถึง 60 วินาที +1 เพียงครั้งเดียว</td></tr></table>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้เห็นความเสี่ยงเป็นเปอร์เซ็นต์เข้าใจง่าย ขณะที่ระบบยังเก็บ trace ของคะแนนและองค์ประกอบเพื่ออธิบายย้อนหลังได้</p>
+    <div class="callout danger"><b>คำอธิบายที่ถูกต้อง:</b> “RULA-adapted/PostGuard risk score สำหรับกล้องด้านหน้า” ไม่ควรเรียกว่า Full RULA หรือผลวินิจฉัยทางคลินิก</div>
+    <p class="small">ไฟล์หลัก: <code>backend/camera_card/posture_score/modified_rula.py</code>, <code>risk_evaluation/risk_evaluator.py</code>, <code>desktop/app/services/risk_engine.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>14 — Temporal, Risk Event &amp; Alert Lifecycle</h2>
+    <h3>Pipeline</h3>
+    <div class="flow">Assessment → Temporal duration → Risk level
+→ RiskEventTracker → AlertPolicy → UI + API persistence</div>
+    <h3>Event และ Notification ต่างกัน</h3>
+    <p><b>Risk Event</b> คือช่วงความเสี่ยงต่อเนื่องจริง มีเวลาเริ่ม/จบ/duration ส่วน <b>Alert Notification</b> คือครั้งที่ระบบตัดสินใจแจ้งผู้ใช้ภายใน event นั้น</p>
+    <table class="compact"><tr><th>Alert type</th><th>ความหมาย</th></tr><tr><td>FIRST</td><td>แจ้งครั้งแรกหลัง event ผ่านเงื่อนไขเวลา</td></tr><tr><td>REPEAT</td><td>event ยังอยู่และพ้น cooldown จึงแจ้งซ้ำ</td></tr><tr><td>ESCALATION</td><td>ระดับ MODERATE → HIGH; ตั้งค่าให้ข้าม cooldown</td></tr><tr><td>RESOLUTION</td><td>event กลับปกติ; policy ปัจจุบันไม่แสดง notification เพราะ <code>notify_on_resolution=False</code></td></tr></table>
+    <h3>Timing ปัจจุบัน</h3>
+    <table class="compact"><tr><th>ระดับ</th><th>FIRST delay</th><th>REPEAT cooldown</th></tr><tr><td>MODERATE</td><td>5 วินาที</td><td>300 วินาที</td></tr><tr><td>HIGH</td><td>ทันที</td><td>180 วินาที</td></tr></table>
+    <p>Risk event เริ่มตั้งแต่ MODERATE; recovery grace 5 วินาทีป้องกัน LOW/NONE ชั่วคราวตัด event เดียวเป็นหลาย event</p>
+    <h3>ได้อะไร</h3>
+    <p>ระบบยังติดตามความเสี่ยงต่อเนื่องแม้ notification ถูก cooldown และสามารถ audit ได้ว่าความเสี่ยงเกิดเมื่อไรกับแจ้งผู้ใช้เมื่อไร</p>
+    <p class="small">ไฟล์หลัก: <code>temporal_posture_tracker.py</code>, <code>risk_event_tracker.py</code>, <code>alert_policy.py</code>, <code>validated_risk_pipeline_service.py</code>, <code>risk_persistence_service.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>15 — Camera Loss, Data Gap &amp; Recovery</h2>
+    <h3>Data Gap คืออะไร</h3>
+    <p>ช่วงที่ระบบไม่มี observation ที่ใช้ประเมินได้ เช่น กล้องหลุด, อ่าน frame ไม่สำเร็จ, ไม่เห็น pose/face หรือ context ไม่พร้อม ไม่ใช่คะแนนต่ำและไม่ควรนับเป็นท่าปกติ</p>
+    <h3>ทำอย่างไร</h3>
+    <ul>
+      <li><code>CameraLossTracker</code> จับเวลาเริ่ม/สิ้นสุด camera loss</li>
+      <li>Risk pipeline รับ <code>process_data_gap()</code> เพื่อหยุด continuity ที่ไม่มีหลักฐาน</li>
+      <li>Eye policy ทิ้ง rolling window ที่ไม่อาจอ้าง observation ต่อเนื่องได้</li>
+      <li>เมื่อกล้องกลับมา pipeline reset/recover เฉพาะ state ที่จำเป็น ไม่เอาเวลาขาดข้อมูลไปเพิ่ม risk duration</li>
+      <li>Session summary เก็บ data-gap metrics เพื่อบอกคุณภาพ session</li>
+    </ul>
+    <h3>ได้อะไร</h3>
+    <p>ลด false alert และไม่ทำให้ duration/risk score ดูดีหรือแย่เกินจริงเพราะกล้องหาย</p>
+    <p class="small">ไฟล์หลัก: <code>camera_loss_tracker.py</code>, <code>validated_risk_pipeline_service.py</code>, <code>eye_alert_policy.py</code>, migration <code>7c9e2a4b1d60_add_session_data_gap_metrics.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>16 — Session Lifecycle &amp; Mini Controller</h2>
+    <h3>State</h3>
+    <div class="flow">START → RUNNING ⇄ PAUSED → COMPLETED
+unexpected previous run → INTERRUPTED</div>
+    <h3>ทำอย่างไร</h3>
+    <ul>
+      <li>Start ต้องมี consent ปัจจุบัน, camera ของ user และ baseline ที่ valid/confirmed</li>
+      <li>Pause เก็บ <code>paused_at</code>; Resume เพิ่ม paused duration และใช้ session เดิม</li>
+      <li>Stop ปิด event ที่เปิดอยู่, จบ session, คืนกล้อง และสร้าง summary</li>
+      <li>เปลี่ยนไป Dashboard/History ไม่จบ monitoring; detection controller ยังทำงาน</li>
+      <li>เมื่อ minimize แสดง <code>MonitoringMiniController</code> พร้อมภาพย่อ เวลา สถานะ Pause/Resume/Stop และ snap/hide-to-edge</li>
+      <li>Login รอบใหม่พบ RUNNING/PAUSED ค้าง จะให้ recovery เป็น INTERRUPTED ไม่เดา end time</li>
+    </ul>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้ควบคุม session ได้ชัดเจนทั้งหน้าหลักและหน้าต่างเล็ก และข้อมูลไม่ถูกบันทึกเป็น completed เมื่อโปรแกรมปิดผิดปกติ</p>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์</th></tr><tr><td>Backend state machine</td><td><code>backend/app/routers/sessions.py</code></td></tr><tr><td>Monitoring UI</td><td><code>monitoring_page.py</code> และ components/monitoring</td></tr><tr><td>Mini window</td><td><code>monitoring_mini_controller.py</code></td></tr><tr><td>Recovery</td><td><code>session_recovery_service.py</code></td></tr></table>
+  </section>
+
+  <section class="feature">
+    <h2>17 — Persistence, Session Summary &amp; Reports</h2>
+    <h3>ข้อมูลที่บันทึก</h3>
+    <p>Session timestamps/status, baseline id, detection counts/averages, risk buckets, average/max risk, blink summary, data gaps, risk events, alert notifications, eye/screen notifications และ report summary — ไม่เก็บ raw frame</p>
+    <h3>ทำอย่างไร</h3>
+    <ul>
+      <li><code>RiskPersistenceService</code> map runtime event id กับ database record และส่ง START/UPDATE/RESOLVE</li>
+      <li>API ใช้ idempotency เพื่อกัน retry สร้างข้อมูลซ้ำ</li>
+      <li><code>build_summary_payload()</code> รวมสถิติหลัง COMPLETED เท่านั้น</li>
+      <li>Backend ตรวจ ownership, session state และคำนวณค่าที่ควรเชื่อถือจาก records</li>
+      <li>หาก save summary ล้มเหลว UI เก็บสถานะ retry; 409 จะโหลด summary เดิมแทนสร้างซ้ำ</li>
+      <li>Saved Report อ่านค่าที่บันทึก ไม่เปิดกล้องหรือคำนวณ detection ย้อนหลังใหม่</li>
+    </ul>
+    <h3>ได้อะไร</h3>
+    <p>รายงาน reproducible, retry ได้ และแยก “ค่าที่วัดขณะ session” ออกจาก “การแสดงผลย้อนหลัง” อย่างชัดเจน</p>
+    <p class="small">ไฟล์หลัก: <code>risk_persistence_service.py</code>, <code>session_summary_service.py</code>, <code>backend/app/routers/risk_persistence.py</code>, <code>session_summaries.py</code>, <code>saved_session_report_dialog.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>18 — Dashboard, History &amp; Graph</h2>
+    <h3>Dashboard</h3>
+    <p>โหลด session ของ user ผ่าน background worker เพื่อไม่ block กล้อง แสดงจำนวน session, active monitoring time, interrupted count, รายการล่าสุด และกราฟแนวโน้มคะแนนความเสี่ยงตามลำดับ session</p>
+    <h3>History</h3>
+    <p>เรียงหมายเลขการใช้งานให้เข้าใจง่ายแทน internal session id, รองรับค้นหา/เลือก session, เปิด saved report, alert history และเปรียบเทียบ session</p>
+    <h3>Graph</h3>
+    <p><code>session_risk_trend_chart.py</code> ใช้ข้อมูล summary ที่บันทึกแล้วเพื่อแสดงการเปลี่ยนแปลง ไม่สร้างคะแนนตัวอย่างเมื่อข้อมูลไม่มี; <code>risk_score_chart.py</code> แสดงองค์ประกอบ/ระดับใน session report</p>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้เห็นพัฒนาการตามเวลาและย้อนดูเหตุการณ์ของแต่ละครั้งได้ โดย N/A ยังคงเป็น N/A ไม่แทนด้วยศูนย์</p>
+    <p class="small">ไฟล์หลัก: <code>dashboard_page.py</code>, <code>history_page.py</code>, <code>session_risk_trend_chart.py</code>, <code>session_comparison_service.py</code>, <code>alert_history_dialog.py</code></p>
+  </section>
+
+  <section class="feature">
+    <h2>19 — Validation Tools &amp; Testing</h2>
+    <h3>Automated tests ที่รันในรายงานนี้</h3>
+    <table><tr><th>Suite</th><th>ผล</th><th>เวลา</th></tr><tr><td>Backend <code>tests/unit</code></td><td><span class="pill">52 PASSED</span></td><td>3.918 s</td></tr><tr><td>Desktop <code>tests/unit</code> (Qt offscreen)</td><td><span class="pill">472 PASSED</span></td><td>14.279 s</td></tr></table>
+    <h3>Validation Studio</h3>
+    <p>เครื่องมือ v4/v7 แยกจาก production ใช้เปิดวิดีโอ ทำ ground truth และประเมิน Shoulder/Neck, Baseline repeatability, Blink, Relative distance, Temporal, Risk, Alert lifecycle, Natural E2E และ Landmark จากนั้น export report/evidence</p>
+    <h3>วิธีแบ่งระดับการทดสอบ</h3>
+    <ol>
+      <li>Unit tests: contract, state machine, validation, API retry โดยไม่เปิดกล้อง</li>
+      <li>Hardware/manual: webcam, resolution, pose/face/eye และ camera roll</li>
+      <li>Offline validation: วิดีโอ + human ground truth + metrics</li>
+      <li>Live E2E: Desktop → Render API → Supabase → History/Report</li>
+    </ol>
+    <h3>ได้อะไร</h3>
+    <p>แยก regression ทางซอฟต์แวร์ออกจากการวัดความแม่นยำ CV; การที่ unit tests ผ่านยืนยัน logic/contract แต่ไม่เท่ากับ accuracy ผ่าน จึงต้องรายงานผล ground truth แยกต่างหาก</p>
+    <div class="callout warning">v7 package ที่ใช้งานล่าสุดเป็น validation harness ภายนอกโครงสร้าง branch ปัจจุบัน และไม่ overwrite production thresholds</div>
+  </section>
+
+  <section class="feature">
+    <h2>20 — Deployment</h2>
+    <h3>Backend</h3>
+    <p>Docker image รัน Alembic migration แล้ว start Uvicorn บน Render Blueprint; ใช้ <code>/health</code> สำหรับ liveness และ <code>/ready</code> ตรวจ database readiness โดยไม่เปิดเผย connection string</p>
+    <h3>Desktop</h3>
+    <p>ทำงานบน Windows และเรียก <code>https://postguard-api-k8oh.onrender.com</code> ใน exam branch; override เป็น localhost ได้ด้วย <code>POSTGUARD_API_BASE_URL</code> กล้อง/MediaPipe ยังคงทำงานในเครื่องผู้ใช้</p>
+    <h3>ได้อะไร</h3>
+    <p>ผู้ใช้ไม่ต้องเปิด Backend เองเมื่อใช้ hosted API แต่ยังต้องมี Python environment หรือ package เป็น EXE/installer สำหรับแจกเครื่องอื่น ปัจจุบัน desktop packaging ยังเป็น release task แยก</p>
+    <table class="compact"><tr><th>จุด review</th><th>ไฟล์</th></tr><tr><td>Container</td><td><code>backend/Dockerfile</code></td></tr><tr><td>Render blueprint</td><td><code>render.yaml</code></td></tr><tr><td>Endpoint config</td><td><code>desktop/app/core/config.py</code></td></tr><tr><td>คู่มือ</td><td><code>docs/DEPLOYMENT.md</code></td></tr></table>
+  </section>
+
+  <section class="page-break">
+    <h2>Database Feature Map</h2>
+    <table class="compact">
+      <tr><th>Model/Table responsibility</th><th>ข้อมูลสำคัญ</th><th>ฟีเจอร์ที่ใช้</th></tr>
+      <tr><td>User</td><td>email, password hash, profile, auth version, consent, deletion state</td><td>Auth, Profile, Privacy, Deletion</td></tr>
+      <tr><td>Registration OTP / Password Reset</td><td>OTP hash, expiry, attempts/token tracking</td><td>Register, Forgot password</td></tr>
+      <tr><td>Camera</td><td>device metadata และ ownership</td><td>Camera setup</td></tr>
+      <tr><td>Personal Baseline</td><td>posture references, camera reference, validation state</td><td>Baseline, Session gate</td></tr>
+      <tr><td>Posture Session</td><td>status, started/paused/ended, data gap</td><td>Monitoring lifecycle</td></tr>
+      <tr><td>Risk Event Record</td><td>risk level, started/ended, evidence, runtime id</td><td>Risk persistence</td></tr>
+      <tr><td>Alert Notification</td><td>FIRST/REPEAT/ESCALATION, emitted time</td><td>Alert history</td></tr>
+      <tr><td>Eye / Screen Notification</td><td>policy output และ metric snapshot</td><td>Eye, distance reminders</td></tr>
+      <tr><td>Session Summary / Risk Buckets</td><td>average/max, breakdown, blink, counts</td><td>Reports, Dashboard graph</td></tr>
+      <tr><td>User Settings</td><td>notification, sound, volume, interval</td><td>Settings</td></tr>
+    </table>
+    <p>Alembic migrations ใน <code>backend/alembic/versions</code> ทำหน้าที่ version schema และควรรัน <code>alembic upgrade head</code> ก่อนเปิด release ใหม่</p>
+  </section>
+
+  <section class="page-break">
+    <h2>Code Review Checklist</h2>
+    <table class="compact">
+      <tr><th>#</th><th>คำถามที่ต้องตรวจทุกครั้ง</th></tr>
+      <tr><td>1</td><td>ฟีเจอร์ใหม่วางถูก layer หรือยัง: UI / service / vision / router / model?</td></tr>
+      <tr><td>2</td><td>ค่าจากกล้องมี status, unit, reason และ contract version หรือไม่?</td></tr>
+      <tr><td>3</td><td>missing data ถูกคืนเป็น N/A/NOT_EVALUATED หรือถูกแทนเป็นศูนย์โดยผิดความหมาย?</td></tr>
+      <tr><td>4</td><td>Backend ตรวจ user ownership และ state transition ก่อนเขียนฐานข้อมูลหรือไม่?</td></tr>
+      <tr><td>5</td><td>request ที่ retry มี idempotency หรือเสี่ยงสร้าง event/summary ซ้ำ?</td></tr>
+      <tr><td>6</td><td>access token หมดอายุระหว่าง monitoring แล้ว refresh/retry ได้หรือไม่?</td></tr>
+      <tr><td>7</td><td>camera/data gap หยุด temporal continuity และไม่เพิ่ม duration ปลอมหรือไม่?</td></tr>
+      <tr><td>8</td><td>Pause/Resume/Stop ใช้ session เดิมและคำนวณ active time ถูกต้องหรือไม่?</td></tr>
+      <tr><td>9</td><td>raw frame, secret, token, OTP หรือ password หลุดเข้า log/database หรือไม่?</td></tr>
+      <tr><td>10</td><td>Popup/sound เคารพ settings และ cooldown หรือไม่?</td></tr>
+      <tr><td>11</td><td>ข้อความ UI ระบุ prototype/experimental และไม่กล่าวอ้างทางคลินิกเกินจริงหรือไม่?</td></tr>
+      <tr><td>12</td><td>เพิ่ม unit/regression test และแยก hardware validation จาก unit test แล้วหรือไม่?</td></tr>
+    </table>
+    <h3>Known limitations / งาน release ที่ต้องจำ</h3>
+    <ul>
+      <li>ผล accuracy ต้องสรุปจากชุดวิดีโอ ground truth จริงเพิ่มเติม; unit test ไม่วัดความแม่นยำของคนจริง</li>
+      <li>Screen distance เป็น relative ratio ไม่ใช่ cm</li>
+      <li>Blink และ alert timing เป็น prototype policy values ต้องรายงานฐานการปรับแต่งแยกจาก clinical threshold</li>
+      <li>กล้องด้านหน้าไม่เห็นข้อมือ แขน ลำตัวด้านข้าง และแรงกด จึงไม่สามารถเป็น Full RULA</li>
+      <li>Render Free อาจ sleep; ก่อนสาธิตต้อง warm up <code>/ready</code></li>
+      <li>การแจกผู้ใช้ทั่วไปยังต้อง build/test Windows EXE หรือ installer บนเครื่องสะอาด</li>
+    </ul>
+  </section>
+
+  <section class="page-break">
+    <h2>สรุปผลลัพธ์ของโครงการ</h2>
+    <p>PostGuard ปัจจุบันไม่ได้มีเพียงหน้ากล้อง แต่เป็นระบบครบวงจรตั้งแต่บัญชีและ consent, การเตรียมกล้อง, baseline ส่วนบุคคล, local detection, temporal/risk/alert lifecycle, การจัดการ session ที่ทนต่อ token/camera/data gap, persistence, report, graph, history และ backend deployment</p>
+    <p>จุดแข็งทางสถาปัตยกรรมคือการเก็บ raw camera data ไว้ในเครื่อง, ใช้ contract/status ป้องกันการตีความ missing data, แยก risk event ออกจาก user notification และเก็บหลักฐานที่สามารถย้อน audit ได้ จุดที่ต้องสื่อสารตรงไปตรงมาคือคะแนนและ threshold บางส่วนเป็นงานประยุกต์เชิง prototype ซึ่งต้องมี validation study แยกก่อนกล่าวอ้างเชิงมาตรฐานหรือการแพทย์</p>
+    <div class="callout success"><b>สถานะ ณ วันที่จัดทำ:</b> Backend unit tests 52/52 และ Desktop unit tests 472/472 ผ่านบน branch <code>deploy/render-exam</code> commit <code>285069d</code></div>
+    <p class="footer-note">Generated from the PostGuard source tree for internal technical review. This document describes the inspected commit; later code changes may require regeneration.</p>
+  </section>
+</body>
+</html>

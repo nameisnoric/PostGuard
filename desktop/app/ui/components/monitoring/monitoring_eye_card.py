@@ -44,7 +44,11 @@ def _tile(title, icon, value_label, accent="#0f172a"):
         "border-radius: 12px;"
         "}"
     )
-    tile.setMinimumHeight(100)
+    tile.setFixedHeight(100)
+    tile.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Fixed,
+    )
 
     layout = QVBoxLayout(tile)
     layout.setContentsMargins(11, 9, 11, 9)
@@ -56,17 +60,21 @@ def _tile(title, icon, value_label, accent="#0f172a"):
         | Qt.AlignmentFlag.AlignTop
     )
     heading.setStyleSheet(
-        "font-size: 12px;"
+        "font-size: 11px;"
         "font-weight: 700;"
         "color: #475569;"
         "border: none;"
     )
 
     value_label.setStyleSheet(
-        f"font-size: 20px;"
+        f"font-size: 16px;"
         f"font-weight: 800;"
         f"color: {accent};"
         "border: none;"
+    )
+    value_label.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Preferred,
     )
 
     layout.addWidget(heading)
@@ -99,7 +107,7 @@ class MonitoringEyeCard(QFrame):
             "👁  สายตาและการกระพริบตา"
         )
         self.title_label.setStyleSheet(
-            "font-size: 20px;"
+            "font-size: 19px;"
             "font-weight: 800;"
             "color: #0f172a;"
         )
@@ -157,6 +165,10 @@ class MonitoringEyeCard(QFrame):
             _tile("การเปิดตา (R | L)", "〽", self.eye_openness_label, "#334155"),
             0, 4,
         )
+
+        for column in range(5):
+            grid.setColumnStretch(column, 1)
+            grid.setColumnMinimumWidth(column, 0)
 
         root.addLayout(grid)
 

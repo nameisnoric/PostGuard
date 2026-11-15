@@ -1,6 +1,37 @@
-"""Shared PostGuard visual tokens and Qt Style Sheet (QSS)."""
+"""Shared PostGuard visual tokens, typography, and Qt Style Sheet (QSS)."""
 
+from pathlib import Path
+
+from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
+
+
+FONT_FAMILY = "Noto Sans Thai"
+FONT_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "fonts"
+    / "NotoSansThai-Variable.ttf"
+)
+
+
+def install_application_font(app: QApplication) -> str:
+    """Load the bundled Thai font and make it the default for every widget."""
+    family = FONT_FAMILY
+    font_id = QFontDatabase.addApplicationFont(str(FONT_PATH))
+
+    if font_id >= 0:
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        if families:
+            family = families[0]
+    else:
+        family = "Leelawadee UI"
+
+    app_font = QFont(family)
+    app_font.setPointSize(10)
+    app.setFont(app_font)
+    app.setStyleSheet(APP_QSS)
+    return family
 
 
 COLORS = {
@@ -41,6 +72,15 @@ APP_QSS = """
    APP
    ========================================================= */
 
+* {
+    font-family:
+        "Noto Sans Thai",
+        "Leelawadee UI",
+        "Tahoma",
+        "Segoe UI",
+        sans-serif;
+}
+
 QMainWindow,
 QDialog,
 QWidget#appRoot,
@@ -49,8 +89,8 @@ QStackedWidget#pageStack {
     background: #f6f8fc;
     color: #0f172a;
     font-family:
-        "Leelawadee UI",
         "Noto Sans Thai",
+        "Leelawadee UI",
         "Tahoma",
         "Segoe UI",
         sans-serif;

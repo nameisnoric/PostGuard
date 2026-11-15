@@ -173,7 +173,7 @@ class MonitoringHeader(QFrame):
         )
 
         self.session_label = QLabel(
-            "เซสชัน: -"
+            "สถานะ: ยังไม่เริ่ม"
         )
 
         self.session_label.setProperty(
@@ -182,7 +182,7 @@ class MonitoringHeader(QFrame):
         )
 
         self.baseline_label = QLabel(
-            "Baseline: -"
+            "ค่าท่าทางส่วนบุคคล: --"
         )
 
         self.baseline_label.setProperty(

@@ -2070,6 +2070,9 @@ class DashboardPage(QWidget):
                 SavedSessionReportDialog(
                     session=session,
                     saved_summary=saved,
+                    session_number=self.session_numbers.get(
+                        session_id
+                    ),
                     parent=self,
                 )
             )

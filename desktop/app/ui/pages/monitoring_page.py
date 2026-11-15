@@ -1,6 +1,7 @@
 """PostGuard real-time monitoring using the validated risk pipeline."""
 
 import math
+import os
 import statistics
 import time
 from datetime import datetime
@@ -54,6 +55,7 @@ from app.ui.dialogs.posture_alert_dialog import (
 from app.ui.utils.preview_sizing import (
     fit_preview_label,
 )
+from app.ui.utils.camera_display import camera_display_name
 from app.services.blink_detection_service import (
     BlinkDetectionService,
 )
@@ -116,6 +118,7 @@ RISK_LEVELS = (
 )
 CAMERA_LOSS_GRACE_SECONDS = 60.0
 CAMERA_RECONNECT_INTERVAL_SECONDS = 2.0
+CAMERA_MOVEMENT_DEBUG = os.getenv("POSTGUARD_CAMERA_DEBUG") == "1"
 
 
 FACTOR_THAI = {
@@ -206,7 +209,7 @@ class MonitoringPage(QWidget):
             CameraMovementGuard(
                 CameraMovementConfig(
                     analysis_width=640,
-                    sample_every_frames=3,
+                    sample_every_frames=6,
                     warmup_samples=20,
 
                     min_tracked_points=18,
@@ -616,6 +619,10 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         camera_panel = QFrame()
+        camera_panel.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Expanding,
+        )
 
         camera_layout = QVBoxLayout(
             camera_panel
@@ -646,6 +653,10 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         metrics_panel = QFrame()
+        metrics_panel.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Expanding,
+        )
 
         metrics_panel.setProperty(
             "card",
@@ -681,15 +692,14 @@ class MonitoringPage(QWidget):
 
         metrics_layout.addStretch()
 
-        columns.addWidget(
-            camera_panel,
-            5,
-        )
+        columns.addWidget(camera_panel)
+        columns.addWidget(metrics_panel)
 
-        columns.addWidget(
-            metrics_panel,
-            3,
-        )
+        # Keep the Monitoring workspace at a stable 50:50 split.
+        # Child text must not change the width allocation while values
+        # update from frame to frame.
+        columns.setStretch(0, 1)
+        columns.setStretch(1, 1)
 
         layout.addLayout(
             columns,
@@ -2142,16 +2152,11 @@ class MonitoringPage(QWidget):
             return False
 
         self.camera_label.setText(
-            "กล้อง: "
-            +
-            camera.get(
-                "camera_name",
-                "กล้องไม่ทราบชื่อ",
-            )
+            f"กล้องที่ใช้: {camera_display_name(camera)}"
         )
 
         self.baseline_label.setText(
-            f"รหัสค่าท่าทางอ้างอิง: {baseline_id}"
+            "ค่าท่าทางส่วนบุคคล: พร้อมใช้งาน"
         )
 
         # ====================================================
@@ -2235,6 +2240,10 @@ class MonitoringPage(QWidget):
             self.capture.set(
                 cv2.CAP_PROP_FPS,
                 30,
+            )
+            self.capture.set(
+                cv2.CAP_PROP_BUFFERSIZE,
+                1,
             )
 
             # =================================================
@@ -2451,7 +2460,7 @@ class MonitoringPage(QWidget):
         # ====================================================
 
         self.session_label.setText(
-            f"รหัสเซสชัน: {self.session_id}"
+            "สถานะ: กำลังตรวจจับ"
         )
 
         self.status_label.setText(
@@ -4509,6 +4518,10 @@ class MonitoringPage(QWidget):
                 cv2.CAP_PROP_FPS,
                 30,
             )
+            capture.set(
+                cv2.CAP_PROP_BUFFERSIZE,
+                1,
+            )
 
         # ====================================================
         # READ REAL FRAME
@@ -4852,6 +4865,10 @@ class MonitoringPage(QWidget):
                 cv2.CAP_PROP_FPS,
                 30,
             )
+            capture.set(
+                cv2.CAP_PROP_BUFFERSIZE,
+                1,
+            )
 
         success, frame = capture.read()
 
@@ -5092,7 +5109,7 @@ class MonitoringPage(QWidget):
             )
         )
 
-        if movement_result.get("status") in {
+        if CAMERA_MOVEMENT_DEBUG and movement_result.get("status") in {
             "STABLE",
             "MOVED",
             "UNAVAILABLE",
@@ -5634,7 +5651,6 @@ class MonitoringPage(QWidget):
                 channels * width,
                 QImage.Format.Format_RGB888,
             )
-            .copy()
         )
 
         pixmap = (
@@ -5644,7 +5660,7 @@ class MonitoringPage(QWidget):
             .scaled(
                 self.preview_label.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+                Qt.TransformationMode.FastTransformation,
             )
         )
 
@@ -5968,12 +5984,10 @@ class MonitoringPage(QWidget):
                 QMessageBox.warning(
                     self,
                     "ยังไม่สามารถจบเซสชัน",
-                    f"เซสชัน {self.session_id} "
-                    "อาจยังมีสถานะ RUNNING "
-                    "อยู่บนเซิร์ฟเวอร์\n"
+                    "การตรวจจับครั้งนี้อาจยังทำงานอยู่บนเซิร์ฟเวอร์\n"
                     f"{error}\n"
                     "กรุณาเชื่อมต่ออีกครั้งและลองใหม่ "
-                    "ก่อนเริ่มเซสชันใหม่",
+                    "ก่อนเริ่มการตรวจจับครั้งใหม่",
                 )
 
         self._release_local_resources()
@@ -5985,7 +5999,7 @@ class MonitoringPage(QWidget):
             )
 
             self.session_label.setText(
-                "รหัสเซสชัน: -"
+                "สถานะ: หยุดแล้ว"
             )
 
         else:
@@ -5996,8 +6010,7 @@ class MonitoringPage(QWidget):
             )
 
             self.session_label.setText(
-                f"รหัสเซสชัน: {self.session_id} "
-                "(กำลังรอยืนยัน)"
+                "สถานะ: กำลังรอการยืนยัน"
             )
 
         self.state_changed.emit()
@@ -6093,6 +6106,10 @@ class MonitoringPage(QWidget):
                     "กล้องไม่ทราบชื่อ",
                 )
             ),
+
+            "camera_device_index": camera.get("device_index"),
+
+            "camera_display_number": camera.get("display_number"),
 
             "camera_id": (
                 camera.get(

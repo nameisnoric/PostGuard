@@ -32,6 +32,7 @@ class SavedSessionReportDialog(
         *,
         session: dict,
         saved_summary: dict,
+        session_number: int | None = None,
         parent=None,
     ):
         super().__init__(
@@ -86,11 +87,13 @@ class SavedSessionReportDialog(
         # WINDOW
         # ====================================================
 
+        display_title = (
+            f"ครั้งที่ {session_number}"
+            if type(session_number) is int and session_number > 0
+            else "ครั้งที่เลือก"
+        )
         self.setWindowTitle(
-            (
-                "PostGuard - รายงานเซสชันที่บันทึกไว้ "
-                f"#{session_id}"
-            )
+            f"PostGuard - รายงานการตรวจจับ {display_title}"
         )
 
         self.resize(
@@ -141,6 +144,7 @@ class SavedSessionReportDialog(
         self.report_page.set_saved_report(
             session,
             saved_summary,
+            session_number=session_number,
         )
 
         self.report_page.back_requested.connect(

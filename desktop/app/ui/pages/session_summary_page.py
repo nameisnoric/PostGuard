@@ -40,6 +40,7 @@ from app.ui.dialogs.alert_history_dialog import (
 from app.ui.risk_score_chart import (
     RiskScoreChart,
 )
+from app.ui.utils.camera_display import camera_display_name
 
 
 class SessionSummaryPage(
@@ -117,7 +118,7 @@ class SessionSummaryPage(
         header_copy = QVBoxLayout()
 
         self.title_label = QLabel(
-            "สรุปผลเซสชัน"
+            "สรุปผลการตรวจจับ"
         )
 
         self.title_label.setProperty(
@@ -127,7 +128,7 @@ class SessionSummaryPage(
 
         self.description_label = QLabel(
             "ภาพรวมการใช้งาน ท่าทาง สายตา "
-            "ความเสี่ยง และการแจ้งเตือนในเซสชันนี้"
+            "ความเสี่ยง และการแจ้งเตือนในการตรวจจับครั้งนี้"
         )
 
         self.description_label.setProperty(
@@ -149,7 +150,7 @@ class SessionSummaryPage(
         )
 
         self.database_label = QLabel(
-            "สถานะเซสชัน: --"
+            "สถานะ: --"
         )
 
         self.database_label.setProperty(
@@ -202,7 +203,7 @@ class SessionSummaryPage(
         session_top.setSpacing(12)
 
         self.session_label = QLabel(
-            "รหัสเซสชัน: --"
+            "การตรวจจับครั้งนี้"
         )
 
         self.camera_label = QLabel(
@@ -210,7 +211,7 @@ class SessionSummaryPage(
         )
 
         self.baseline_label = QLabel(
-            "ค่าท่าทางอ้างอิง: --"
+            "ค่าท่าทางส่วนบุคคล: --"
         )
 
         for label in (
@@ -1277,6 +1278,19 @@ class SessionSummaryPage(
             return "N/A"
 
     @staticmethod
+    def _user_status_text(value) -> str:
+        """Translate persisted workflow states into user-facing Thai."""
+        return {
+            "COMPLETED": "บันทึกผลเรียบร้อย",
+            "RUNNING": "กำลังตรวจจับ",
+            "PAUSED": "หยุดชั่วคราว",
+            "INTERRUPTED": "ข้อมูลไม่สมบูรณ์",
+            "SAVED": "บันทึกผลเรียบร้อย",
+            "LOADED": "โหลดรายงานเรียบร้อย",
+            "FAILED": "บันทึกผลไม่สำเร็จ",
+        }.get(str(value).upper(), "--")
+
+    @staticmethod
     def _risk_breakdown(
         summary,
     ) -> str:
@@ -1332,6 +1346,8 @@ class SessionSummaryPage(
         self,
         session: dict,
         saved: dict,
+        *,
+        session_number: int | None = None,
     ) -> None:
         """
         Display persisted values without recalculating
@@ -1353,10 +1369,7 @@ class SessionSummaryPage(
                     "camera_name"
                 )
                 or
-                (
-                    "ID "
-                    f"{session.get('camera_id', 'N/A')}"
-                )
+                "กล้องที่ใช้ในการตรวจจับ"
             ),
 
             "baseline_id": (
@@ -1402,6 +1415,10 @@ class SessionSummaryPage(
             "summary_save_status": (
                 "LOADED"
             ),
+
+            "display_session_number": (
+                session_number
+            ),
         }
 
         self.set_summary(
@@ -1409,7 +1426,7 @@ class SessionSummaryPage(
         )
 
         self.title_label.setText(
-            "รายงานเซสชันที่บันทึกไว้"
+            "รายงานผลการตรวจจับที่บันทึกไว้"
         )
 
         self.back_button.setText(
@@ -1451,21 +1468,24 @@ class SessionSummaryPage(
         # Session
         # ----------------------------------------------------
 
+        display_number = summary.get(
+            "display_session_number"
+        )
         self.session_label.setText(
             (
-                "รหัสเซสชัน: "
-                f"{self.current_session_id}"
+                f"การตรวจจับครั้งที่ {display_number}"
+                if type(display_number) is int and display_number > 0
+                else "การตรวจจับครั้งนี้"
             )
         )
 
         self.database_label.setText(
             (
-                "สถานะเซสชัน: "
+                "สถานะ: "
                 +
-                str(
+                self._user_status_text(
                     summary.get(
-                        "database_status",
-                        "--",
+                        "database_status"
                     )
                 )
             )
@@ -1473,26 +1493,25 @@ class SessionSummaryPage(
 
         self.camera_label.setText(
             (
-                "กล้อง: "
-                +
-                str(
-                    summary.get(
-                        "camera_name",
-                        "--",
-                    )
+                "กล้องที่ใช้: "
+                + camera_display_name(
+                    {
+                        "camera_name": summary.get("camera_name"),
+                        "device_index": summary.get("camera_device_index"),
+                        "display_number": summary.get("camera_display_number"),
+                    }
                 )
             )
         )
 
         self.baseline_label.setText(
             (
-                "รหัสค่าท่าทางอ้างอิง: "
+                "ค่าท่าทางส่วนบุคคล: "
                 +
-                str(
-                    summary.get(
-                        "baseline_id",
-                        "--",
-                    )
+                (
+                    "ใช้งานแล้ว"
+                    if summary.get("baseline_id") is not None
+                    else "ไม่มีข้อมูล"
                 )
             )
         )
@@ -1708,22 +1727,8 @@ class SessionSummaryPage(
             maximum_score,
         )
 
-        method = report_metrics.get(
-            "risk_score_method"
-        )
-
         self.risk_score_method_label.setText(
-            (
-                "วิธีคำนวณคะแนน: "
-                +
-                (
-                    str(
-                        method
-                    )
-                    if method
-                    else "N/A"
-                )
-            )
+            "คะแนนยิ่งต่ำ หมายถึงระบบพบท่าทางเสี่ยงน้อยลง"
         )
 
         # ----------------------------------------------------

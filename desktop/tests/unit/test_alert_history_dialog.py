@@ -119,6 +119,16 @@ class AlertHistoryDialogTests(unittest.TestCase):
             12,
         )
 
+        self.assertIn(
+            "ครั้งที่ 2",
+            dialog.session_selector.currentText(),
+        )
+
+        self.assertNotIn(
+            "#12",
+            dialog.session_selector.currentText(),
+        )
+
         self.assertTrue(
             dialog.empty_label.isVisibleTo(dialog)
         )
@@ -162,43 +172,38 @@ class AlertHistoryDialogTests(unittest.TestCase):
             dialog.table.isHidden()
         )
 
-        # Column 0: Notification ID
+        # Column 0: ลำดับที่ผู้ใช้เห็น
         self.assertEqual(
             dialog.table.item(0, 0).text(),
-            "21",
+            "1",
         )
 
-        # Column 1: Risk Event ID
+        # Column 1: หมวดที่เข้าใจได้
         self.assertEqual(
             dialog.table.item(0, 1).text(),
-            "30",
+            "ท่าทาง",
         )
 
-        # Column 2: Alert Type
-        # implementation แปลงเป็น uppercase
+        # Column 2: ประเภทการแจ้งเตือนภาษาไทย
         self.assertEqual(
             dialog.table.item(0, 2).text(),
-            "FIRST",
+            "แจ้งครั้งแรก",
         )
 
-        # Column 3: Risk Level
-        # implementation แปลงเป็น uppercase
+        # Column 3: ระดับความเสี่ยงภาษาไทย
         self.assertEqual(
             dialog.table.item(0, 3).text(),
-            "MODERATE",
+            "ปานกลาง",
         )
 
-        # Column 4: Decision
-        self.assertEqual(
-            dialog.table.item(0, 4).text(),
-            "ALERT",
-        )
-
-        # Column 5: Reason
-        self.assertEqual(
-            dialog.table.item(0, 5).text(),
-            "FIRST_ALERT_READY",
-        )
+        # รหัสภายในไม่ถูกนำมาแสดงในตาราง
+        visible_values = [
+            dialog.table.item(0, column).text()
+            for column in range(dialog.table.columnCount())
+        ]
+        self.assertNotIn("21", visible_values)
+        self.assertNotIn("30", visible_values)
+        self.assertNotIn("FIRST_ALERT_READY", visible_values)
 
     def test_notification_statistics_are_rendered(self):
         """
@@ -297,22 +302,22 @@ class AlertHistoryDialogTests(unittest.TestCase):
 
         self.assertEqual(
             dialog.table.item(0, 0).text(),
-            "EYE-5",
+            "1",
+        )
+
+        self.assertEqual(
+            dialog.table.item(0, 1).text(),
+            "สายตา",
         )
 
         self.assertEqual(
             dialog.table.item(0, 2).text(),
-            "REPEAT",
+            "แจ้งซ้ำ",
         )
 
         self.assertEqual(
             dialog.table.item(0, 3).text(),
-            "EYE",
-        )
-
-        self.assertIn(
-            "LOW_BLINK_REPEAT_READY",
-            dialog.table.item(0, 5).text(),
+            "สายตา",
         )
 
         stats = dialog.stats_label.text()

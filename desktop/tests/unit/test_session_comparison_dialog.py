@@ -96,6 +96,10 @@ class SessionComparisonDialogTests(
             40,
         )
 
+        self.assertIn("ครั้งที่ 1", dialog.session_a_combo.currentText())
+        self.assertIn("ครั้งที่ 2", dialog.session_b_combo.currentText())
+        self.assertNotIn("#39", dialog.session_a_combo.currentText())
+
         self.assertEqual(
             dialog.progress_label.text(),
             (
@@ -223,7 +227,7 @@ class SessionComparisonDialogTests(
         )
 
         self.assertIn(
-            "อย่างน้อย 2 เซสชัน",
+            "อย่างน้อย 2 ครั้ง",
             dialog.explanation_label.text(),
         )
 

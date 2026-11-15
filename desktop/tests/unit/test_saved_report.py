@@ -410,6 +410,7 @@ class SavedReportTests(
             dialog_class.assert_called_once_with(
                 session=self.session,
                 saved_summary=self.saved,
+                session_number=1,
                 parent=page,
             )
 

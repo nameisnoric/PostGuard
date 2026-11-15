@@ -23,11 +23,22 @@ def fit_preview_label(label, frame_width, frame_height, max_width, max_height):
         max_width,
         max_height,
     )
-    if label.width() != width or label.height() != height:
+    geometry_changed = label.width() != width or label.height() != height
+    if geometry_changed:
         label.setFixedSize(width, height)
-    label.setSizePolicy(
-        QSizePolicy.Policy.Fixed,
-        QSizePolicy.Policy.Fixed,
+
+    policy = label.sizePolicy()
+    policy_changed = (
+        policy.horizontalPolicy() != QSizePolicy.Policy.Fixed
+        or policy.verticalPolicy() != QSizePolicy.Policy.Fixed
     )
-    label.updateGeometry()
+    if policy_changed:
+        label.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+
+    if geometry_changed or policy_changed:
+        label.updateGeometry()
+
     return width, height

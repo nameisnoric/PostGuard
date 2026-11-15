@@ -148,7 +148,7 @@ class HistoryPage(
 
         self.description_label = self._label(
             (
-                "ตรวจสอบเซสชัน, Risk Score, "
+            "ตรวจสอบผลการตรวจจับ, Risk Score, "
                 "เหตุการณ์แจ้งเตือน, รายงานที่บันทึกไว้ "
                 "และเปรียบเทียบความเปลี่ยนแปลงระหว่างเซสชัน"
             ),
@@ -169,7 +169,7 @@ class HistoryPage(
         )
 
         self.compare_button = QPushButton(
-            "เปรียบเทียบเซสชัน"
+            "เปรียบเทียบผลการตรวจจับ"
         )
 
         self.compare_button.setEnabled(
@@ -230,19 +230,19 @@ class HistoryPage(
         self.total_value = self._metric(
             metrics,
             0,
-            "เซสชันทั้งหมด",
+            "การตรวจจับทั้งหมด",
         )
 
         self.completed_value = self._metric(
             metrics,
             1,
-            "เสร็จสิ้น",
+            "ตรวจจับสำเร็จ",
         )
 
         self.interrupted_value = self._metric(
             metrics,
             2,
-            "ถูกขัดจังหวะ",
+            "ข้อมูลไม่สมบูรณ์",
         )
 
         self.reports_value = self._metric(
@@ -259,7 +259,7 @@ class HistoryPage(
         # HISTORY
         # ====================================================
 
-        history_heading = self._label("เซสชันที่บันทึกไว้", "heading")
+        history_heading = self._label("ประวัติการตรวจจับ", "heading")
         history_heading.setStyleSheet(
             "font-size:20px;font-weight:700;color:#0f172a;margin-top:8px;"
         )
@@ -281,8 +281,7 @@ class HistoryPage(
 
         self.search_input.setPlaceholderText(
             (
-                "ค้นหาด้วยครั้งที่ วันที่ "
-                "หรือรหัสกล้อง"
+                "ค้นหาด้วยครั้งที่หรือวันที่ตรวจจับ"
             )
         )
 
@@ -401,14 +400,14 @@ class HistoryPage(
 
         details_layout.addWidget(
             self._label(
-                "รายละเอียดเซสชัน",
+                "รายละเอียดการตรวจจับ",
                 "heading",
             )
         )
 
         self.details_hint = self._label(
             (
-                "เลือกเซสชันเพื่อดู"
+                "เลือกครั้งที่ต้องการเพื่อดู"
                 "รายละเอียดที่บันทึกไว้"
             ),
             "muted",
@@ -438,8 +437,6 @@ class HistoryPage(
             ("total", "เวลารวม"),
             ("paused", "เวลาที่หยุดชั่วคราว"),
             ("pauses", "จำนวนครั้งที่หยุดชั่วคราว"),
-            ("camera", "รหัสกล้อง"),
-            ("baseline", "รหัสค่าท่าทางอ้างอิง"),
             ("avg_risk", "ความเสี่ยงเฉลี่ย"),
             ("min_risk", "ความเสี่ยงต่ำสุด"),
             ("max_risk", "ความเสี่ยงสูงสุด"),
@@ -498,7 +495,7 @@ class HistoryPage(
         actions = QHBoxLayout()
 
         self.selected_alerts_button = QPushButton(
-            "ดูการแจ้งเตือนของเซสชัน"
+            "ดูการแจ้งเตือนของครั้งนี้"
         )
 
         self.selected_alerts_button.setEnabled(
@@ -608,9 +605,9 @@ class HistoryPage(
         title,
     ):
         colors = {
-            "เซสชันทั้งหมด": ("#2563eb", "#1d4ed8"),
-            "เสร็จสิ้น": ("#16a34a", "#15803d"),
-            "ถูกขัดจังหวะ": ("#dc2626", "#b91c1c"),
+            "การตรวจจับทั้งหมด": ("#2563eb", "#1d4ed8"),
+            "ตรวจจับสำเร็จ": ("#16a34a", "#15803d"),
+            "ข้อมูลไม่สมบูรณ์": ("#dc2626", "#b91c1c"),
             "รายงานที่บันทึก": ("#2563eb", "#1d4ed8"),
         }
         accent, value_color = colors.get(title, ("#2563eb", "#1d4ed8"))
@@ -1032,9 +1029,6 @@ class HistoryPage(
                 )
                 for key
                 in (
-                    "session_id",
-                    "camera_id",
-                    "baseline_id",
                     "started_at",
                 )
             )
@@ -1141,14 +1135,14 @@ class HistoryPage(
         ):
             self.empty_label.setText(
                 (
-                    "ไม่มีเซสชันตรงกับ"
+                    "ไม่มีประวัติที่ตรงกับ"
                     "ตัวกรองปัจจุบัน"
                 )
             )
 
         else:
             self.empty_label.setText(
-                "ยังไม่มีเซสชันการตรวจจับ"
+                "ยังไม่มีประวัติการตรวจจับ"
             )
 
         self.status_label.setText(
@@ -1190,7 +1184,7 @@ class HistoryPage(
         ):
             self.details_hint.setText(
                 (
-                    "เลือกเซสชันเพื่อดู"
+                    "เลือกครั้งที่ต้องการเพื่อดู"
                     "รายละเอียดที่บันทึกไว้"
                 )
             )
@@ -1328,16 +1322,6 @@ class HistoryPage(
             "pauses": session.get(
                 "pause_count",
                 0,
-            ),
-
-            "camera": session.get(
-                "camera_id",
-                "--",
-            ),
-
-            "baseline": session.get(
-                "baseline_id",
-                "--",
             ),
 
             "avg_risk": (
@@ -1552,6 +1536,9 @@ class HistoryPage(
                 SavedSessionReportDialog(
                     session=session,
                     saved_summary=saved,
+                    session_number=self.session_numbers.get(
+                        session_id
+                    ),
                     parent=self,
                 )
             )

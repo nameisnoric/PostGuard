@@ -675,7 +675,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "เซสชันก่อนหน้ายังไม่ได้รับการแก้ไข",
+            "การตรวจจับครั้งก่อนยังไม่ได้รับการแก้ไข",
             self.window.monitoring_status_label.text(),
         )
 
@@ -724,7 +724,7 @@ class DesktopWorkflowTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "ตรวจสอบเซสชันไม่สำเร็จ",
+            "ตรวจสอบการตรวจจับครั้งก่อนไม่สำเร็จ",
             self.window.monitoring_status_label.text(),
         )
 

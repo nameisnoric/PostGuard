@@ -31,15 +31,34 @@ class MetricValueLabel(QLabel):
                 value = value[len(prefix):].strip()
                 break
 
-        replacements = {
-            "NOT_EVALUATED": "ยังไม่ประเมิน",
-            "DATA_GAP": "รอข้อมูล",
-        }
+        normalized = value.strip().upper()
 
-        for source, target in replacements.items():
-            if source in value:
-                value = target
-                break
+        if "DATA_GAP" in normalized:
+            value = "รอข้อมูล"
+        elif "CAMERA_MOVED" in normalized or "CAMERA_DATA_GAP" in normalized:
+            value = "ไม่มีข้อมูล"
+        elif "NOT_EVALUATED" in normalized:
+            value = "กำลังประเมิน"
+        elif normalized in {"N/A", "--", "-"}:
+            value = "รอข้อมูล"
+        elif normalized.startswith("N/A"):
+            value = "รอข้อมูล"
+        elif normalized.startswith("LOW"):
+            value = "ต่ำ"
+        elif normalized.startswith("MODERATE") or normalized.startswith("MEDIUM"):
+            value = "ปานกลาง"
+        elif normalized.startswith("HIGH"):
+            value = "สูง"
+        elif normalized.startswith("NONE"):
+            value = "ปกติ"
+        elif normalized == "COMPLETE":
+            value = "ประเมินแล้ว"
+        elif normalized.startswith("NO_ALERT"):
+            value = "ไม่มีการแจ้งเตือน"
+        elif normalized.startswith("ALERT"):
+            value = "แจ้งเตือนแล้ว"
+        elif normalized.startswith("SUPPRESSED"):
+            value = "กำลังติดตาม"
 
         super().setText(value)
 
@@ -54,7 +73,11 @@ def _tile(title, icon, value_label, background="#ffffff", accent="#0f172a"):
         "border-radius: 12px;"
         "}"
     )
-    tile.setMinimumHeight(104)
+    tile.setFixedHeight(104)
+    tile.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Fixed,
+    )
 
     layout = QVBoxLayout(tile)
     layout.setContentsMargins(11, 9, 11, 9)
@@ -66,17 +89,21 @@ def _tile(title, icon, value_label, background="#ffffff", accent="#0f172a"):
         | Qt.AlignmentFlag.AlignTop
     )
     heading.setStyleSheet(
-        "font-size: 12px;"
+        "font-size: 11px;"
         "font-weight: 700;"
         "color: #475569;"
         "border: none;"
     )
 
     value_label.setStyleSheet(
-        f"font-size: 19px;"
+        f"font-size: 16px;"
         f"font-weight: 800;"
         f"color: {accent};"
         "border: none;"
+    )
+    value_label.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Preferred,
     )
 
     layout.addWidget(heading)
@@ -107,7 +134,7 @@ class MonitoringRiskCard(QFrame):
 
         self.title_label = QLabel("⚠  ความเสี่ยง")
         self.title_label.setStyleSheet(
-            "font-size: 20px;"
+            "font-size: 19px;"
             "font-weight: 800;"
             "color: #0f172a;"
         )
@@ -136,7 +163,7 @@ class MonitoringRiskCard(QFrame):
             ("ปัจจัยต่อเนื่องนานที่สุด:", "ต่อเนื่องนานสุด:")
         )
         self.alert_label = MetricValueLabel(
-            ("การแจ้งเตือน:",)
+            ("สถานะการแจ้งเตือน:", "การแจ้งเตือน:")
         )
 
         grid = QGridLayout()
@@ -183,6 +210,10 @@ class MonitoringRiskCard(QFrame):
             ),
             0, 3,
         )
+
+        for column in range(4):
+            grid.setColumnStretch(column, 1)
+            grid.setColumnMinimumWidth(column, 0)
 
         root.addLayout(grid)
 

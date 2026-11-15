@@ -40,6 +40,7 @@ from app.services.personal_baseline_service import (
     PersonalBaselineCollector,
 )
 from app.ui.theme import APP_QSS
+from app.ui.utils.camera_display import camera_display_name
 
 
 def add_detail_rows(layout, rows):
@@ -490,12 +491,11 @@ class BaselineSavedDialog(QDialog):
         details = QGridLayout(card)
         details.setContentsMargins(18, 16, 18, 16)
         rows = (
-            ("รหัสค่าอ้างอิง", baseline_id),
-            ("รหัสกล้อง", camera_id),
+            ("สถานะ", "พร้อมใช้งาน"),
             ("ความเอียงของหัวไหล่", f"{result['shoulder_tilt']:+.2f}°"),
             ("ความเอียงคอด้านข้าง", f"{result['neck_lateral_tilt']:+.2f}°"),
             ("การก้มเงยของคอ", f"{result['neck_flexion']:+.2f}°"),
-            ("ระยะตาในภาพ", f"{result['eye_distance']:.2f} px"),
+            ("ระยะใบหน้า", "บันทึกเป็นค่าอ้างอิงแล้ว"),
         )
         add_detail_rows(details, rows)
         layout.addWidget(card)
@@ -605,22 +605,12 @@ class BaselinePage(QWidget):
             'กล้อง: ยังไม่ได้เลือก'
         )
 
-        self.device_label = QLabel(
-            'อุปกรณ์: -'
-        )
-
-        self.camera_id_label = QLabel(
-            'รหัสกล้อง: -'
-        )
-
         self.resolution_label = QLabel(
             'ความละเอียด: -'
         )
         self.camera_reference_label = QLabel('การเตรียมกล้อง: ยังไม่เสร็จ')
         for label in (
             self.camera_name_label,
-            self.device_label,
-            self.camera_id_label,
             self.resolution_label,
             self.camera_reference_label,
         ):
@@ -629,10 +619,8 @@ class BaselinePage(QWidget):
         camera_layout.setHorizontalSpacing(32)
         camera_layout.setVerticalSpacing(6)
         camera_layout.addWidget(self.camera_name_label, 0, 0)
-        camera_layout.addWidget(self.device_label, 0, 1)
-        camera_layout.addWidget(self.camera_id_label, 1, 0)
-        camera_layout.addWidget(self.resolution_label, 1, 1)
-        camera_layout.addWidget(self.camera_reference_label, 2, 0, 1, 2)
+        camera_layout.addWidget(self.resolution_label, 0, 1)
+        camera_layout.addWidget(self.camera_reference_label, 1, 0, 1, 2)
         camera_layout.setColumnStretch(0, 1)
         camera_layout.setColumnStretch(1, 1)
 
@@ -956,19 +944,6 @@ class BaselinePage(QWidget):
         self.save_button.setEnabled(False)
         self.monitor_button.setEnabled(False)
 
-        camera_id = camera.get(
-            "camera_id"
-        )
-
-        camera_name = camera.get(
-            "camera_name",
-            "กล้องไม่ทราบชื่อ"
-        )
-
-        device_index = camera.get(
-            "device_index"
-        )
-
         width = camera.get(
             "resolution_width"
         )
@@ -977,20 +952,12 @@ class BaselinePage(QWidget):
             "resolution_height"
         )
 
-        self.camera_id_label.setText(
-            f"รหัสกล้อง: {camera_id}"
-        )
-
         self.camera_name_label.setText(
-            f"กล้อง: {camera_name}"
-        )
-
-        self.device_label.setText(
-            f"อุปกรณ์: {device_index}"
+            f"กล้องที่เลือก: {camera_display_name(camera)}"
         )
 
         self.resolution_label.setText(
-            f"ความละเอียด: {width}x{height}"
+            f"ความละเอียด: {width}×{height}"
         )
 
         camera_reference = camera.get("camera_calibration")
@@ -1000,9 +967,7 @@ class BaselinePage(QWidget):
             self.calibrate_button.setEnabled(False)
             return
         self.camera_reference_label.setText(
-            "การเตรียมกล้อง: พร้อมใช้งาน | "
-            f"สเกล {camera_reference.get('scale_avg', 0):.2f} px/mm | "
-            f"มุมกล้อง {camera_reference.get('card_roll_deg', 0):+.2f}°"
+            "การปรับแนวกล้อง: พร้อมใช้งาน"
         )
 
         print(
@@ -1694,7 +1659,7 @@ class BaselinePage(QWidget):
         pixmap = pixmap.scaled(
             self.preview_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
+            Qt.TransformationMode.FastTransformation
         )
 
         self.preview_label.setPixmap(

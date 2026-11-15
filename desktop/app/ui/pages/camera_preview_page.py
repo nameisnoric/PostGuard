@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.detection_service import DetectionService
+from app.ui.utils.camera_display import camera_display_name
 from app.ui.utils.preview_sizing import fit_preview_label
 
 
@@ -285,8 +286,8 @@ class CameraPreviewPage(QWidget):
         height = camera.get("resolution_height")
 
         self.camera_info_label.setText(
-            f"อุปกรณ์: {device_index}\n"
-            f"ความละเอียด: {width}x{height}"
+            f"กล้องที่เลือก: {camera_display_name(camera)}\n"
+            f"ความละเอียด: {width}×{height}"
         )
 
         if device_index is None:
@@ -346,6 +347,10 @@ class CameraPreviewPage(QWidget):
         self.capture.set(
             cv2.CAP_PROP_FPS,
             30,
+        )
+        self.capture.set(
+            cv2.CAP_PROP_BUFFERSIZE,
+            1,
         )
 
         try:
@@ -481,7 +486,7 @@ class CameraPreviewPage(QWidget):
         pixmap = pixmap.scaled(
             self.preview_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+            Qt.TransformationMode.FastTransformation,
         )
 
         self.preview_label.setPixmap(pixmap)

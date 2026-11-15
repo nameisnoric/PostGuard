@@ -54,6 +54,10 @@ from app.services.alert_history_service import (
     validate_session_id,
 )
 from app.ui.theme import APP_QSS
+from app.ui.utils.session_numbering import (
+    build_session_number_map,
+    session_number_text,
+)
 
 
 class AlertHistoryDialog(QDialog):
@@ -97,6 +101,7 @@ class AlertHistoryDialog(QDialog):
         self.initial_session_id = (
             session_id
         )
+        self.session_numbers = {}
 
         # ==================================================
         # ROOT LAYOUT
@@ -138,7 +143,7 @@ class AlertHistoryDialog(QDialog):
         # ==================================================
 
         self.description = QLabel(
-            "ประวัติการแจ้งเตือนของเซสชัน ทั้งการแจ้งเตือนท่าทางและ "
+            "ประวัติการแจ้งเตือนของแต่ละครั้งที่ตรวจจับ ทั้งการแจ้งเตือนท่าทางและ "
             "การแจ้งเตือนการกระพริบตา โดยการแจ้งเตือนการกระพริบตาจะแยกจากเหตุการณ์ความเสี่ยงด้านท่าทาง"
         )
         self.description.setWordWrap(
@@ -156,7 +161,7 @@ class AlertHistoryDialog(QDialog):
         controls = QHBoxLayout()
 
         session_label = QLabel(
-            "เซสชัน:"
+            "ครั้งที่ตรวจจับ:"
         )
 
         controls.addWidget(
@@ -258,7 +263,7 @@ class AlertHistoryDialog(QDialog):
         root_layout.addLayout(summary_grid)
 
         self.stats_label = QLabel(
-            "เลือกเซสชันเพื่อโหลดประวัติการแจ้งเตือน"
+            "เลือกครั้งที่ตรวจจับเพื่อดูประวัติการแจ้งเตือน"
         )
         self.stats_label.setProperty("role", "cardSubtitle")
         self.stats_label.setWordWrap(True)
@@ -324,7 +329,7 @@ class AlertHistoryDialog(QDialog):
         # ==================================================
 
         self.empty_label = QLabel(
-            "เซสชันนี้ไม่มีการแจ้งเตือน"
+            "การตรวจจับครั้งนี้ไม่มีการแจ้งเตือน"
         )
         self.empty_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -348,19 +353,16 @@ class AlertHistoryDialog(QDialog):
 
         self.table = QTableWidget(
             0,
-            8,
+            5,
         )
 
         self.table.setHorizontalHeaderLabels(
             [
-                "รหัสการแจ้งเตือน",
-                "รหัสเหตุการณ์ความเสี่ยง",
-                "ประเภท",
-                "ระดับความเสี่ยง",
-                "ผลการตัดสินใจ",
-                "เหตุผล",
-                "เวลาที่แจ้งเตือน",
-                "เวลาที่สร้าง",
+                "ลำดับ",
+                "หมวด",
+                "การแจ้งเตือน",
+                "ระดับ",
+                "เวลา",
             ]
         )
 
@@ -397,24 +399,19 @@ class AlertHistoryDialog(QDialog):
             self.table.horizontalHeader()
         )
 
-        header.setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
-        )
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
-        # Reason can contain longer text.
-        header.setSectionResizeMode(
-            5,
-            QHeaderView.ResizeMode.Stretch,
-        )
-
-        technical_title = QLabel("รายละเอียดเชิงเทคนิค")
+        technical_title = QLabel("รายการแจ้งเตือน")
         technical_title.setStyleSheet(
             "font-size:16px;font-weight:700;color:#334155;"
         )
 
         technical_note = QLabel(
-            "ข้อมูลด้านล่างเป็นรายละเอียดที่ระบบบันทึกไว้ "
-            "สำหรับตรวจสอบย้อนหลัง"
+            "เรียงตามลำดับที่ระบบแจ้งผู้ใช้ในการตรวจจับครั้งนี้"
         )
         technical_note.setProperty(
             "role",
@@ -517,6 +514,8 @@ class AlertHistoryDialog(QDialog):
                     "ข้อมูลเซสชันที่ได้รับไม่ถูกต้อง"
                 )
 
+            self.session_numbers = build_session_number_map(sessions)
+
             self.session_selector.blockSignals(
                 True
             )
@@ -545,13 +544,6 @@ class AlertHistoryDialog(QDialog):
                 ):
                     continue
 
-                status = (
-                    session.get(
-                        "status",
-                        "--",
-                    )
-                )
-
                 started = (
                     local_datetime(
                         session.get(
@@ -562,9 +554,9 @@ class AlertHistoryDialog(QDialog):
 
                 self.session_selector.addItem(
                     (
-                        f"#{session_id} | "
-                        f"{started} | "
-                        f"{status}"
+                        "ครั้งที่ "
+                        f"{session_number_text(session_id, self.session_numbers)}"
+                        f" • {started}"
                     ),
                     session_id,
                 )
@@ -606,7 +598,7 @@ class AlertHistoryDialog(QDialog):
             self.table.hide()
 
             self.stats_label.setText(
-                "ไม่สามารถโหลดรายการเซสชันได้"
+                "ไม่สามารถโหลดรายการครั้งที่ตรวจจับได้"
             )
 
             self.empty_label.setText(
@@ -1036,7 +1028,7 @@ class AlertHistoryDialog(QDialog):
         if not has_notifications:
 
             self.empty_label.setText(
-                "เซสชันนี้ไม่มีการแจ้งเตือนจากระบบ"
+                "การตรวจจับครั้งนี้ไม่มีการแจ้งเตือนจากระบบ"
             )
 
             self.table.setRowCount(
@@ -1063,20 +1055,6 @@ class AlertHistoryDialog(QDialog):
             ):
                 continue
 
-            notification_id = (
-                notification.get(
-                    "notification_id",
-                    "--",
-                )
-            )
-
-            risk_event_id = (
-                notification.get(
-                    "risk_event_id",
-                    "--",
-                )
-            )
-
             alert_type = str(
                 notification.get(
                     "alert_type",
@@ -1090,28 +1068,12 @@ class AlertHistoryDialog(QDialog):
                 )
             )
 
-            if risk_level is None:
-                risk_level_text = "--"
-            else:
-                risk_level_text = str(
-                    risk_level
-                ).upper()
+            risk_level_text = self._risk_level_text(risk_level)
 
-            decision = (
-                notification.get(
-                    "decision",
-                    "--",
-                )
-            )
-
-            reason = (
-                notification.get(
-                    "reason"
-                )
-            )
-
-            if not reason:
-                reason = "--"
+            category = str(
+                notification.get("alert_category", "POSTURE")
+            ).upper()
+            category_text = "สายตา" if category == "EYE" else "ท่าทาง"
 
             emitted_at = (
                 local_datetime(
@@ -1121,23 +1083,12 @@ class AlertHistoryDialog(QDialog):
                 )
             )
 
-            created_at = (
-                local_datetime(
-                    notification.get(
-                        "created_at"
-                    )
-                )
-            )
-
             values = [
-                notification_id,
-                risk_event_id,
-                alert_type,
+                row + 1,
+                category_text,
+                self._alert_type_text(alert_type),
                 risk_level_text,
-                decision,
-                reason,
                 emitted_at,
-                created_at,
             ]
 
             for column, value in enumerate(
@@ -1158,8 +1109,30 @@ class AlertHistoryDialog(QDialog):
                     item,
                 )
 
-        # Keep long Reason column readable.
         self.table.resizeRowsToContents()
+
+    @staticmethod
+    def _alert_type_text(alert_type):
+        return {
+            "FIRST": "แจ้งครั้งแรก",
+            "REPEAT": "แจ้งซ้ำ",
+            "ESCALATION": "ความเสี่ยงเพิ่มขึ้น",
+            "RESOLUTION": "กลับสู่ปกติ",
+            "RESOLVED": "กลับสู่ปกติ",
+        }.get(str(alert_type).upper(), "การแจ้งเตือน")
+
+    @staticmethod
+    def _risk_level_text(risk_level):
+        if risk_level is None:
+            return "--"
+        return {
+            "LOW": "ต่ำ",
+            "MODERATE": "ปานกลาง",
+            "MEDIUM": "ปานกลาง",
+            "HIGH": "สูง",
+            "NONE": "ปกติ",
+            "EYE": "สายตา",
+        }.get(str(risk_level).upper(), "--")
 
     # ======================================================
     # END CLASS

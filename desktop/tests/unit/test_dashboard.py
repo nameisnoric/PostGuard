@@ -456,6 +456,7 @@ class DashboardTests(
             dialog_class.assert_called_once_with(
                 session=session,
                 saved_summary=summary,
+                session_number=1,
                 parent=self.page,
             )
 

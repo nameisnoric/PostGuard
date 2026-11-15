@@ -47,7 +47,11 @@ def _metric_tile(title, icon, value_label):
         "border-radius: 12px;"
         "}"
     )
-    tile.setMinimumHeight(108)
+    tile.setFixedHeight(108)
+    tile.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Fixed,
+    )
 
     layout = QVBoxLayout(tile)
     layout.setContentsMargins(12, 10, 12, 10)
@@ -55,7 +59,7 @@ def _metric_tile(title, icon, value_label):
 
     heading = QLabel(f"{icon}  {title}")
     heading.setStyleSheet(
-        "font-size: 12px;"
+        "font-size: 11px;"
         "font-weight: 700;"
         "color: #475569;"
         "border: none;"
@@ -66,10 +70,14 @@ def _metric_tile(title, icon, value_label):
     )
 
     value_label.setStyleSheet(
-        "font-size: 22px;"
+        "font-size: 19px;"
         "font-weight: 800;"
         "color: #0f172a;"
         "border: none;"
+    )
+    value_label.setSizePolicy(
+        QSizePolicy.Policy.Ignored,
+        QSizePolicy.Policy.Preferred,
     )
 
     layout.addWidget(heading)
@@ -100,7 +108,7 @@ class MonitoringPostureCard(QFrame):
 
         self.title_label = QLabel("🧍  ท่าทาง")
         self.title_label.setStyleSheet(
-            "font-size: 20px;"
+            "font-size: 19px;"
             "font-weight: 800;"
             "color: #0f172a;"
         )
@@ -152,6 +160,10 @@ class MonitoringPostureCard(QFrame):
             _metric_tile("ระยะห่างหน้าจอ", "📏", self.screen_distance_label),
             0, 3,
         )
+
+        for column in range(4):
+            grid.setColumnStretch(column, 1)
+            grid.setColumnMinimumWidth(column, 0)
 
         root.addLayout(grid)
 

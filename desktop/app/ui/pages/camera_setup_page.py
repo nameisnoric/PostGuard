@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.camera_service import CameraService
+from app.ui.utils.camera_display import camera_display_name
 
 
 class CameraSetupPage(QWidget):
@@ -140,7 +141,11 @@ class CameraSetupPage(QWidget):
             self.scan_button.setEnabled(True)
             self.scan_button.setText("สแกนอีกครั้ง")
 
-        self.detected_cameras = cameras
+        self.detected_cameras = []
+        for display_number, camera in enumerate(cameras, start=1):
+            prepared_camera = camera.copy()
+            prepared_camera["display_number"] = display_number
+            self.detected_cameras.append(prepared_camera)
         if not cameras:
             self.status_label.setText(
                 "ไม่พบกล้องที่พร้อมใช้งาน โปรดตรวจสอบสิทธิ์การใช้กล้องใน Windows "
@@ -148,13 +153,11 @@ class CameraSetupPage(QWidget):
             )
             return
 
-        for camera in cameras:
-            name = camera.get("camera_name", "กล้องไม่ทราบชื่อ")
-            device_index = camera.get("device_index", "--")
+        for camera in self.detected_cameras:
             width = camera.get("resolution_width", "--")
             height = camera.get("resolution_height", "--")
             self.camera_list.addItem(
-                f"{name} · อุปกรณ์ {device_index} · {width}×{height}"
+                f"{camera_display_name(camera)} · ความละเอียด {width}×{height}"
             )
 
         count = len(cameras)

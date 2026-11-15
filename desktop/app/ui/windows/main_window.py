@@ -623,8 +623,8 @@ class MainWindow(QMainWindow):
         if monitor.network_stop_pending:
 
             status = (
-                f"เซสชัน {monitor.session_id}: "
-                "กำลังรอสิ้นสุด | การเชื่อมต่อเครือข่ายขาดหาย"
+                "การตรวจจับ: กำลังรอสิ้นสุด | "
+                "การเชื่อมต่อเครือข่ายขาดหาย"
             )
 
         elif monitor.is_stopping:
@@ -667,9 +667,7 @@ class MainWindow(QMainWindow):
                 state = "กำลังตรวจจับ (เปิดกล้อง)"
 
             status = (
-                f"เซสชัน "
-                f"{monitor.session_id}: "
-                f"{state}"
+                f"การตรวจจับ: {state}"
             )
 
         else:
@@ -730,24 +728,24 @@ class MainWindow(QMainWindow):
             sessions = find_unclosed_sessions()
             for session in sessions:
                 answer = QMessageBox.question(
-                    self, 'พบเซสชันที่ยังไม่จบ',
-                    f"เซสชัน {session['session_id']} ยังอยู่ในสถานะ {session['status']}.\n"
-                    "เซสชันนี้อาจกำลังทำงานอยู่บนอุปกรณ์อื่น\n\n"
-                    "ต้องการกำหนดเซสชันนี้เป็นถูกขัดจังหวะ เพื่อเริ่มเซสชันใหม่หรือไม่?\n"
+                    self, 'พบการตรวจจับครั้งก่อนที่ยังไม่จบ',
+                    "การตรวจจับครั้งก่อนอาจยังทำงานอยู่บนอุปกรณ์อื่น\n\n"
+                    "ต้องการกำหนดว่าการตรวจจับครั้งก่อนถูกขัดจังหวะ "
+                    "เพื่อเริ่มการตรวจจับครั้งใหม่หรือไม่?\n"
                     "ข้อมูลที่บันทึกไว้เดิมจะยังคงอยู่ แต่เวลาสิ้นสุดจริงและสถิติการตรวจจับ "
                     "ที่สูญหายจะไม่สามารถกู้คืนได้ และระบบจะไม่สร้างข้อมูลสรุปขึ้นมาแทน",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )
                 if answer != QMessageBox.StandardButton.Yes:
-                    self.monitoring_status_label.setText("เซสชันก่อนหน้ายังไม่ได้รับการแก้ไข กรุณาลองเริ่มการตรวจจับอีกครั้ง")
+                    self.monitoring_status_label.setText("การตรวจจับครั้งก่อนยังไม่ได้รับการแก้ไข กรุณาลองเริ่มอีกครั้ง")
                     return False
                 interrupt_previous_session(session["session_id"])
             self.update_monitoring_controls()
             return True
         except (requests.RequestException, RuntimeError, ValueError) as error:
-            self.monitoring_status_label.setText("ตรวจสอบเซสชันไม่สำเร็จ กรุณาลองเริ่มการตรวจจับอีกครั้ง")
-            QMessageBox.warning(self, 'การกู้คืนเซสชัน', str(error))
+            self.monitoring_status_label.setText("ตรวจสอบการตรวจจับครั้งก่อนไม่สำเร็จ กรุณาลองเริ่มอีกครั้ง")
+            QMessageBox.warning(self, 'กู้คืนการตรวจจับครั้งก่อน', str(error))
             return False
         finally:
             self._recovery_in_progress = False

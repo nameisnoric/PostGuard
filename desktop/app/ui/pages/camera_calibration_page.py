@@ -88,6 +88,7 @@ from app.services.camera_setup.roll_correction import (
     level_frame,
     prepare_frame,
 )
+from app.ui.utils.camera_display import camera_display_name
 
 
 # ============================================================
@@ -815,9 +816,8 @@ class CameraCalibrationPage(
         self._reset_all()
 
         self.camera_label.setText(
-            f"กล้อง: "
-            f"{camera.get('camera_name', 'ไม่ทราบ')} | "
-            f"{camera.get('resolution_width', '--')}x"
+            f"กล้องที่เลือก: {camera_display_name(camera)} | "
+            f"{camera.get('resolution_width', '--')}×"
             f"{camera.get('resolution_height', '--')}"
         )
 
@@ -1756,7 +1756,7 @@ class CameraCalibrationPage(
             ).scaled(
                 self.preview_label.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+                Qt.TransformationMode.FastTransformation,
             )
         )
 
