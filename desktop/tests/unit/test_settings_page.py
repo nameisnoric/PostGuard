@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 from app.services.api_client import APIClient
 from app.ui.dialogs.account_deletion_dialog import AccountDeletionConfirmationDialog
 from app.ui.pages.settings_page import SettingsPage
+from app.ui.theme import APP_QSS
 
 
 def response(data, status=200):
@@ -40,6 +41,14 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(self.page.volume_slider.value(), 35)
         self.assertEqual(self.page.reminder_interval.currentData(), 10)
         updated.assert_called_once_with(self.settings)
+
+    def test_checkbox_text_has_readable_light_theme_colors(self):
+        self.assertIn("QCheckBox {", APP_QSS)
+        self.assertIn("QCheckBox:disabled {", APP_QSS)
+        self.assertIn("color: #0f172a;", APP_QSS)
+        self.assertIn("color: #64748b;", APP_QSS)
+        self.assertTrue(self.page.notifications_enabled.text())
+        self.assertTrue(self.page.sound_enabled.text())
 
     def test_save_persists_complete_payload(self):
         self.page.notifications_enabled.setChecked(True)
